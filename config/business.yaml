@@ -1,0 +1,27 @@
+# Configuración del negocio — Generado por AgentKit
+negocio:
+  nombre: "LiTek"
+  descripcion: >
+    LiTek es una imprenta visual y empresa de producción gráfica en Campeche, México.
+    Se especializa en resolver necesidades de comunicación visual, publicidad física e imagen
+    comercial mediante impresión, rotulación, instalación y producción gráfica personalizada.
+    Ayuda a negocios, instituciones y clientes particulares a verse profesionales, llamar la
+    atención y comunicar mejor sus productos, servicios, eventos o promociones.
+    Servicios: lonas, gran formato, letras 3D, vinil adhesivo, etiquetas, corte láser,
+    sublimación, serigrafía y corte router.
+  horario: "Lunes a Viernes 9:00–19:00, Sábados 9:00–16:00. Domingos cerrado."
+  ubicacion: "Av. Colosio 414, Col. Pensiones, CP 24040, Campeche, México"
+  telefono: "+52 198 455 7696 4"
+
+agente:
+  nombre: "Clio"
+  tono: "Amigable y casual con enfoque en ventas. Cercana, directa, sin rodeos. Inspira confianza y cierra conversaciones."
+  casos_de_uso:
+    - "Responder preguntas frecuentes sobre precios y tiempos de entrega"
+    - "Calificar leads y convertirlos en ventas"
+    - "Tomar datos del pedido y generar cotizaciones"
+
+metadata:
+  creado: "2026-05-01"
+  version: "1.0"
+  proveedor_whatsapp: "whapi"
