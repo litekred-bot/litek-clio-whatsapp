@@ -90,6 +90,7 @@ async def webhook_handler(request: Request):
 
             # Obtener historial ANTES de guardar el mensaje actual
             historial = await obtener_historial(msg.telefono)
+            es_primer_mensaje = len(historial) == 0
 
             # Generar respuesta con Claude (con soporte de imagen si aplica)
             respuesta = await generar_respuesta(
@@ -132,6 +133,11 @@ async def webhook_handler(request: Request):
             if sticker_nombre and hasattr(proveedor, 'enviar_sticker'):
                 await proveedor.enviar_sticker(msg.telefono, sticker_nombre)
                 logger.info(f"Sticker enviado: {sticker_nombre}")
+
+            # Sticker de bienvenida — primer mensaje del cliente
+            elif es_primer_mensaje and hasattr(proveedor, 'enviar_sticker'):
+                await proveedor.enviar_sticker(msg.telefono, "calidad")
+                logger.info("Sticker de bienvenida enviado: calidad")
 
             logger.info(f"Respuesta a {msg.telefono}: {respuesta}")
 
