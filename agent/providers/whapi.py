@@ -127,14 +127,19 @@ class ProveedorWhapi(ProveedorWhatsApp):
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json",
         }
+        # Intentar diferentes formatos que acepta Whapi
+        formatos = [
+            {"to": telefono, "sticker": {"url": url_sticker}},
+            {"to": telefono, "sticker": {"link": url_sticker}},
+            {"to": telefono, "media": url_sticker, "type": "sticker"},
+        ]
         async with httpx.AsyncClient() as client:
-            r = await client.post(
-                self.url_sticker,
-                json={"to": telefono, "sticker": {"url": url_sticker}},
-                headers=headers,
-            )
-            logger.info(f"Sticker '{nombre}' a {telefono}: {r.status_code}")
-            return r.status_code == 200
+            for payload in formatos:
+                r = await client.post(self.url_sticker, json=payload, headers=headers)
+                logger.info(f"Sticker '{nombre}' formato {list(payload.keys())}: {r.status_code} — {r.text[:100]}")
+                if r.status_code == 200 or r.status_code == 201:
+                    return True
+        return False
 
     async def enviar_mensaje(self, telefono: str, mensaje: str) -> bool:
         """Envía mensaje via Whapi.cloud."""
