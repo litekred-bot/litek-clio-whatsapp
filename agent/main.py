@@ -104,19 +104,31 @@ async def webhook_handler(request: Request):
             await guardar_mensaje(msg.telefono, "user", msg.texto)
             await guardar_mensaje(msg.telefono, "assistant", respuesta)
 
-            # Detectar si la respuesta incluye un comando de sticker [STICKER:nombre]
+            # Detectar comando de sticker explícito [STICKER:nombre]
+            import re
             sticker_nombre = None
             if "[STICKER:" in respuesta:
-                import re
                 match = re.search(r'\[STICKER:(\w+)\]', respuesta)
                 if match:
                     sticker_nombre = match.group(1)
                     respuesta = re.sub(r'\[STICKER:\w+\]', '', respuesta).strip()
 
+            # Auto-detectar despedida y asignar sticker automáticamente
+            if not sticker_nombre and hasattr(proveedor, 'enviar_sticker'):
+                FRASES_CIERRE = [
+                    "aquí estaremos", "con gusto te cotizamos", "hasta luego",
+                    "que tengas", "buen día", "buenas noches", "buenas tardes",
+                    "nos vemos", "cuídate", "cualquier duda aquí", "estamos para",
+                    "cuando gustes regresa", "con mucho gusto", "fue un placer",
+                ]
+                resp_lower = respuesta.lower()
+                if any(frase in resp_lower for frase in FRASES_CIERRE):
+                    sticker_nombre = "logo"
+
             # Enviar respuesta por WhatsApp
             await proveedor.enviar_mensaje(msg.telefono, respuesta)
 
-            # Enviar sticker si Clio lo indicó
+            # Enviar sticker si aplica
             if sticker_nombre and hasattr(proveedor, 'enviar_sticker'):
                 await proveedor.enviar_sticker(msg.telefono, sticker_nombre)
                 logger.info(f"Sticker enviado: {sticker_nombre}")
