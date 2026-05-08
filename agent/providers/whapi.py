@@ -60,6 +60,14 @@ class ProveedorWhapi(ProveedorWhatsApp):
                 imagen_data = msg.get("image", {})
                 media_url = imagen_data.get("link", "")
                 caption = imagen_data.get("caption", "")
+                # Log para diagnóstico
+                logger.info(f"Imagen recibida — URL: {media_url!r} | caption: {caption!r} | datos: {imagen_data}")
+                # Si no hay link, construir URL con el ID del media
+                if not media_url:
+                    media_id = imagen_data.get("id", "")
+                    if media_id:
+                        media_url = f"https://gate.whapi.cloud/media/{media_id}"
+                        logger.info(f"URL construida desde ID: {media_url}")
                 mensajes.append(MensajeEntrante(
                     telefono=telefono,
                     texto=caption or "[El cliente envió una imagen]",
