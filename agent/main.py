@@ -12,6 +12,7 @@ from agent.brain import generar_respuesta
 from agent.memory import inicializar_db, guardar_mensaje, obtener_historial
 from agent.providers import obtener_proveedor
 from agent.transcription import transcribir_audio
+from agent.document_reader import leer_documento
 
 load_dotenv()
 
@@ -70,10 +71,17 @@ async def webhook_handler(request: Request):
                 continue
 
             # Si es nota de voz, transcribir primero
-            if msg.tipo == "audio" and msg.media_url:
+            if msg.tipo in ("audio", "voice", "ptt") and msg.media_url:
                 logger.info(f"Nota de voz de {msg.telefono} — transcribiendo...")
                 msg.texto = await transcribir_audio(msg.media_url, proveedor.token)
                 logger.info(f"Transcripción: {msg.texto}")
+
+            # Si es documento, extraer texto
+            elif msg.tipo == "document" and msg.media_url:
+                logger.info(f"Documento de {msg.telefono} — extrayendo texto...")
+                texto_doc = await leer_documento(msg.media_url, proveedor.token, msg.texto)
+                msg.texto = texto_doc
+                msg.tipo = "text"  # Procesar como texto normal con el contenido extraído
 
             if not msg.texto:
                 continue

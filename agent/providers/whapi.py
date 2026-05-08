@@ -77,6 +77,37 @@ class ProveedorWhapi(ProveedorWhatsApp):
                     media_url=media_url,
                 ))
 
+            elif tipo_msg == "document":
+                # Documento (PDF, Word, etc.)
+                doc_data = msg.get("document", {})
+                media_url = doc_data.get("link", "")
+                filename = doc_data.get("filename", "documento")
+                mime_type = doc_data.get("mime_type", "")
+                caption = doc_data.get("caption", "")
+                logger.info(f"Documento recibido — archivo: {filename} | URL: {media_url!r} | tipo: {mime_type}")
+                if not media_url:
+                    media_id = doc_data.get("id", "")
+                    if media_id:
+                        media_url = f"https://gate.whapi.cloud/media/{media_id}"
+                mensajes.append(MensajeEntrante(
+                    telefono=telefono,
+                    texto=caption or f"[El cliente envió un documento: {filename}]",
+                    mensaje_id=mensaje_id,
+                    es_propio=es_propio,
+                    tipo="document",
+                    media_url=media_url,
+                ))
+
+            elif tipo_msg == "sticker":
+                # Sticker — responder amigablemente
+                mensajes.append(MensajeEntrante(
+                    telefono=telefono,
+                    texto="[El cliente envió un sticker]",
+                    mensaje_id=mensaje_id,
+                    es_propio=es_propio,
+                    tipo="sticker",
+                ))
+
         return mensajes
 
     async def enviar_mensaje(self, telefono: str, mensaje: str) -> bool:
