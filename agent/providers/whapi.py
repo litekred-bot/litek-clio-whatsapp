@@ -18,16 +18,57 @@ class ProveedorWhapi(ProveedorWhatsApp):
         self.url_envio = "https://gate.whapi.cloud/messages/text"
 
     async def parsear_webhook(self, request: Request) -> list[MensajeEntrante]:
-        """Parsea el payload de Whapi.cloud."""
+        """Parsea el payload de Whapi.cloud — soporta texto, audio e imagen."""
         body = await request.json()
         mensajes = []
         for msg in body.get("messages", []):
-            mensajes.append(MensajeEntrante(
-                telefono=msg.get("chat_id", ""),
-                texto=msg.get("text", {}).get("body", ""),
-                mensaje_id=msg.get("id", ""),
-                es_propio=msg.get("from_me", False),
-            ))
+            tipo_msg = msg.get("type", "text")
+            telefono = msg.get("chat_id", "")
+            mensaje_id = msg.get("id", "")
+            es_propio = msg.get("from_me", False)
+
+            if tipo_msg == "text":
+                # Mensaje de texto normal
+                mensajes.append(MensajeEntrante(
+                    telefono=telefono,
+                    texto=msg.get("text", {}).get("body", ""),
+                    mensaje_id=mensaje_id,
+                    es_propio=es_propio,
+                    tipo="text",
+                ))
+
+            elif tipo_msg in ("audio", "voice", "ptt"):
+                # Nota de voz — extraer URL del media
+                audio_data = msg.get("audio") or msg.get("voice") or msg.get("ptt") or {}
+                media_url = audio_data.get("link", "")
+                if not media_url:
+                    # Intentar construir URL desde el ID del media
+                    media_id = audio_data.get("id", "")
+                    media_url = f"https://gate.whapi.cloud/media/{media_id}"
+
+                mensajes.append(MensajeEntrante(
+                    telefono=telefono,
+                    texto="",  # Se llenará con la transcripción en main.py
+                    mensaje_id=mensaje_id,
+                    es_propio=es_propio,
+                    tipo="audio",
+                    media_url=media_url,
+                ))
+
+            elif tipo_msg == "image":
+                # Imagen — extraer URL
+                imagen_data = msg.get("image", {})
+                media_url = imagen_data.get("link", "")
+                caption = imagen_data.get("caption", "")
+                mensajes.append(MensajeEntrante(
+                    telefono=telefono,
+                    texto=caption or "[El cliente envió una imagen]",
+                    mensaje_id=mensaje_id,
+                    es_propio=es_propio,
+                    tipo="image",
+                    media_url=media_url,
+                ))
+
         return mensajes
 
     async def enviar_mensaje(self, telefono: str, mensaje: str) -> bool:

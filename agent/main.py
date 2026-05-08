@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from agent.brain import generar_respuesta
 from agent.memory import inicializar_db, guardar_mensaje, obtener_historial
 from agent.providers import obtener_proveedor
+from agent.transcription import transcribir_audio
 
 load_dotenv()
 
@@ -65,10 +66,19 @@ async def webhook_handler(request: Request):
         mensajes = await proveedor.parsear_webhook(request)
 
         for msg in mensajes:
-            if msg.es_propio or not msg.texto:
+            if msg.es_propio:
                 continue
 
-            logger.info(f"Mensaje de {msg.telefono}: {msg.texto}")
+            # Si es nota de voz, transcribir primero
+            if msg.tipo == "audio" and msg.media_url:
+                logger.info(f"Nota de voz de {msg.telefono} — transcribiendo...")
+                msg.texto = await transcribir_audio(msg.media_url, proveedor.token)
+                logger.info(f"Transcripción: {msg.texto}")
+
+            if not msg.texto:
+                continue
+
+            logger.info(f"Mensaje de {msg.telefono} [{msg.tipo}]: {msg.texto}")
 
             # Obtener historial ANTES de guardar el mensaje actual
             historial = await obtener_historial(msg.telefono)
