@@ -13,9 +13,17 @@ logger = logging.getLogger("agentkit")
 class ProveedorWhapi(ProveedorWhatsApp):
     """Proveedor de WhatsApp usando Whapi.cloud (REST API simple)."""
 
+    # URLs de stickers en GitHub (raw)
+    STICKERS = {
+        "calidad": "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/sticker_calidad.webp",
+        "logo":    "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/sticker_logo.webp",
+        "lona":    "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/sticker_lona.webp",
+    }
+
     def __init__(self):
         self.token = os.getenv("WHAPI_TOKEN")
         self.url_envio = "https://gate.whapi.cloud/messages/text"
+        self.url_sticker = "https://gate.whapi.cloud/messages/sticker"
 
     async def parsear_webhook(self, request: Request) -> list[MensajeEntrante]:
         """Parsea el payload de Whapi.cloud — soporta texto, audio e imagen."""
@@ -109,6 +117,24 @@ class ProveedorWhapi(ProveedorWhatsApp):
                 ))
 
         return mensajes
+
+    async def enviar_sticker(self, telefono: str, nombre: str = "calidad") -> bool:
+        """Envía un sticker de LiTek. nombre: 'calidad' | 'logo' | 'lona'"""
+        if not self.token:
+            return False
+        url_sticker = self.STICKERS.get(nombre, self.STICKERS["calidad"])
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Content-Type": "application/json",
+        }
+        async with httpx.AsyncClient() as client:
+            r = await client.post(
+                self.url_sticker,
+                json={"to": telefono, "sticker": {"url": url_sticker}},
+                headers=headers,
+            )
+            logger.info(f"Sticker '{nombre}' a {telefono}: {r.status_code}")
+            return r.status_code == 200
 
     async def enviar_mensaje(self, telefono: str, mensaje: str) -> bool:
         """Envía mensaje via Whapi.cloud."""

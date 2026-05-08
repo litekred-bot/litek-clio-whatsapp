@@ -104,8 +104,22 @@ async def webhook_handler(request: Request):
             await guardar_mensaje(msg.telefono, "user", msg.texto)
             await guardar_mensaje(msg.telefono, "assistant", respuesta)
 
+            # Detectar si la respuesta incluye un comando de sticker [STICKER:nombre]
+            sticker_nombre = None
+            if "[STICKER:" in respuesta:
+                import re
+                match = re.search(r'\[STICKER:(\w+)\]', respuesta)
+                if match:
+                    sticker_nombre = match.group(1)
+                    respuesta = re.sub(r'\[STICKER:\w+\]', '', respuesta).strip()
+
             # Enviar respuesta por WhatsApp
             await proveedor.enviar_mensaje(msg.telefono, respuesta)
+
+            # Enviar sticker si Clio lo indicó
+            if sticker_nombre and hasattr(proveedor, 'enviar_sticker'):
+                await proveedor.enviar_sticker(msg.telefono, sticker_nombre)
+                logger.info(f"Sticker enviado: {sticker_nombre}")
 
             logger.info(f"Respuesta a {msg.telefono}: {respuesta}")
 
