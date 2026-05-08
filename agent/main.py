@@ -83,8 +83,14 @@ async def webhook_handler(request: Request):
             # Obtener historial ANTES de guardar el mensaje actual
             historial = await obtener_historial(msg.telefono)
 
-            # Generar respuesta con Claude
-            respuesta = await generar_respuesta(msg.texto, historial)
+            # Generar respuesta con Claude (con soporte de imagen si aplica)
+            respuesta = await generar_respuesta(
+                msg.texto,
+                historial,
+                media_url=msg.media_url,
+                whapi_token=proveedor.token,
+                tipo=msg.tipo,
+            )
 
             # Guardar usuario y respuesta en memoria
             await guardar_mensaje(msg.telefono, "user", msg.texto)
