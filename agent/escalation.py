@@ -67,7 +67,7 @@ async def enviar_alerta_asesor(
         async with httpx.AsyncClient(timeout=15.0) as client:
             r = await client.post(
                 "https://gate.whapi.cloud/messages/text",
-                json={"to": numero_asesor, "body": mensaje},
+                json={"to": f"{numero_asesor}@s.whatsapp.net", "body": mensaje},
                 headers=headers,
             )
             if r.status_code == 200:
