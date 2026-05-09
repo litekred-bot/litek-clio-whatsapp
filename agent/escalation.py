@@ -14,10 +14,10 @@ logger = logging.getLogger("agentkit")
 
 # Números de cada área (formato internacional sin +)
 AREAS = {
-    "director":      {"numero": "529812710000",  "nombre": "Director"},
-    "asesor":        {"numero": "529818290272",  "nombre": "Asesor General"},
-    "letreros":      {"numero": "529811670283",  "nombre": "Asesor Letreros/Láser/Offset/Róuter"},
-    "contabilidad":  {"numero": "529811388508",  "nombre": "Contabilidad"},
+    "director":      {"numero": "529812710000",  "nombre": "Chino LiTek (Fco Sánchez)"},
+    "asesor":        {"numero": "529818290272",  "nombre": "Anna"},
+    "letreros":      {"numero": "529811670283",  "nombre": "Brayan"},
+    "contabilidad":  {"numero": "529811388508",  "nombre": "Tere"},
 }
 
 
