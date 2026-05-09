@@ -13,6 +13,7 @@ from agent.memory import inicializar_db, guardar_mensaje, obtener_historial
 from agent.providers import obtener_proveedor
 from agent.transcription import transcribir_audio
 from agent.document_reader import leer_documento
+from agent.escalation import enviar_alerta_asesor, AREAS
 
 load_dotenv()
 
@@ -105,8 +106,17 @@ async def webhook_handler(request: Request):
             await guardar_mensaje(msg.telefono, "user", msg.texto)
             await guardar_mensaje(msg.telefono, "assistant", respuesta)
 
-            # Detectar comando de sticker explícito [STICKER:nombre]
             import re
+
+            # Detectar escalación [ESCALAR:area]
+            area_escalar = None
+            if "[ESCALAR:" in respuesta:
+                match = re.search(r'\[ESCALAR:(\w+)\]', respuesta)
+                if match:
+                    area_escalar = match.group(1)
+                    respuesta = re.sub(r'\[ESCALAR:\w+\]', '', respuesta).strip()
+
+            # Detectar comando de sticker explícito [STICKER:nombre]
             sticker_nombre = None
             if "[STICKER:" in respuesta:
                 match = re.search(r'\[STICKER:(\w+)\]', respuesta)
@@ -140,6 +150,16 @@ async def webhook_handler(request: Request):
                 logger.info("Sticker de bienvenida enviado: calidad")
 
             logger.info(f"Respuesta a {msg.telefono}: {respuesta}")
+
+            # Enviar alerta al asesor si hay escalación
+            if area_escalar:
+                await enviar_alerta_asesor(
+                    area=area_escalar,
+                    telefono_cliente=msg.telefono,
+                    resumen=msg.texto[:200],
+                    whapi_token=proveedor.token,
+                )
+                logger.info(f"Escalación enviada a área: {area_escalar}")
 
         return {"status": "ok"}
 
