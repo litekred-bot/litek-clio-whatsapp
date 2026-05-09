@@ -12,12 +12,15 @@ import os
 
 logger = logging.getLogger("agentkit")
 
-# Números de cada área (formato internacional sin +)
+# Grupo de alertas del equipo LiTek (Aletas clio)
+GRUPO_ALERTAS = "120363425558631008@g.us"
+
+# Responsable de cada área (para mencionar en el mensaje del grupo)
 AREAS = {
-    "director":      {"numero": "529812710000",  "nombre": "Chino LiTek (Fco Sánchez)"},
-    "asesor":        {"numero": "529818290272",  "nombre": "Anna"},
-    "letreros":      {"numero": "529811670283",  "nombre": "Brayan"},
-    "contabilidad":  {"numero": "529811388508",  "nombre": "Tere"},
+    "director":      {"nombre": "Chino LiTek (Fco Sánchez)"},
+    "asesor":        {"nombre": "Anna"},
+    "letreros":      {"nombre": "Brayan"},
+    "contabilidad":  {"nombre": "Tere"},
 }
 
 
@@ -28,7 +31,7 @@ async def enviar_alerta_asesor(
     whapi_token: str,
 ) -> bool:
     """
-    Envía un mensaje de alerta al asesor del área indicada.
+    Envía un mensaje de alerta al grupo del equipo LiTek.
 
     Args:
         area: 'director' | 'asesor' | 'letreros' | 'contabilidad'
@@ -43,16 +46,12 @@ async def enviar_alerta_asesor(
         logger.warning(f"Área desconocida: {area}")
         return False
 
-    area_info = AREAS[area]
-    numero_asesor = area_info["numero"]
-    nombre_area = area_info["nombre"]
-
-    # Limpiar número del cliente para mostrar
-    numero_display = telefono_cliente.replace("@s.whatsapp.net", "").replace("529", "+52 9")
-
+    nombre_area = AREAS[area]["nombre"]
     numero_limpio = telefono_cliente.replace('@s.whatsapp.net', '')
+
     mensaje = (
-        f"🔔 *LEAD NUEVO — {nombre_area}*\n\n"
+        f"🔔 *ALERTA CLIO — {area.upper()}*\n\n"
+        f"👤 *Para:* {nombre_area}\n"
         f"📱 *Cliente:* +{numero_limpio}\n"
         f"📋 *Solicita:* {resumen}\n\n"
         f"👉 *Contactar:* wa.me/{numero_limpio}"
@@ -67,14 +66,14 @@ async def enviar_alerta_asesor(
         async with httpx.AsyncClient(timeout=15.0) as client:
             r = await client.post(
                 "https://gate.whapi.cloud/messages/text",
-                json={"to": f"{numero_asesor}@s.whatsapp.net", "body": mensaje},
+                json={"to": GRUPO_ALERTAS, "body": mensaje},
                 headers=headers,
             )
             if r.status_code == 200:
-                logger.info(f"Alerta enviada a {nombre_area} ({numero_asesor}): OK")
+                logger.info(f"Alerta enviada al grupo para {nombre_area}: OK")
                 return True
             else:
-                logger.error(f"Error enviando alerta a {nombre_area}: {r.status_code} — {r.text[:100]}")
+                logger.error(f"Error enviando alerta al grupo: {r.status_code} — {r.text[:100]}")
                 return False
     except Exception as e:
         logger.error(f"Excepción enviando alerta: {e}")
