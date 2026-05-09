@@ -48,11 +48,13 @@ async def enviar_alerta_asesor(
 
     nombre_area = AREAS[area]["nombre"]
     numero_limpio = telefono_cliente.replace('@s.whatsapp.net', '')
+    # Formato legible: +52 981 138 8508
+    numero_display = f"+{numero_limpio[:2]} {numero_limpio[2:5]} {numero_limpio[5:8]} {numero_limpio[8:]}"
 
     mensaje = (
         f"🔔 *ALERTA CLIO — {area.upper()}*\n\n"
         f"👤 *Para:* {nombre_area}\n"
-        f"📱 *Cliente:* +{numero_limpio}\n"
+        f"📱 *Cliente:* {numero_display}\n"
         f"📋 *Solicita:* {resumen}\n\n"
         f"👉 *Contactar:* wa.me/{numero_limpio}"
     )
