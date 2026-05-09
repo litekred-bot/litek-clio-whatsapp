@@ -153,10 +153,18 @@ async def webhook_handler(request: Request):
 
             # Enviar alerta al asesor si hay escalación
             if area_escalar:
+                # Construir resumen con todo el historial de la conversación
+                resumen_lineas = []
+                for h in historial[-10:]:  # últimos 10 mensajes
+                    rol = "Cliente" if h["role"] == "user" else "Clio"
+                    resumen_lineas.append(f"{rol}: {h['content'][:120]}")
+                resumen_lineas.append(f"Cliente: {msg.texto[:120]}")
+                resumen_completo = "\n".join(resumen_lineas)
+
                 await enviar_alerta_asesor(
                     area=area_escalar,
                     telefono_cliente=msg.telefono,
-                    resumen=msg.texto[:200],
+                    resumen=resumen_completo,
                     whapi_token=proveedor.token,
                 )
                 logger.info(f"Escalación enviada a área: {area_escalar}")

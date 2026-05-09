@@ -50,11 +50,12 @@ async def enviar_alerta_asesor(
     # Limpiar número del cliente para mostrar
     numero_display = telefono_cliente.replace("@s.whatsapp.net", "").replace("529", "+52 9")
 
+    numero_limpio = telefono_cliente.replace('@s.whatsapp.net', '')
     mensaje = (
         f"🔔 *LEAD NUEVO — {nombre_area}*\n\n"
-        f"📱 Cliente: +{telefono_cliente.replace('@s.whatsapp.net', '')}\n"
-        f"📋 Solicita: {resumen}\n\n"
-        f"👉 Responder: wa.me/{telefono_cliente.replace('@s.whatsapp.net', '')}"
+        f"📱 *Cliente:* +{numero_limpio}\n"
+        f"📋 *Solicita:* {resumen}\n\n"
+        f"👉 *Contactar:* wa.me/{numero_limpio}"
     )
 
     headers = {
