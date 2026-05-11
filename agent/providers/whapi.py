@@ -23,6 +23,7 @@ class ProveedorWhapi(ProveedorWhatsApp):
     # URLs de imágenes de catálogo en GitHub (raw)
     IMAGENES = {
         "vinil":     "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/img_vinil.jpg",
+        "vinil2":    "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/img_vinil2.jpg",
         "etiquetas": "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/img_etiquetas.jpg",
         "lonas":     "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/img_lonas.jpg",
         "letras3d":  "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/img_letras3d.jpg",
