@@ -116,6 +116,14 @@ async def webhook_handler(request: Request):
                     area_escalar = match.group(1)
                     respuesta = re.sub(r'\[ESCALAR:\w+\]', '', respuesta).strip()
 
+            # Detectar comando de imagen [IMAGEN:nombre]
+            imagen_nombre = None
+            if "[IMAGEN:" in respuesta:
+                match = re.search(r'\[IMAGEN:(\w+)\]', respuesta)
+                if match:
+                    imagen_nombre = match.group(1)
+                    respuesta = re.sub(r'\[IMAGEN:\w+\]', '', respuesta).strip()
+
             # Detectar comando de sticker explícito [STICKER:nombre]
             sticker_nombre = None
             if "[STICKER:" in respuesta:
@@ -138,6 +146,11 @@ async def webhook_handler(request: Request):
 
             # Enviar respuesta por WhatsApp
             await proveedor.enviar_mensaje(msg.telefono, respuesta)
+
+            # Enviar imagen de catálogo si aplica
+            if imagen_nombre and hasattr(proveedor, 'enviar_imagen'):
+                await proveedor.enviar_imagen(msg.telefono, imagen_nombre)
+                logger.info(f"Imagen enviada: {imagen_nombre}")
 
             # Enviar sticker si aplica
             if sticker_nombre and hasattr(proveedor, 'enviar_sticker'):

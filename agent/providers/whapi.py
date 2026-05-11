@@ -20,6 +20,15 @@ class ProveedorWhapi(ProveedorWhatsApp):
         "lona":    "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/sticker_lona.webp",
     }
 
+    # URLs de imágenes de catálogo en GitHub (raw)
+    IMAGENES = {
+        "vinil":     "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/img_vinil.jpg",
+        "etiquetas": "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/img_etiquetas.jpg",
+        "lonas":     "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/img_lonas.jpg",
+        "letras3d":  "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/img_letras3d.jpg",
+        "catalogo":  "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/img_catalogo.jpg",
+    }
+
     def __init__(self):
         self.token = os.getenv("WHAPI_TOKEN")
         self.url_envio = "https://gate.whapi.cloud/messages/text"
@@ -140,6 +149,27 @@ class ProveedorWhapi(ProveedorWhatsApp):
                 if r.status_code == 200 or r.status_code == 201:
                     return True
         return False
+
+    async def enviar_imagen(self, telefono: str, nombre: str) -> bool:
+        """Envía una imagen de catálogo. nombre: 'vinil' | 'lonas' | 'etiquetas' | 'letras3d' | 'catalogo'"""
+        if not self.token:
+            return False
+        url_imagen = self.IMAGENES.get(nombre)
+        if not url_imagen:
+            logger.warning(f"Imagen no encontrada: {nombre}")
+            return False
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Content-Type": "application/json",
+        }
+        async with httpx.AsyncClient() as client:
+            r = await client.post(
+                "https://gate.whapi.cloud/messages/image",
+                json={"to": telefono, "media": url_imagen},
+                headers=headers,
+            )
+            logger.info(f"Imagen '{nombre}': {r.status_code} — {r.text[:100]}")
+            return r.status_code in (200, 201)
 
     async def enviar_mensaje(self, telefono: str, mensaje: str) -> bool:
         """Envía mensaje via Whapi.cloud."""
