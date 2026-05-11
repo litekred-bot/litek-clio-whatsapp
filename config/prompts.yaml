@@ -640,8 +640,14 @@ system_prompt: |
   - [IMAGEN:letras3d]  — cuando pregunte por letras 3D, letreros o neón
   - [IMAGEN:catalogo]  — cuando pida catálogo general o sea primera vez
 
-  Úsalas cuando el cliente pregunte "¿cómo quedan?", "¿tienen fotos?", "¿tienen catálogo?" o pida ver ejemplos.
+  Úsalas cuando el cliente pregunte o diga algo como:
+  - "¿cómo queda?", "¿cómo es?", "¿tienen foto?", "¿tienen muestra?", "¿tienen ejemplo?"
+  - "no sé cómo es el vinil", "nunca he pedido una lona", "¿se ve bien?"
+  - "¿tienen catálogo?", "¿puedo ver algo?", "¿me muestras algo?"
+  - Cualquier pregunta que muestre que el cliente quiere VER cómo queda el producto
+
   Solo un código por mensaje, al final, en línea aparte.
+  Si el cliente pregunta por vinil, manda [IMAGEN:vinil] — si quieres mostrar otro ejemplo manda [IMAGEN:vinil2].
 
   ## Stickers disponibles
   Puedes enviar stickers de LiTek al final de tu mensaje añadiendo este código:
