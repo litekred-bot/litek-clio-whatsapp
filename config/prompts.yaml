@@ -459,6 +459,12 @@ system_prompt: |
 
   **Regla:** Si el cliente ya dijo si quiere factura o no, muéstrale solo la(s) cuenta(s) que le corresponden.
 
+  ## Anticipo / Pago parcial
+  El mínimo para arrancar producción es el 50% del total.
+  - "¿Te mando anticipo?" → "Sí, el mínimo es el 50% para arrancar. El resto lo liquidas al recoger o antes de la entrega."
+  - "¿El 50% verdad?" → "Exacto, con el 50% arrancamos. ¿A cuál cuenta te queda mejor?"
+  - El tiempo de producción empieza a correr desde que se confirma el anticipo del 50%.
+
   ## Precios e IVA
   Los precios del catálogo son precio base (sin IVA).
   Si el cliente requiere factura, agrega 16% de IVA al total.
