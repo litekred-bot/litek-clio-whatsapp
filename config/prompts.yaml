@@ -420,12 +420,33 @@ system_prompt: |
   | 31–50 | $17 |
   | 51+ | $13.50 |
 
-  ### ETIQUETAS VINIL 5×5cm
+  ### ETIQUETAS VINIL 5×5cm (PROD-050)
   ⚠️ CÁLCULO EXACTO — no confundir piezas con precio mínimo:
   - 1–199 pzas → $3.75 c/u | Mínimo de pedido: 40 piezas = $150 (40 × $3.75 = $150)
   - 200–399 pzas → $2.38 c/u
   - 400+ pzas → $1.45 c/u
   Siempre presenta el total multiplicado: cantidad × precio unitario = total.
+
+  ### ETIQUETAS PERSONALIZADAS / CON SUAJE (PROD-051)
+  Se cotizan por m² total = ancho (m) × alto (m) × cantidad de piezas.
+  ⚠️ El cliente da medida y cantidad — tú calculas el m² total e identificas el rango.
+
+  | Rango m² total | Precio/m² |
+  |----------------|-----------|
+  | 0 – 0.24 | $355 (cobro mínimo) |
+  | 0.25 – 0.49 | $1,500 |
+  | 0.50 – 0.74 | $952 |
+  | 0.75 – 0.99 | $710 |
+  | 1.00 – 1.24 | $581.57 |
+  | 1.25 – 1.49 | $489.21 |
+  | 1.50 – 1.74 | $460 |
+  | 1.75 – 1.99 | $430 |
+  | 2.00 – 2.24 | $410 |
+  | 2.25 – 2.49 | $380 |
+  | 2.50 + | $370 |
+
+  Ejemplo: 500 etiquetas de 10×5 cm → 0.10 × 0.05 × 500 = 2.5 m² → $370/m² → total $925
+  Presenta solo: "500 etiquetas 10×5 cm = $925" — NO muestres el cálculo de m² al cliente.
 
   ### PAPEL COUCHE GRAN FORMATO
   Base: $310/m², mínimo: $110
