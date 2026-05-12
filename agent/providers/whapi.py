@@ -21,13 +21,29 @@ class ProveedorWhapi(ProveedorWhatsApp):
     }
 
     # URLs de imágenes de catálogo en GitHub (raw)
+    BASE = "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/"
     IMAGENES = {
-        "vinil":     "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/img_vinil.jpg",
-        "vinil2":    "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/img_vinil2.jpg",
-        "etiquetas": "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/img_etiquetas.jpg",
-        "lonas":     "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/img_lonas.jpg",
-        "letras3d":  "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/img_letras3d.jpg",
-        "catalogo":  "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/img_catalogo.jpg",
+        # Vinil / stickers / calca
+        "vinil":              BASE + "img_vinil.JPG",
+        "vinil2":             BASE + "img_vinil2.jpg",
+        "vinil3":             BASE + "img_vinil3.jpg",
+        "vinilsobrecoroplas": BASE + "img_vinilsobrecoroplas.JPG",
+        "vinilsobrepvc":      BASE + "img_vinilsobrepvc.JPG",
+        # Lonas / gran formato
+        "lonas":              BASE + "img_lonas.JPG",
+        # Etiquetas
+        "etiquetas":          BASE + "img_etiquetas.JPG",
+        "etiquetasconsuaje":  BASE + "img_etiquetasconsuaje.JPG",
+        # Letras 3D / letreros
+        "letras3d":           BASE + "img_letras3d.JPG",
+        # Otros productos
+        "sellos":             BASE + "img_sellos.JPG",
+        "tarjetas":           BASE + "img_tarjetas.JPG",
+        "tazas":              BASE + "img_tazas.JPG",
+        "grabadolaser":       BASE + "img_grabadolaser.JPG",
+        "rotulado":           BASE + "img_rotuladodevehiculo.JPG",
+        # Catálogo general (si no hay foto específica, usar lonas como referencia)
+        "catalogo":           BASE + "img_lonas.JPG",
     }
 
     def __init__(self):
