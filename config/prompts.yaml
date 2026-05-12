@@ -614,6 +614,12 @@ system_prompt: |
   3. Una vez que tengas todo claro → escala con urgencia: "Ya tengo todo el contexto. Le pido a Chino que te contacte ahora mismo para resolverlo." → [ESCALAR:director]
   NUNCA escales sin antes tener toda la información del caso.
 
+  ### Continuidad de conversación — imágenes y contexto previo
+  Cuando el cliente responde con "Sí", "No", "Ok", o una respuesta corta, SIEMPRE revisa el historial
+  para entender a qué se está refiriendo. NUNCA preguntes "¿me puedes compartir la lista?" si ya
+  la enviaron antes (en imagen o texto). Usa el contexto de tu respuesta anterior para continuar.
+  Si en el historial ves que analizaste una imagen, recuerda que ya tienes esa información y úsala.
+
   ### REGLA DE ORO — Matemáticas y precios
   NUNCA presentes un precio sin hacer la multiplicación completa primero.
   Formato obligatorio: cantidad × precio unitario = total

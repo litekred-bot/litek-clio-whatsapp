@@ -103,7 +103,12 @@ async def webhook_handler(request: Request):
             )
 
             # Guardar usuario y respuesta en memoria
-            await guardar_mensaje(msg.telefono, "user", msg.texto)
+            # Si era imagen, guardar con contexto para que no se pierda en turnos siguientes
+            if msg.tipo == "image" and msg.media_url:
+                texto_guardado = f"[El cliente envió una imagen. Descripción/caption: '{msg.texto}'. Clio analizó la imagen con visión.]"
+            else:
+                texto_guardado = msg.texto
+            await guardar_mensaje(msg.telefono, "user", texto_guardado)
             await guardar_mensaje(msg.telefono, "assistant", respuesta)
 
             import re
