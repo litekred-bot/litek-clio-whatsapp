@@ -7,6 +7,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import PlainTextResponse
 from dotenv import load_dotenv
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+from zoneinfo import ZoneInfo
 
 from agent.brain import generar_respuesta
 from agent.memory import inicializar_db, guardar_mensaje, obtener_historial
@@ -14,6 +17,7 @@ from agent.providers import obtener_proveedor
 from agent.transcription import transcribir_audio
 from agent.document_reader import leer_documento
 from agent.escalation import enviar_alerta_asesor, AREAS
+from agent.reporte_diario import generar_reporte_diario
 
 load_dotenv()
 
@@ -28,12 +32,29 @@ PORT = int(os.getenv("PORT", 8000))
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Inicializa la base de datos al arrancar el servidor."""
+    """Inicializa la base de datos y el scheduler al arrancar el servidor."""
     await inicializar_db()
     logger.info("Base de datos inicializada")
     logger.info(f"Servidor AgentKit — LiTek corriendo en puerto {PORT}")
     logger.info(f"Proveedor de WhatsApp: {proveedor.__class__.__name__}")
+
+    # Scheduler: reporte diario a las 6:00 AM hora Campeche
+    scheduler = AsyncIOScheduler(timezone=ZoneInfo("America/Merida"))
+    scheduler.add_job(
+        generar_reporte_diario,
+        CronTrigger(hour=6, minute=0),
+        args=[proveedor.token],
+        id="reporte_diario",
+        name="Reporte diario de clientes pendientes",
+        replace_existing=True,
+    )
+    scheduler.start()
+    logger.info("Scheduler iniciado — reporte diario a las 6:00 AM (Campeche)")
+
     yield
+
+    scheduler.shutdown()
+    logger.info("Scheduler detenido")
 
 
 app = FastAPI(
@@ -47,6 +68,13 @@ app = FastAPI(
 async def health_check():
     """Endpoint de salud para Railway/monitoreo."""
     return {"status": "ok", "service": "agentkit-litek", "agente": "Clio"}
+
+
+@app.post("/reporte")
+async def disparar_reporte(request: Request):
+    """Dispara el reporte diario manualmente (para pruebas o uso bajo demanda)."""
+    ok = await generar_reporte_diario(proveedor.token)
+    return {"status": "ok" if ok else "error", "mensaje": "Reporte enviado al grupo" if ok else "Error al enviar"}
 
 
 @app.get("/webhook")

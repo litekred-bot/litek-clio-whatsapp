@@ -10,3 +10,4 @@ python-multipart>=0.0.6
 greenlet>=3.0.0
 openai>=1.0.0
 pdfplumber>=0.10.0
+apscheduler>=3.10.0
