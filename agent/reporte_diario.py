@@ -18,7 +18,7 @@ from agent.memory import async_session, Mensaje
 logger = logging.getLogger("agentkit")
 
 # Número de Chino (director) — recibe el reporte diario
-DESTINATARIO_REPORTE = "529812710000@s.whatsapp.net"
+DESTINATARIO_REPORTE = "5219812710000@s.whatsapp.net"
 
 # Zona horaria de Campeche (CST = UTC-6)
 TZ_CAMPECHE = ZoneInfo("America/Merida")
