@@ -42,14 +42,14 @@ async def lifespan(app: FastAPI):
     scheduler = AsyncIOScheduler(timezone=ZoneInfo("America/Merida"))
     scheduler.add_job(
         generar_reporte_diario,
-        CronTrigger(hour=6, minute=0),
+        CronTrigger(hour=5, minute=0),
         args=[proveedor.token],
         id="reporte_diario",
         name="Reporte diario de clientes pendientes",
         replace_existing=True,
     )
     scheduler.start()
-    logger.info("Scheduler iniciado — reporte diario a las 6:00 AM (Campeche)")
+    logger.info("Scheduler iniciado — reporte diario a las 5:00 AM (Campeche)")
 
     yield
 
