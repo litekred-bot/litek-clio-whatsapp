@@ -17,8 +17,8 @@ from agent.memory import async_session, Mensaje
 
 logger = logging.getLogger("agentkit")
 
-# Grupo de alertas del equipo
-GRUPO_ALERTAS = "120363425558631008@g.us"
+# Número de Chino (director) — recibe el reporte diario
+DESTINATARIO_REPORTE = "529812710000@s.whatsapp.net"
 
 # Zona horaria de Campeche (CST = UTC-6)
 TZ_CAMPECHE = ZoneInfo("America/Merida")
@@ -205,7 +205,7 @@ async def generar_reporte_diario(whapi_token: str) -> bool:
 
             mensaje = "\n".join(lineas)
 
-        # Enviar al grupo
+        # Enviar a Chino (director)
         headers = {
             "Authorization": f"Bearer {whapi_token}",
             "Content-Type": "application/json",
@@ -213,7 +213,7 @@ async def generar_reporte_diario(whapi_token: str) -> bool:
         async with httpx.AsyncClient(timeout=15.0) as client:
             r = await client.post(
                 "https://gate.whapi.cloud/messages/text",
-                json={"to": GRUPO_ALERTAS, "body": mensaje},
+                json={"to": DESTINATARIO_REPORTE, "body": mensaje},
                 headers=headers,
             )
             if r.status_code == 200:
