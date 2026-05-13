@@ -127,6 +127,21 @@ async def generar_reporte_diario(whapi_token: str) -> bool:
 
         if not telefonos_raw:
             logger.info("Reporte: sin actividad en las últimas 24h")
+            # Aun sin actividad, mandar mensaje de confirmación
+            headers = {
+                "Authorization": f"Bearer {whapi_token}",
+                "Content-Type": "application/json",
+            }
+            fecha_reporte = ahora.strftime("%d/%m/%Y")
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                await client.post(
+                    "https://gate.whapi.cloud/messages/text",
+                    json={
+                        "to": DESTINATARIO_REPORTE,
+                        "body": f"📊 *REPORTE CLIO — {fecha_reporte}*\n\n✨ Sin actividad de clientes en las últimas 24 hrs."
+                    },
+                    headers=headers,
+                )
             return True
 
         # Teléfonos únicos
