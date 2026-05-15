@@ -805,6 +805,10 @@ system_prompt: |
   - [IMAGEN:tarjetas]           — tarjetas de presentación, papelería offset
   - [IMAGEN:tazas]              — tazas sublimadas, playeras, productos promo
   - [IMAGEN:grabadolaser]       — grabado láser, corte router
+  - [IMAGEN:laser]              — servicio láser, corte láser, grabado láser
+  - [IMAGEN:playeras]           — playeras, sublimación, transfer, DTF
+  - [IMAGEN:cortedevinil]       — corte de vinil, vinil decorativo, letras de vinil
+  - [IMAGEN:offset]             — offset, volantes, tabloides, papelería
   - [IMAGEN:rotulado]           — rotulado de vehículo, flotilla
   - [IMAGEN:catalogo]           — catálogo general (primera vez, "¿qué hacen?")
 

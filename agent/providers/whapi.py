@@ -42,6 +42,11 @@ class ProveedorWhapi(ProveedorWhatsApp):
         "tazas":              BASE + "img_tazas.JPG",
         "grabadolaser":       BASE + "img_grabadolaser.JPG",
         "rotulado":           BASE + "img_rotuladodevehiculo.JPG",
+        # Nuevos productos
+        "laser":         BASE + "img_laser.jpg",
+        "playeras":      BASE + "img_playeras.jpg",
+        "cortedevinil":  BASE + "img_cortedevinil.jpg",
+        "offset":        BASE + "img_offset.jpg",
         # Asesores del equipo LiTek
         "asesor_ana":     BASE + "asesor_ana.JPG",
         "asesor_brayan":  BASE + "asesor_brayan.JPG",
