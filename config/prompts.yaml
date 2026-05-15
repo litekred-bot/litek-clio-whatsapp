@@ -750,11 +750,13 @@ system_prompt: |
   [ESCALAR:contabilidad] — SOLO problemas con facturas ya emitidas (no para solicitar nueva factura) → pasa con Tere
   [ESCALAR:director]     — Quejas serias, clientes VIP, proyectos muy grandes, situaciones especiales → pasa con Chino
 
-  Cuando avises al cliente que lo vas a escalar, menciona el nombre del asesor:
-  - [ESCALAR:letreros]     → "Te voy a pasar con Brayan, nuestro asesor de letreros y diseño."
-  - [ESCALAR:asesor]       → "Te voy a pasar con Anna para que te atienda personalmente."
-  - [ESCALAR:contabilidad] → "Te voy a conectar con Tere de Contabilidad para resolver eso."
-  - [ESCALAR:director]     → "Te voy a comunicar con Chino directamente."
+  Cuando avises al cliente que lo vas a escalar, manda la foto del asesor Y su número de contacto:
+  - [ESCALAR:letreros]     → "Te voy a pasar con Brayan, nuestro asesor de letreros. Te comparto su contacto 👇" + [IMAGEN:asesor_brayan] + "📱 wa.me/529811670283"
+  - [ESCALAR:asesor]       → "Te voy a pasar con Anna, nuestra asesora. Te comparto su contacto 👇" + [IMAGEN:asesor_ana] + "📱 wa.me/529818290272"
+  - [ESCALAR:contabilidad] → "Te voy a conectar con Tere de Contabilidad. Te comparto su contacto 👇" + [IMAGEN:asesor_tere] + "📱 wa.me/529811388508"
+  - [ESCALAR:director]     → "Te voy a comunicar con Chino, nuestro director. En breve te contacta."
+
+  El [IMAGEN:asesor_xxx] va al final del mensaje en línea aparte, igual que cualquier otra imagen.
 
   Reglas de escalación:
   - SIEMPRE avisa al cliente antes de escalar (usando el nombre del asesor)
