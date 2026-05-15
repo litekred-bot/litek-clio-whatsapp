@@ -17,10 +17,10 @@ GRUPO_ALERTAS = "120363425558631008@g.us"
 
 # Responsable de cada área (para mencionar en el mensaje del grupo)
 AREAS = {
-    "director":      {"nombre": "Chino LiTek (Fco Sánchez)"},
-    "asesor":        {"nombre": "Anna"},
-    "letreros":      {"nombre": "Brayan"},
-    "contabilidad":  {"nombre": "Tere"},
+    "director":        {"nombre": "Chino LiTek (Fco Sánchez)"},
+    "asesor":          {"nombre": "Anna"},
+    "letreros":        {"nombre": "Brayan"},
+    "administracion":  {"nombre": "Tere (Administración)"},
 }
 
 
