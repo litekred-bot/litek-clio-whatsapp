@@ -5,7 +5,7 @@ import os
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, RedirectResponse
 from dotenv import load_dotenv
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -68,6 +68,18 @@ app = FastAPI(
 async def health_check():
     """Endpoint de salud para Railway/monitoreo."""
     return {"status": "ok", "service": "agentkit-litek", "agente": "Clio"}
+
+
+@app.get("/anuncio")
+async def redirigir_anuncio():
+    """
+    Redirige al WhatsApp de Clio desde anuncios de Facebook/Instagram.
+    Usamos esta URL en los anuncios para evitar que Facebook bloquee el link directo de wa.me.
+    El cliente llega con el mensaje 'vi su anuncio en Facebook' y Clio lo atiende automáticamente.
+    """
+    url_whatsapp = "https://wa.me/5219845576964?text=Hola%20LiTek%2C%20vi%20su%20anuncio%20en%20Facebook"
+    logger.info("Redirigiendo visita de anuncio Facebook → WhatsApp Clio")
+    return RedirectResponse(url=url_whatsapp, status_code=302)
 
 
 @app.post("/reporte")
