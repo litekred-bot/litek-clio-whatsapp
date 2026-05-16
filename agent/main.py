@@ -227,6 +227,18 @@ async def webhook_handler(request: Request):
                 )
                 logger.info(f"Escalación enviada a área: {area_escalar}")
 
+                # Enviar foto del asesor al cliente según el área
+                if hasattr(proveedor, 'enviar_imagen'):
+                    foto_asesor = {
+                        "asesor":         "asesor_ana",
+                        "director":       "asesor_ana",
+                        "letreros":       "asesor_brayan",
+                        "administracion": "asesor_tere",
+                    }.get(area_escalar)
+                    if foto_asesor:
+                        await proveedor.enviar_imagen(msg.telefono, foto_asesor)
+                        logger.info(f"Foto de asesor enviada al cliente: {foto_asesor}")
+
         return {"status": "ok"}
 
     except Exception as e:
