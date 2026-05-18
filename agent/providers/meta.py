@@ -41,18 +41,15 @@ class ProveedorMeta(ProveedorWhatsApp):
         except Exception:
             return []
 
-        logger.debug(f"Webhook Meta recibido: {body}")
+        # Log completo para diagnóstico (INFO para que sea visible)
+        logger.info(f"Webhook Meta payload: {body}")
 
         mensajes = []
         for entry in body.get("entry", []):
             for change in entry.get("changes", []):
                 field = change.get("field", "")
                 value = change.get("value", {})
-
-                # Solo procesar cambios del campo "messages"
-                if field != "messages":
-                    logger.debug(f"Ignorando campo webhook: {field}")
-                    continue
+                logger.info(f"Webhook campo: {field}, keys en value: {list(value.keys())}")
 
                 # Mensajes de texto entrantes
                 for msg in value.get("messages", []):
@@ -68,7 +65,7 @@ class ProveedorMeta(ProveedorWhatsApp):
                             es_propio=False,
                         ))
                     else:
-                        logger.info(f"Mensaje tipo '{msg_type}' ignorado (solo texto soportado)")
+                        logger.info(f"Mensaje tipo '{msg_type}' recibido")
 
         return mensajes
 
