@@ -19,6 +19,8 @@ class ProveedorMeta(ProveedorWhatsApp):
         self.phone_number_id = os.getenv("META_PHONE_NUMBER_ID")
         self.verify_token = os.getenv("META_VERIFY_TOKEN", "agentkit-verify")
         self.api_version = "v21.0"
+        # Compatibilidad con main.py que usa proveedor.token
+        self.token = self.access_token
 
     async def validar_webhook(self, request: Request):
         """Meta requiere verificación GET con hub.verify_token."""
