@@ -36,19 +36,40 @@ class ProveedorMeta(ProveedorWhatsApp):
 
     async def parsear_webhook(self, request: Request) -> list[MensajeEntrante]:
         """Parsea el payload anidado de Meta Cloud API."""
-        body = await request.json()
+        try:
+            body = await request.json()
+        except Exception:
+            return []
+
+        logger.debug(f"Webhook Meta recibido: {body}")
+
         mensajes = []
         for entry in body.get("entry", []):
             for change in entry.get("changes", []):
+                field = change.get("field", "")
                 value = change.get("value", {})
+
+                # Solo procesar cambios del campo "messages"
+                if field != "messages":
+                    logger.debug(f"Ignorando campo webhook: {field}")
+                    continue
+
+                # Mensajes de texto entrantes
                 for msg in value.get("messages", []):
-                    if msg.get("type") == "text":
+                    msg_type = msg.get("type")
+                    if msg_type == "text":
+                        telefono = msg.get("from", "")
+                        texto = msg.get("text", {}).get("body", "")
+                        logger.info(f"Mensaje Meta de {telefono}: {texto}")
                         mensajes.append(MensajeEntrante(
-                            telefono=msg.get("from", ""),
-                            texto=msg.get("text", {}).get("body", ""),
+                            telefono=telefono,
+                            texto=texto,
                             mensaje_id=msg.get("id", ""),
                             es_propio=False,
                         ))
+                    else:
+                        logger.info(f"Mensaje tipo '{msg_type}' ignorado (solo texto soportado)")
+
         return mensajes
 
     async def enviar_mensaje(self, telefono: str, mensaje: str) -> bool:
