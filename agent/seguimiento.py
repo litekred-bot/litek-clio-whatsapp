@@ -14,7 +14,7 @@ Reglas:
 import logging
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-from sqlalchemy import select, func, text
+from sqlalchemy import select, func
 from agent.memory import async_session, Mensaje
 
 logger = logging.getLogger("agentkit")
@@ -31,8 +31,12 @@ MENSAJE_SEGUIMIENTO = (
     "Es gratis y tarda 10 segundos → *litek.mx/ruleta*"
 )
 
-# Marcador especial para identificar mensajes de seguimiento (evitar reenvíos)
-MARCA_SEGUIMIENTO = "[SEGUIMIENTO_AUTOMATICO]"
+# Marcador sin corchetes para evitar problemas con LIKE en SQLite
+MARCA_SEGUIMIENTO = "SEGUIMIENTO_AUTO"
+
+# Cache en memoria: teléfonos que ya recibieron seguimiento en esta sesión del servidor
+# Esto evita reenvíos incluso si la DB falla — se limpia al reiniciar el servidor
+_enviados_sesion: set[str] = set()
 
 
 async def obtener_conversaciones_inactivas() -> list[str]:
@@ -60,6 +64,10 @@ async def obtener_conversaciones_inactivas() -> list[str]:
             if "test" in telefono.lower() or telefono.startswith("alerta"):
                 continue
 
+            # Cache en memoria: si ya se envió en esta sesión, saltar
+            if telefono in _enviados_sesion:
+                continue
+
             # Obtener el último mensaje de esta conversación
             query_ultimo = (
                 select(Mensaje)
@@ -81,7 +89,7 @@ async def obtener_conversaciones_inactivas() -> list[str]:
             if ultimo.timestamp > limite_tiempo:
                 continue
 
-            # Verificar que no sea un mensaje de seguimiento reciente
+            # Verificar que el último mensaje no sea un seguimiento previo
             if MARCA_SEGUIMIENTO in ultimo.content:
                 continue
 
@@ -96,12 +104,13 @@ async def obtener_conversaciones_inactivas() -> list[str]:
             if total < 2:
                 continue
 
-            # Verificar que no se haya enviado seguimiento en las últimas 24h
+            # Verificar en DB que no se haya enviado seguimiento en las últimas 24h
             query_seguimiento = (
                 select(Mensaje)
                 .where(
                     Mensaje.telefono == telefono,
-                    Mensaje.content.contains(MARCA_SEGUIMIENTO),
+                    Mensaje.role == "assistant",
+                    Mensaje.content.like(f"%{MARCA_SEGUIMIENTO}%"),
                     Mensaje.timestamp > limite_seguimiento,
                 )
             )
@@ -109,6 +118,7 @@ async def obtener_conversaciones_inactivas() -> list[str]:
             seguimiento_reciente = result.scalar_one_or_none()
 
             if seguimiento_reciente:
+                _enviados_sesion.add(telefono)  # sincronizar cache
                 continue
 
             telefonos_inactivos.append(telefono)
@@ -142,7 +152,9 @@ async def enviar_seguimientos(token: str):
     import httpx
     for telefono in telefonos:
         try:
-            # Enviar via Whapi
+            # Agregar al cache ANTES de enviar para evitar condición de carrera
+            _enviados_sesion.add(telefono)
+
             headers = {
                 "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json",
@@ -155,7 +167,7 @@ async def enviar_seguimientos(token: str):
                 )
                 if r.status_code == 200:
                     logger.info(f"Seguimiento enviado a {telefono}")
-                    # Guardar en memoria con marca para evitar reenvíos
+                    # Guardar en DB con marca para persistir entre reinicios
                     from agent.memory import guardar_mensaje
                     await guardar_mensaje(
                         telefono, "assistant",
@@ -163,5 +175,8 @@ async def enviar_seguimientos(token: str):
                     )
                 else:
                     logger.error(f"Error enviando seguimiento a {telefono}: {r.text}")
+                    # Quitar del cache si falló el envío para reintentar en próxima vuelta
+                    _enviados_sesion.discard(telefono)
         except Exception as e:
             logger.error(f"Error en seguimiento para {telefono}: {e}")
+            _enviados_sesion.discard(telefono)
