@@ -18,6 +18,7 @@ from agent.transcription import transcribir_audio
 from agent.document_reader import leer_documento
 from agent.escalation import enviar_alerta_asesor, AREAS
 from agent.reporte_diario import generar_reporte_diario
+from agent.seguimiento import enviar_seguimientos
 
 load_dotenv()
 
@@ -48,8 +49,17 @@ async def lifespan(app: FastAPI):
         name="Reporte diario de clientes pendientes",
         replace_existing=True,
     )
+    scheduler.add_job(
+        enviar_seguimientos,
+        "interval",
+        minutes=30,
+        args=[proveedor.token],
+        id="seguimiento_inactivos",
+        name="Seguimiento clientes inactivos cada 30 minutos",
+        replace_existing=True,
+    )
     scheduler.start()
-    logger.info("Scheduler iniciado — reporte diario a las 5:00 AM (Campeche)")
+    logger.info("Scheduler iniciado — reporte diario a las 5:00 AM, seguimiento cada 30 min (Campeche)")
 
     yield
 
