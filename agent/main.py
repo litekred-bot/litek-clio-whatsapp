@@ -4,12 +4,18 @@
 import os
 import logging
 from contextlib import asynccontextmanager
+from collections import OrderedDict
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import PlainTextResponse, RedirectResponse
 from dotenv import load_dotenv
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from zoneinfo import ZoneInfo
+
+# Cache de IDs procesados para evitar duplicados (Whapi reintenta si tardamos)
+# OrderedDict para poder limpiar los más viejos y no crecer infinitamente
+_ids_procesados: OrderedDict[str, bool] = OrderedDict()
+MAX_IDS_CACHE = 500
 
 from agent.brain import generar_respuesta
 from agent.memory import inicializar_db, guardar_mensaje, obtener_historial
@@ -120,6 +126,15 @@ async def webhook_handler(request: Request):
         for msg in mensajes:
             if msg.es_propio:
                 continue
+
+            # Deduplicación: ignorar mensajes ya procesados (Whapi reintenta webhooks)
+            if msg.mensaje_id and msg.mensaje_id in _ids_procesados:
+                logger.info(f"Mensaje duplicado ignorado: {msg.mensaje_id}")
+                continue
+            if msg.mensaje_id:
+                _ids_procesados[msg.mensaje_id] = True
+                if len(_ids_procesados) > MAX_IDS_CACHE:
+                    _ids_procesados.popitem(last=False)  # elimina el más viejo
 
             # Si es nota de voz, transcribir primero
             if msg.tipo in ("audio", "voice", "ptt") and msg.media_url:
