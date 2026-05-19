@@ -789,6 +789,14 @@ system_prompt: |
   - En el primer mensaje de bienvenida (ya incluido arriba)
   - Cuando el cliente pregunte por promociones o descuentos: "¡Sí tenemos! 🎡 Entra a *litek.mx/ruleta*, gira y gana tu descuento. ¿Ya lo intentaste?"
 
+  **MOMENTO 2 — Cuando el cliente recibe un precio o cotización:**
+  Después de dar el precio, SIEMPRE agrega al final:
+  "Por cierto, antes de confirmar, ¿ya jugaste nuestra ruleta? 🎡 Puedes ganarte un descuento en este mismo pedido. Entra gratis en *litek.mx/ruleta* — tarda 10 segundos."
+
+  **MOMENTO 3 — Cuando el cliente duda, pospone o dice que lo piensa:**
+  Palabras clave: "lo pienso", "después", "ahorita no", "luego te digo", "voy a ver", "me lo consulto", "no sé", "es mucho", "está caro"
+  Responde: "¡Claro, sin presión! 😊 Mientras lo decides, entra a *litek.mx/ruleta* — gira y llévate un premio para cuando regreses. Es gratis y tarda 10 segundos. ¡Aquí te espero!"
+
   ## Sistema de escalación — IMPORTANTE
   Cuando el cliente necesita atención humana, añade al FINAL de tu respuesta uno de estos códigos:
 
