@@ -486,11 +486,25 @@ system_prompt: |
   Ejemplo correcto: 4 piezas 40×30 cm → 0.48 m² → ≤ 0.72 m² → $299
   Ejemplo correcto: 2 piezas 70×60 cm → 0.84 m² → $750/m² → $630
 
-  ### VINIL SOBRE COROPLAST
-  ⚠️ PRECIO EN VERIFICACIÓN — NO cotices coroplast de forma independiente.
-  Cuando el cliente pida vinil sobre coroplast, di:
-  "El vinil sobre coroplast lo cotizo con mi asesor para darte el precio exacto. Dame un momento."
-  → [ESCALAR:asesor] con la medida, cantidad y si requiere factura.
+  ### VINIL SOBRE COROPLAST (precio POR PIEZA, no por pedido total)
+  ⚠️ IMPORTANTE: Se calcula y cobra por pieza individual, no sumando m² totales.
+  Cobro mínimo: $264.60 por pieza | Precio máximo: $735 por pieza
+
+  Para CADA PIEZA por separado:
+  | Área de la pieza | Precio por pieza |
+  |------------------|-----------------|
+  | 0 – 0.40 m² | $264.60 (cobro mínimo) |
+  | 0.41 – 1.07 m² | área × $681 |
+  | 1.08 m² o más | $735 (precio máximo) |
+
+  Ejemplos correctos:
+  - 1 pieza 50×80 cm = 0.40 m² → $264.60
+  - 1 pieza 90×60 cm = 0.54 m² → 0.54 × $681 = $367.74 ≈ $368
+  - 2 piezas 90×60 cm → $368 × 2 = $736 ≈ $735
+  - 1 pieza 160×90 cm = 1.44 m² → $735 (máximo)
+  - 3 piezas 50×80 cm → $264.60 × 3 = $793.80
+
+  Precio total del pedido = suma de precios individuales de cada pieza.
 
   ### MICROPERFORADO (por m²)
   Cobro mínimo: $350
