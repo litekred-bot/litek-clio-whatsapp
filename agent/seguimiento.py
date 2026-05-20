@@ -31,12 +31,45 @@ MENSAJE_SEGUIMIENTO = (
     "Es gratis y tarda 10 segundos → *litek.mx/ruleta*"
 )
 
-# Marcador sin corchetes para evitar problemas con LIKE en SQLite
+# Marcador sin caracteres especiales para evitar problemas en SQLite LIKE
 MARCA_SEGUIMIENTO = "SEGUIMIENTO_AUTO"
 
-# Cache en memoria: teléfonos que ya recibieron seguimiento en esta sesión del servidor
-# Esto evita reenvíos incluso si la DB falla — se limpia al reiniciar el servidor
-_enviados_sesion: set[str] = set()
+# Cache en memoria: telefono → timestamp del último seguimiento enviado
+# Se puebla desde la DB al arrancar el servidor (ver cargar_cache_desde_db)
+_cache_enviados: dict[str, datetime] = {}
+VENTANA_HORAS = 24  # No reenviar en 24 horas
+
+
+async def cargar_cache_desde_db():
+    """
+    Carga desde la DB los teléfonos que ya recibieron seguimiento reciente.
+    Se llama al arrancar el servidor para que el cache sobreviva reinicios.
+    """
+    limite = datetime.utcnow() - timedelta(hours=VENTANA_HORAS)
+    async with async_session() as session:
+        query = (
+            select(Mensaje.telefono, Mensaje.timestamp)
+            .where(
+                Mensaje.role == "assistant",
+                Mensaje.content.contains(MARCA_SEGUIMIENTO),
+                Mensaje.timestamp > limite,
+            )
+            .order_by(Mensaje.timestamp.desc())
+        )
+        result = await session.execute(query)
+        rows = result.fetchall()
+        for telefono, timestamp in rows:
+            if telefono not in _cache_enviados:
+                _cache_enviados[telefono] = timestamp
+    logger.info(f"Seguimiento: cache cargado desde DB — {len(_cache_enviados)} teléfono(s) bloqueado(s)")
+
+
+def _ya_recibio_seguimiento(telefono: str) -> bool:
+    """Verifica si el teléfono recibió seguimiento en las últimas 24h (cache en memoria)."""
+    if telefono not in _cache_enviados:
+        return False
+    enviado_en = _cache_enviados[telefono]
+    return datetime.utcnow() - enviado_en < timedelta(hours=VENTANA_HORAS)
 
 
 async def obtener_conversaciones_inactivas() -> list[str]:
@@ -45,16 +78,14 @@ async def obtener_conversaciones_inactivas() -> list[str]:
     - Último mensaje es de 'assistant'
     - Hace más de INACTIVIDAD_MINUTOS minutos
     - Al menos 2 mensajes en total
-    - No se ha enviado ya un seguimiento reciente
+    - No se ha enviado ya un seguimiento en las últimas 24h
     """
     ahora_utc = datetime.utcnow()
     limite_tiempo = ahora_utc - timedelta(minutes=INACTIVIDAD_MINUTOS)
-    limite_seguimiento = ahora_utc - timedelta(hours=24)  # No reenviar en 24h
 
     telefonos_inactivos = []
 
     async with async_session() as session:
-        # Obtener todos los teléfonos únicos con conversaciones
         query_telefonos = select(Mensaje.telefono).distinct()
         result = await session.execute(query_telefonos)
         telefonos = [row[0] for row in result.fetchall()]
@@ -64,8 +95,8 @@ async def obtener_conversaciones_inactivas() -> list[str]:
             if "test" in telefono.lower() or telefono.startswith("alerta"):
                 continue
 
-            # Cache en memoria: si ya se envió en esta sesión, saltar
-            if telefono in _enviados_sesion:
+            # ① Cache en memoria — barrera más rápida
+            if _ya_recibio_seguimiento(telefono):
                 continue
 
             # Obtener el último mensaje de esta conversación
@@ -81,7 +112,7 @@ async def obtener_conversaciones_inactivas() -> list[str]:
             if not ultimo:
                 continue
 
-            # El último mensaje debe ser de assistant (Clio ya respondió, cliente no contesta)
+            # El último mensaje debe ser de assistant (Clio respondió, cliente no contesta)
             if ultimo.role != "assistant":
                 continue
 
@@ -89,8 +120,9 @@ async def obtener_conversaciones_inactivas() -> list[str]:
             if ultimo.timestamp > limite_tiempo:
                 continue
 
-            # Verificar que el último mensaje no sea un seguimiento previo
+            # ② Si el último mensaje ya es un seguimiento, no reenviar
             if MARCA_SEGUIMIENTO in ultimo.content:
+                _cache_enviados[telefono] = ultimo.timestamp  # sincronizar cache
                 continue
 
             # Contar total de mensajes (conversación real, no solo saludo)
@@ -102,23 +134,6 @@ async def obtener_conversaciones_inactivas() -> list[str]:
             total = result.scalar_one()
 
             if total < 2:
-                continue
-
-            # Verificar en DB que no se haya enviado seguimiento en las últimas 24h
-            query_seguimiento = (
-                select(Mensaje)
-                .where(
-                    Mensaje.telefono == telefono,
-                    Mensaje.role == "assistant",
-                    Mensaje.content.like(f"%{MARCA_SEGUIMIENTO}%"),
-                    Mensaje.timestamp > limite_seguimiento,
-                )
-            )
-            result = await session.execute(query_seguimiento)
-            seguimiento_reciente = result.scalar_one_or_none()
-
-            if seguimiento_reciente:
-                _enviados_sesion.add(telefono)  # sincronizar cache
                 continue
 
             telefonos_inactivos.append(telefono)
@@ -152,8 +167,8 @@ async def enviar_seguimientos(token: str):
     import httpx
     for telefono in telefonos:
         try:
-            # Agregar al cache ANTES de enviar para evitar condición de carrera
-            _enviados_sesion.add(telefono)
+            # ③ Marcar en cache ANTES de enviar para evitar condición de carrera
+            _cache_enviados[telefono] = datetime.utcnow()
 
             headers = {
                 "Authorization": f"Bearer {token}",
@@ -167,7 +182,7 @@ async def enviar_seguimientos(token: str):
                 )
                 if r.status_code == 200:
                     logger.info(f"Seguimiento enviado a {telefono}")
-                    # Guardar en DB con marca para persistir entre reinicios
+                    # Guardar en DB para persistir entre reinicios del servidor
                     from agent.memory import guardar_mensaje
                     await guardar_mensaje(
                         telefono, "assistant",
@@ -175,8 +190,8 @@ async def enviar_seguimientos(token: str):
                     )
                 else:
                     logger.error(f"Error enviando seguimiento a {telefono}: {r.text}")
-                    # Quitar del cache si falló el envío para reintentar en próxima vuelta
-                    _enviados_sesion.discard(telefono)
+                    # Si falló el envío, quitar del cache para reintentar después
+                    _cache_enviados.pop(telefono, None)
         except Exception as e:
             logger.error(f"Error en seguimiento para {telefono}: {e}")
-            _enviados_sesion.discard(telefono)
+            _cache_enviados.pop(telefono, None)

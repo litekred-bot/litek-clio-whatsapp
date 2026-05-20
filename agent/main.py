@@ -24,7 +24,7 @@ from agent.transcription import transcribir_audio
 from agent.document_reader import leer_documento
 from agent.escalation import enviar_alerta_asesor, AREAS
 from agent.reporte_diario import generar_reporte_diario
-from agent.seguimiento import enviar_seguimientos
+from agent.seguimiento import enviar_seguimientos, cargar_cache_desde_db
 
 load_dotenv()
 
@@ -42,6 +42,7 @@ async def lifespan(app: FastAPI):
     """Inicializa la base de datos y el scheduler al arrancar el servidor."""
     await inicializar_db()
     logger.info("Base de datos inicializada")
+    await cargar_cache_desde_db()  # Carga seguimientos recientes para no reenviar tras reinicio
     logger.info(f"Servidor AgentKit — LiTek corriendo en puerto {PORT}")
     logger.info(f"Proveedor de WhatsApp: {proveedor.__class__.__name__}")
 
