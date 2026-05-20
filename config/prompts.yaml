@@ -267,9 +267,16 @@ system_prompt: |
   Si NO coincide → continúa al paso 2.
 
   PASO 2 — Cálculo por m² (solo si no hay precio promocional):
-  Área m² = (base en cm ÷ 100) × (alto en cm ÷ 100)
-  Luego busca el rango en la tabla y multiplica.
-  Aplica el cobro mínimo si el área calculada queda por debajo.
+  Área m² TOTAL = (base en cm ÷ 100) × (alto en cm ÷ 100) × cantidad de piezas
+  Luego busca el rango en la tabla con el m² TOTAL y multiplica.
+  Aplica el cobro mínimo al PEDIDO COMPLETO si el m² total queda por debajo — NUNCA por pieza.
+
+  ⚠️ REGLA CRÍTICA — COBRO MÍNIMO Y m² SIEMPRE ES POR PEDIDO COMPLETO:
+  Si el cliente pide 4 piezas de 40×30 cm:
+  ✅ CORRECTO: área total = 4 × (0.40 × 0.30) = 0.48 m² → buscar rango con 0.48 m²
+  ❌ INCORRECTO: calcular precio por pieza y multiplicar × 4 piezas
+  ❌ INCORRECTO: aplicar cobro mínimo × 4 piezas = 4 cobros mínimos
+  El cobro mínimo es UNA SOLA VEZ sin importar cuántas piezas sean.
 
   ### 5. Presenta la cotización
 
