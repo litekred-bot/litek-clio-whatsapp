@@ -439,20 +439,16 @@ system_prompt: |
 
   ### LONAS (por m²)
   Cobro mínimo: $99
-  | Rango m² | Precio/m² |
-  |----------|-----------|
-  | 0 – 0.49 | $99 |
-  | 0.50 – 0.98 | $185 |
-  | 0.99 – 2.00 | $166 |
+  Calcula m² total (todas las piezas). Si resultado < $99 → cobra $99.
+  | Rango m² total | Precio/m² |
+  |----------------|-----------|
+  | 0 – 2.00 | $185 |
   | 2.01 – 4.00 | $150 |
   | 4.01 – 6.00 | $144 |
   | 6.01 – 9.00 | $130 |
   | 9.01 – 12.00 | $125 |
   | 12.01 – 15.00 | $115 |
-  | 15.01 – 100 | $95 |
-  | 100.01 – 200 | $80 |
-  | 200.01 – 400 | $75 |
-  | 400.01 + | $65 |
+  | 15.01 + | $99 |
 
   ### LONAS PROMOCIONALES (medidas fijas)
   | Medida | Precio |
@@ -466,10 +462,10 @@ system_prompt: |
 
   ### VINIL IMPRESO (por m²)
   Cobro mínimo: $188
-  | Rango m² | Precio/m² |
-  |----------|-----------|
-  | 0 – 0.56 | $188 |
-  | 0.57 – 1.00 | $388 |
+  Calcula m² total. Si resultado < $188 → cobra $188.
+  | Rango m² total | Precio/m² |
+  |----------------|-----------|
+  | 0 – 1.00 | $388 |
   | 1.01 – 2.00 | $300 |
   | 2.01 – 4.00 | $280 |
   | 4.01 – 6.00 | $250 |
@@ -477,35 +473,63 @@ system_prompt: |
   | 8.01 + | $200 |
 
   ### VINIL SOBRE PVC 3mm (por m²)
-  Cobro mínimo: $299
-  | Rango m² | Precio/m² |
-  |----------|-----------|
-  | 0 – 0.18 | $1,198 |
-  | 0.19 – 0.72 | $799 |
+  ⚠️ REGLA ESPECIAL: Para pedidos ≤ 0.72 m² totales → precio FIJO $299 (no calcular por m²)
+  Para pedidos > 0.72 m² → calcular por m² según tabla:
+  | Rango m² total | Precio/m² |
+  |----------------|-----------|
+  | 0 – 0.72 | $299 FIJO (cobro mínimo, sin cálculo) |
   | 0.73 – 1.40 | $750 |
   | 1.41 – 2.88 | $710 |
   | 2.89 – 5.76 | $650 |
   | 5.77 + | $610 |
 
+  Ejemplo correcto: 4 piezas 40×30 cm → 0.48 m² → ≤ 0.72 m² → $299
+  Ejemplo correcto: 2 piezas 70×60 cm → 0.84 m² → $750/m² → $630
+
   ### VINIL SOBRE COROPLAST (por m²)
   Cobro mínimo: $264.60
-  | Rango m² | Precio/m² |
-  |----------|-----------|
-  | 0 – 0.18 | $735 |
-  | 0.19 – 0.72 | $474 |
+  Calcula m² total. Si resultado < $264.60 → cobra $264.60.
+  | Rango m² total | Precio/m² |
+  |----------------|-----------|
+  | 0 – 0.72 | $474 |
   | 0.73 – 1.40 | $426 |
-  | 1.41 – 2.97 | $413 |
-  | 2.98 – 5.76 | $350 |
+  | 1.41 – 2.88 | $375 |
+  | 2.89 – 5.76 | $350 |
   | 5.77 + | $320 |
 
   ### MICROPERFORADO (por m²)
   Cobro mínimo: $350
-  | Rango m² | Precio/m² |
-  |----------|-----------|
-  | 0 – 0.49 | $350 |
-  | 0.50 – 0.98 | $420 |
-  | 0.99 – 2.00 | $290 |
-  | 2.01 + | $220 |
+  Calcula m² total. Si resultado < $350 → cobra $350.
+  | Rango m² total | Precio/m² |
+  |----------------|-----------|
+  | 0 – 1.00 | $560 |
+  | 1.01 – 2.00 | $300 |
+  | 2.01 – 4.00 | $250 |
+  | 4.01 + | $210 |
+
+  ### PAPEL COUCHÉ GRAN FORMATO (por m²)
+  Cobro mínimo: $110
+  | Rango m² total | Precio/m² |
+  |----------------|-----------|
+  | 0 – 2.00 | $310 |
+  | 2.01 – 4.00 | $227.95 |
+  | 4.01 – 6.00 | $217.95 |
+  | 6.01 – 9.00 | $196.76 |
+  | 9.01 – 12.00 | $189.20 |
+  | 12.01 – 15.00 | $174.08 |
+  | 15.01 + | $143.81 |
+
+  ### PAPEL BOND GRAN FORMATO (por m²)
+  Cobro mínimo: $120
+  | Rango m² total | Precio/m² |
+  |----------------|-----------|
+  | 0 – 2.00 | $299 |
+  | 2.01 – 4.00 | $242.46 |
+  | 4.01 – 6.00 | $232.74 |
+  | 6.01 – 9.00 | $210.11 |
+  | 9.01 – 12.00 | $202.03 |
+  | 12.01 – 15.00 | $185.89 |
+  | 15.01 + | $153.57 |
 
   ### TABLOIDE LÁSER (por pieza)
   | Cantidad | Precio/pza |
@@ -514,6 +538,40 @@ system_prompt: |
   | 11–30 | $20 |
   | 31–50 | $17 |
   | 51+ | $13.50 |
+
+  ### DTF (Transfer Textil)
+  Precios por pieza según tamaño:
+  | Producto | Precio/pza |
+  |----------|------------|
+  | DTFV 30×58 cm | $625 |
+  | DTFV 58×100 cm | $1,250 |
+  | DTF Textil 28×45 cm | $250 |
+  | DTF Textil 30×58 cm | $312.50 |
+  | DTF Textil 58×100 cm | $525 |
+
+  ### ESTAMPADO PLAYERA 10×10 cm (precio por pieza)
+  Cobro mínimo: $127
+  | Cantidad | Precio/pza |
+  |----------|------------|
+  | 1–4 | $31.75 |
+  | 5+ | $27.78 |
+  Mínimo de cobro $127 (equivale a ~4 piezas). Si 1 pieza → $127 no $31.75.
+
+  ### TARJETAS DE PRESENTACIÓN
+  | Tipo | Precio (100 pzas) |
+  |------|-------------------|
+  | 1 Vista | $260 |
+  | 2 Vistas | $340 |
+
+  ### CORTE VINIL (ml)
+  Cobro mínimo: $120
+  | Rango ml | Precio/ml |
+  |----------|-----------|
+  | 0 – 1.00 | $420 |
+  | 1.01 – 2.00 | $350 |
+  | 2.01 – 4.00 | $300 |
+  | 4.01 – 8.00 | $200 |
+  | 8.01 + | $180 |
 
   ### ETIQUETAS VINIL 5×5cm (PROD-050)
   ⚠️ CÁLCULO EXACTO — no confundir piezas con precio mínimo:
