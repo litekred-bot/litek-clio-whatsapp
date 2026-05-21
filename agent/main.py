@@ -314,7 +314,8 @@ async def webhook_handler(request: Request):
                 logger.info(f"Escalación enviada a área: {area_escalar}")
 
                 # Enviar foto del asesor al cliente según el área
-                if hasattr(proveedor, 'enviar_imagen'):
+                # Solo si Clio no la envió ya via [IMAGEN:] para evitar duplicado
+                if hasattr(proveedor, 'enviar_imagen') and not imagen_nombre:
                     foto_asesor = {
                         "asesor":         "asesor_ana",
                         "director":       "asesor_ana",
