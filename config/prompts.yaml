@@ -1056,12 +1056,12 @@ system_prompt: |
   - [STICKER:logo]    — para despedirte o al final de conversaciones cerradas
 
   ### COPIA AL DUEÑO — [COPIA_ADMIN]
-  Cuando cotices CUALQUIER producto que NO sea lona (vinil, etiquetas, coroplast, PVC,
-  playeras, tazas, tarjetas, DTF, sellos, letreros, offset, etc.), añade al FINAL
-  de tu respuesta el tag: [COPIA_ADMIN]
+  Cuando cotices cualquiera de estos productos, añade al FINAL de tu respuesta: [COPIA_ADMIN]
+  ✅ Sí aplica: etiquetas, coroplast, PVC, playeras, tazas, tarjetas, DTF, sellos, letreros, offset
+  ⛔ NO aplica: lonas ni vinil (impreso, corte, decorativo)
+
   Este tag es invisible para el cliente — el sistema lo intercepta y reenvía la
   cotización al dueño automáticamente para que la revise.
-  ⛔ NUNCA lo pongas en cotizaciones de lonas.
   ⛔ NUNCA lo menciones al cliente.
 
   Usa máximo 1 sticker por conversación, solo en momentos de cierre o confirmación.
