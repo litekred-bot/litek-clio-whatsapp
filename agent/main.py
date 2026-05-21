@@ -26,6 +26,9 @@ from agent.escalation import enviar_alerta_asesor, AREAS
 from agent.reporte_diario import generar_reporte_diario
 from agent.seguimiento import enviar_seguimientos, cargar_cache_desde_db
 
+# Número del dueño para recibir copia de cotizaciones de productos que no son lonas
+ADMIN_WHATSAPP = os.getenv("ADMIN_WHATSAPP", "529812710000")
+
 load_dotenv()
 
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
@@ -189,6 +192,12 @@ async def webhook_handler(request: Request):
                     area_escalar = match.group(1)
                     respuesta = re.sub(r'\[ESCALAR:\w+\]', '', respuesta).strip()
 
+            # Detectar [COPIA_ADMIN] — copia de cotización al dueño
+            enviar_copia_admin = False
+            if "[COPIA_ADMIN]" in respuesta:
+                enviar_copia_admin = True
+                respuesta = respuesta.replace("[COPIA_ADMIN]", "").strip()
+
             # Detectar comando de imagen [IMAGEN:nombre]
             imagen_nombre = None
             if "[IMAGEN:" in respuesta:
@@ -236,6 +245,31 @@ async def webhook_handler(request: Request):
                 logger.info("Sticker de bienvenida enviado: calidad")
 
             logger.info(f"Respuesta a {msg.telefono}: {respuesta}")
+
+            # Enviar copia de cotización al dueño (productos que no son lonas)
+            if enviar_copia_admin and ADMIN_WHATSAPP:
+                numero_limpio = msg.telefono.replace('@s.whatsapp.net', '')
+                numero_display = f"+{numero_limpio[:2]} {numero_limpio[2:5]} {numero_limpio[5:8]} {numero_limpio[8:]}"
+                msg_copia = (
+                    f"📋 *COTIZACIÓN ENVIADA — CLIO*\n\n"
+                    f"📱 *Cliente:* {numero_display}\n"
+                    f"💬 *Pidió:* {msg.texto[:200]}\n\n"
+                    f"📤 *Clio respondió:*\n{respuesta[:500]}"
+                )
+                try:
+                    import httpx as _httpx
+                    async with _httpx.AsyncClient(timeout=10.0) as _client:
+                        await _client.post(
+                            "https://gate.whapi.cloud/messages/text",
+                            json={"to": ADMIN_WHATSAPP, "body": msg_copia},
+                            headers={
+                                "Authorization": f"Bearer {proveedor.token}",
+                                "Content-Type": "application/json",
+                            },
+                        )
+                    logger.info(f"Copia de cotización enviada al admin ({ADMIN_WHATSAPP})")
+                except Exception as e:
+                    logger.error(f"Error enviando copia al admin: {e}")
 
             # Enviar alerta al asesor si hay escalación
             if area_escalar:

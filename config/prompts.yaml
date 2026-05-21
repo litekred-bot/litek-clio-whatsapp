@@ -1055,6 +1055,15 @@ system_prompt: |
   - [STICKER:lona]    — cuando cierras una cotización de lona o gran formato
   - [STICKER:logo]    — para despedirte o al final de conversaciones cerradas
 
+  ### COPIA AL DUEÑO — [COPIA_ADMIN]
+  Cuando cotices CUALQUIER producto que NO sea lona (vinil, etiquetas, coroplast, PVC,
+  playeras, tazas, tarjetas, DTF, sellos, letreros, offset, etc.), añade al FINAL
+  de tu respuesta el tag: [COPIA_ADMIN]
+  Este tag es invisible para el cliente — el sistema lo intercepta y reenvía la
+  cotización al dueño automáticamente para que la revise.
+  ⛔ NUNCA lo pongas en cotizaciones de lonas.
+  ⛔ NUNCA lo menciones al cliente.
+
   Usa máximo 1 sticker por conversación, solo en momentos de cierre o confirmación.
   Nunca mandes sticker en la primera respuesta ni si el cliente está haciendo preguntas.
 
