@@ -249,12 +249,17 @@ async def webhook_handler(request: Request):
             # Enviar copia de cotización al dueño (productos que no son lonas)
             if enviar_copia_admin and ADMIN_WHATSAPP:
                 numero_limpio = msg.telefono.replace('@s.whatsapp.net', '')
-                numero_display = f"+{numero_limpio[:2]} {numero_limpio[2:5]} {numero_limpio[5:8]} {numero_limpio[8:]}"
+                if numero_limpio.startswith("521") and len(numero_limpio) == 13:
+                    area_tel = numero_limpio[3:6]
+                    num_tel = numero_limpio[6:]
+                    numero_display = f"+52 {area_tel} {num_tel[:3]} {num_tel[3:]}"
+                else:
+                    numero_display = f"+{numero_limpio}"
                 msg_copia = (
-                    f"📋 *COTIZACIÓN ENVIADA — CLIO*\n\n"
+                    f"📋 *COTIZACIÓN — CLIO*\n\n"
                     f"📱 *Cliente:* {numero_display}\n"
-                    f"💬 *Pidió:* {msg.texto[:200]}\n\n"
-                    f"📤 *Clio respondió:*\n{respuesta[:500]}"
+                    f"💬 *Pidió:* {msg.texto[:300]}\n\n"
+                    f"📤 *Clio respondió:*\n{respuesta}"
                 )
                 try:
                     import httpx as _httpx
@@ -273,13 +278,32 @@ async def webhook_handler(request: Request):
 
             # Enviar alerta al asesor si hay escalación
             if area_escalar:
-                # Construir resumen con todo el historial de la conversación
+                # Construir resumen limpio del historial (sin duplicados ni texto de imágenes)
+                def _limpiar_contenido(texto: str) -> str:
+                    """Simplifica el texto de imágenes y recorta."""
+                    if "[El cliente envió una imagen" in texto:
+                        return "[imagen]"
+                    if "[ESCALAR:" in texto or "[IMAGEN:" in texto or "[STICKER:" in texto:
+                        import re as _re
+                        texto = _re.sub(r'\[\w+:[^\]]*\]', '', texto).strip()
+                    return texto[:120]
+
                 resumen_lineas = []
-                for h in historial[-10:]:  # últimos 10 mensajes
-                    rol = "Cliente" if h["role"] == "user" else "Clio"
-                    resumen_lineas.append(f"{rol}: {h['content'][:120]}")
-                resumen_lineas.append(f"Cliente: {msg.texto[:120]}")
-                resumen_completo = "\n".join(resumen_lineas)
+                mensajes_vistos = set()
+                for h in historial[-8:]:
+                    contenido = _limpiar_contenido(h['content'])
+                    if not contenido or contenido in mensajes_vistos:
+                        continue
+                    mensajes_vistos.add(contenido)
+                    rol = "👤 Cliente" if h["role"] == "user" else "🤖 Clio"
+                    resumen_lineas.append(f"{rol}: {contenido}")
+
+                # Agregar el mensaje actual solo si no es una imagen ya registrada
+                texto_actual = _limpiar_contenido(msg.texto)
+                if texto_actual and texto_actual not in mensajes_vistos:
+                    resumen_lineas.append(f"👤 Cliente: {texto_actual}")
+
+                resumen_completo = "\n".join(resumen_lineas) if resumen_lineas else "(sin historial)"
 
                 await enviar_alerta_asesor(
                     area=area_escalar,

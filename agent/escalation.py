@@ -48,8 +48,19 @@ async def enviar_alerta_asesor(
 
     nombre_area = AREAS[area]["nombre"]
     numero_limpio = telefono_cliente.replace('@s.whatsapp.net', '')
-    # Formato legible: +52 981 138 8508
-    numero_display = f"+{numero_limpio[:2]} {numero_limpio[2:5]} {numero_limpio[5:8]} {numero_limpio[8:]}"
+    # Números mexicanos en Whapi: 521XXXXXXXXXX (52 + 1 + 10 dígitos)
+    # Formato legible: +52 981 105 0955
+    if numero_limpio.startswith("521") and len(numero_limpio) == 13:
+        # 52 + 1 + área(3) + número(7)
+        area_tel = numero_limpio[3:6]
+        num_tel = numero_limpio[6:]
+        numero_display = f"+52 {area_tel} {num_tel[:3]} {num_tel[3:]}"
+    elif numero_limpio.startswith("52") and len(numero_limpio) == 12:
+        area_tel = numero_limpio[2:5]
+        num_tel = numero_limpio[5:]
+        numero_display = f"+52 {area_tel} {num_tel[:3]} {num_tel[3:]}"
+    else:
+        numero_display = f"+{numero_limpio}"
 
     mensaje = (
         f"🔔 *ALERTA CLIO — {area.upper()}*\n\n"
