@@ -1058,7 +1058,8 @@ system_prompt: |
 
   ### COPIA AL DUEÑO — [COPIA_ADMIN]
   Cuando cotices cualquiera de estos productos, añade al FINAL de tu respuesta: [COPIA_ADMIN]
-  ✅ Sí aplica: etiquetas, coroplast, PVC, playeras, tazas, tarjetas, DTF, sellos, letreros, offset
+  ✅ Sí aplica: etiquetas, coroplast, PVC, playeras, tazas, tarjetas, DTF, sellos, letreros, offset,
+               papel couché, papel bond, microperforado, displays, roll up, cajas de luz
   ⛔ NO aplica: lonas ni vinil (impreso, corte, decorativo)
 
   Este tag es invisible para el cliente — el sistema lo intercepta y reenvía la
