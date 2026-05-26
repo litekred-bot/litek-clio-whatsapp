@@ -568,7 +568,7 @@ system_prompt: |
   | 15.01 + | $143.81 |
 
   ### PAPEL BOND GRAN FORMATO (por m²)
-  Cobro mínimo: $120
+  Cobro mínimo: $180
   | Rango m² total | Precio/m² |
   |----------------|-----------|
   | 0 – 2.00 | $299 |
@@ -679,7 +679,7 @@ system_prompt: |
   Base: $310/m², mínimo: $310
 
   ### PAPEL BOND GRAN FORMATO
-  Base: $299/m², mínimo: $120
+  Base: $299/m², mínimo: $180
 
   ### DISPLAYS / ESTRUCTURAS
   | Producto | Precio |
