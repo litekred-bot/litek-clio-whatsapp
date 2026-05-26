@@ -556,7 +556,7 @@ system_prompt: |
   | 4.01 + | $210 |
 
   ### PAPEL COUCHÉ GRAN FORMATO (por m²)
-  Cobro mínimo: $110
+  Cobro mínimo: $310 (equivale a 1 m²)
   | Rango m² total | Precio/m² |
   |----------------|-----------|
   | 0 – 2.00 | $310 |
@@ -676,7 +676,7 @@ system_prompt: |
   "5,000 etiquetas → $3,330 ($0.666 c/u)" ← PROHIBIDO inventar precio por pieza
 
   ### PAPEL COUCHE GRAN FORMATO
-  Base: $310/m², mínimo: $110
+  Base: $310/m², mínimo: $310
 
   ### PAPEL BOND GRAN FORMATO
   Base: $299/m², mínimo: $120
