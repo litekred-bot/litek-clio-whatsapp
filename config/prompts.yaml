@@ -561,7 +561,19 @@ system_prompt: |
   | 4.01 + | $210 |
 
   ### PAPEL COUCHÉ GRAN FORMATO (por m²)
-  Cobro mínimo: $110
+  ⚠️ REGLA ESPECIAL DE COBRO MÍNIMO:
+  1. Calcula el área total en m²
+  2. Multiplica por la tasa de la tabla
+  3. Si el resultado es menor a $110 → cobra $110
+  4. Si el resultado está entre $110 y $310 → cobra $310 (mínimo facturado = 1 m²)
+  5. Si el resultado es mayor a $310 → cobra el resultado calculado
+
+  Ejemplos internos (no mostrar al cliente):
+  - 80×40 cm = 0.32 m² → 0.32 × $310 = $99.20 < $110 → cobra $110
+  - 50×70 cm = 0.35 m² → 0.35 × $310 = $108.50 < $110 → cobra $110
+  - 60×90 cm = 0.54 m² → 0.54 × $310 = $167.40 → entre $110 y $310 → cobra $310
+  - 200×250 cm = 5 m² → rango 4.01-6.00 → 5 × $217.95 = $1,089.75 → cobra $1,089.75
+
   | Rango m² total | Precio/m² |
   |----------------|-----------|
   | 0 – 2.00 | $310 |
