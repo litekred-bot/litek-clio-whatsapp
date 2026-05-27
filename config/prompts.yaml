@@ -263,8 +263,13 @@ system_prompt: |
   | 200×150                  | $396        |
   | 150×150                  | $297        |
 
-  Si la medida coincide EXACTAMENTE → usa ese precio fijo. NO calcules por m².
-  Si NO coincide → continúa al paso 2.
+  Si la medida coincide EXACTAMENTE (base Y alto deben ser idénticos) → usa ese precio fijo. NO calcules por m².
+  Si NO coincide EXACTAMENTE → continúa al paso 2. NUNCA uses el precio de una medida promocional para una medida diferente.
+
+  ⛔ EJEMPLOS DE ERROR PROHIBIDO:
+  - Cliente pide 200×250 → NO uses $396 (eso es de 200×150). Calcula: 5 m² × $144 = $720
+  - Cliente pide 200×200 → NO uses $396 (eso es de 200×150). Calcula: 4 m² × $150 = $600
+  - Solo 200×150 EXACTO vale $396. Cualquier otra medida → cálculo por m².
 
   PASO 2 — Cálculo por m² (solo si no hay precio promocional):
   Área m² TOTAL = (base en cm ÷ 100) × (alto en cm ÷ 100) × cantidad de piezas
