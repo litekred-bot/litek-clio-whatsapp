@@ -286,7 +286,7 @@ system_prompt: |
   ### 5. Presenta la cotización
 
   ⛔⛔⛔ PROHIBIDO ABSOLUTAMENTE — se aplica en TODAS las cotizaciones sin excepción:
-  - NUNCA muestres cálculos: "Calculando... 0.60×0.90 = 0.54 m² → $185/m²..." PROHIBIDO
+  - NUNCA muestres cálculos: "Calculando... 0.60×0.90 = 0.54 m² → $252/m²..." PROHIBIDO
   - NUNCA muestres m², rangos, precio/m², subtotales ni desglose
   - NUNCA agregues IVA si el cliente NO pidió factura
   - NUNCA pongas "Subtotal:", "IVA 16%:", "Total con IVA" si no hay factura
@@ -340,7 +340,7 @@ system_prompt: |
 
   Ejemplo para lona 180×100 cm:
   ```
-  📋 Lona 180×100 cm → $231
+  📋 Lona 180×100 cm → $453.60
 
   📌 150×100 cm → $198 | 200×100 cm → $264
   🎡 litek.mx/ruleta — gana un descuento
@@ -365,9 +365,9 @@ system_prompt: |
 
   Ejemplo correcto (lo que SÍ se muestra):
   Lona 300×200 cm → $864
-  2 Lonas 100×50 cm → $198 ($99 c/u)
+  2 Lonas 100×50 cm → $252 ($126 c/u)
   Lona 70×40 cm → $99
-  Lona 120×55 cm → $122.10
+  Lona 120×55 cm → $166.32
 
   Ejemplo INCORRECTO (lo que NUNCA se muestra):
   ~~Área: 6 m² → $144/m² = $864~~ ← JAMÁS mostrar esto
@@ -482,7 +482,7 @@ system_prompt: |
   Calcula m² total (todas las piezas). Si resultado < $99 → cobra $99.
   | Rango m² total | Precio/m² |
   |----------------|-----------|
-  | 0 – 2.00 | $185 |
+  | 0 – 2.00 | $252 |
   | 2.01 – 4.00 | $150 |
   | 4.01 – 6.00 | $144 |
   | 6.01 – 9.00 | $130 |
