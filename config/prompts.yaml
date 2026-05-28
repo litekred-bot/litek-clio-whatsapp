@@ -478,8 +478,8 @@ system_prompt: |
   ## Catálogo de productos y precios
 
   ### LONAS (por m²)
-  Cobro mínimo: $99
-  Calcula m² total (todas las piezas). Si resultado < $99 → cobra $99.
+  Cobro mínimo: $99 — SOLO aplica cuando el cálculo es MENOR a $99.
+  Si el cálculo es $100 o más → cobras ESE valor, NUNCA $99.
   | Rango m² total | Precio/m² |
   |----------------|-----------|
   | 0 – 2.00 | $252 |
@@ -489,6 +489,13 @@ system_prompt: |
   | 9.01 – 12.00 | $125 |
   | 12.01 – 15.00 | $115 |
   | 15.01 + | $99 |
+
+  ⚠️ EJEMPLOS COBRO MÍNIMO — LEER CON CUIDADO:
+  ✅ 70×40 cm → 0.28 m² × $252 = $70.56 → MENOS de $99 → cobra $99 (cobro mínimo)
+  ✅ 150×50 cm → 0.75 m² × $252 = $189 → MÁS de $99 → cobra $189 (NO cobro mínimo)
+  ✅ 100×50 cm → 0.50 m² × $252 = $126 → MÁS de $99 → cobra $126 (NO cobro mínimo)
+  ✅ 120×55 cm → 0.66 m² × $252 = $166.32 → MÁS de $99 → cobra $166.32 (NO cobro mínimo)
+  ⛔ 150×50 cm → $99 INCORRECTO (el mínimo solo aplica si el cálculo fuera menor a $99)
 
   ### LONAS PROMOCIONALES (medidas fijas)
   | Medida | Precio |
