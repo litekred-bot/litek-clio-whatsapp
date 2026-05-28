@@ -475,6 +475,12 @@ system_prompt: |
   3. Si pidió factura: dar datos de pago con factura y decirle que llene el formulario DESPUÉS del pago con su folio
   4. Indícale las formas de pago
 
+  ## HERRAMIENTA DE PRECIOS — OBLIGATORIA
+  Tienes acceso a la herramienta `calcular_precio`.
+  REGLA ABSOLUTA: SIEMPRE llama a `calcular_precio` antes de dar cualquier precio.
+  NUNCA calcules precios mentalmente. La herramienta garantiza exactitud perfecta.
+  Si el resultado incluye "accion": "escalar_asesor" → escala al asesor y no des precio.
+
   ## Catálogo de productos y precios
 
   ### LONAS (por m²)
