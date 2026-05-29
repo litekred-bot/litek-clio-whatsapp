@@ -2,7 +2,7 @@
 # Generado por AgentKit para LiTek
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import String, Text, DateTime, select, Integer
@@ -32,6 +32,19 @@ class Mensaje(Base):
     role: Mapped[str] = mapped_column(String(20))
     content: Mapped[str] = mapped_column(Text)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class RuletaParticipacion(Base):
+    """Registro de participantes en la ruleta de premios."""
+    __tablename__ = "ruleta_participaciones"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    telefono: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    nombre: Mapped[str] = mapped_column(String(200))
+    premio: Mapped[str] = mapped_column(String(200))
+    descripcion: Mapped[str] = mapped_column(Text)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    vence_en: Mapped[datetime] = mapped_column(DateTime)
 
 
 async def inicializar_db():
@@ -78,6 +91,41 @@ async def obtener_historial(telefono: str, limite: int = 20) -> list[dict]:
             {"role": msg.role, "content": msg.content}
             for msg in mensajes
         ]
+
+
+async def registrar_ruleta(telefono: str, nombre: str, premio: str, descripcion: str) -> bool:
+    """
+    Registra una participación en la ruleta. Retorna False si ya participó.
+    Premio válido por 30 días.
+    """
+    async with async_session() as session:
+        existente = await session.execute(
+            select(RuletaParticipacion).where(RuletaParticipacion.telefono == telefono)
+        )
+        if existente.scalar_one_or_none():
+            return False
+        participacion = RuletaParticipacion(
+            telefono=telefono,
+            nombre=nombre,
+            premio=premio,
+            descripcion=descripcion,
+            vence_en=datetime.utcnow() + timedelta(days=30),
+        )
+        session.add(participacion)
+        await session.commit()
+        return True
+
+
+async def verificar_ruleta(telefono: str) -> dict | None:
+    """Retorna los datos del premio si el teléfono ya participó, None si no."""
+    async with async_session() as session:
+        resultado = await session.execute(
+            select(RuletaParticipacion).where(RuletaParticipacion.telefono == telefono)
+        )
+        p = resultado.scalar_one_or_none()
+        if not p:
+            return None
+        return {"premio": p.premio, "descripcion": p.descripcion, "vence_en": str(p.vence_en)}
 
 
 async def limpiar_historial(telefono: str):

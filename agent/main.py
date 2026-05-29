@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from collections import OrderedDict
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import PlainTextResponse, RedirectResponse
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -18,7 +19,7 @@ _ids_procesados: OrderedDict[str, bool] = OrderedDict()
 MAX_IDS_CACHE = 500
 
 from agent.brain import generar_respuesta
-from agent.memory import inicializar_db, guardar_mensaje, obtener_historial
+from agent.memory import inicializar_db, guardar_mensaje, obtener_historial, registrar_ruleta, verificar_ruleta
 from agent.providers import obtener_proveedor
 from agent.transcription import transcribir_audio
 from agent.document_reader import leer_documento
@@ -84,6 +85,14 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# CORS — permite llamadas desde litek.mx a los endpoints de ruleta
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://litek.mx", "https://www.litek.mx"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
+)
+
 
 @app.get("/")
 async def health_check():
@@ -108,6 +117,73 @@ async def disparar_reporte(request: Request):
     """Dispara el reporte diario manualmente (para pruebas o uso bajo demanda)."""
     ok = await generar_reporte_diario(proveedor.token)
     return {"status": "ok" if ok else "error", "mensaje": "Reporte enviado al grupo" if ok else "Error al enviar"}
+
+
+@app.post("/ruleta/verificar")
+async def ruleta_verificar(request: Request):
+    """Verifica si un número de teléfono ya participó en la ruleta."""
+    data = await request.json()
+    telefono = data.get("telefono", "").strip().replace("+", "").replace(" ", "")
+    if not telefono:
+        return {"ya_jugo": False}
+    resultado = await verificar_ruleta(telefono)
+    if resultado:
+        return {"ya_jugo": True, "premio": resultado["premio"]}
+    return {"ya_jugo": False}
+
+
+@app.post("/ruleta/ganador")
+async def ruleta_ganador(request: Request):
+    """Registra al ganador de la ruleta y le manda WhatsApp con su premio."""
+    import httpx as _httpx
+    data = await request.json()
+    nombre     = data.get("nombre", "").strip()
+    telefono   = data.get("telefono", "").strip()
+    premio     = data.get("premio", "").strip()
+    descripcion = data.get("descripcion", "").strip()
+
+    if not all([nombre, telefono, premio]):
+        raise HTTPException(status_code=400, detail="Faltan datos")
+
+    # Normalizar teléfono a formato Whapi México (521XXXXXXXXXX)
+    tel = telefono.replace("+", "").replace(" ", "").replace("-", "")
+    if len(tel) == 10:
+        tel_wa = f"521{tel}"
+    elif tel.startswith("52") and len(tel) == 12:
+        tel_wa = f"521{tel[2:]}"
+    elif tel.startswith("521") and len(tel) == 13:
+        tel_wa = tel
+    else:
+        tel_wa = f"521{tel[-10:]}"
+
+    # Registrar en DB (retorna False si ya participó)
+    ok = await registrar_ruleta(telefono, nombre, premio, descripcion)
+    if not ok:
+        return {"ok": False, "mensaje": "Este número ya participó"}
+
+    # Guardar mensaje en historial para que Clio tenga contexto
+    msg_wa = (
+        f"¡Hola {nombre}! 🎡 Ganaste en nuestra ruleta LiTek: *{premio}* 🎉\n\n"
+        f"¿Te gustaría aprovechar y ordenar algo? 😊"
+    )
+    await guardar_mensaje(tel_wa, "assistant", msg_wa)
+
+    # Enviar WhatsApp via Whapi
+    try:
+        async with _httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.post(
+                "https://gate.whapi.cloud/messages/text",
+                json={"to": tel_wa, "body": msg_wa},
+                headers={
+                    "Authorization": f"Bearer {proveedor.token}",
+                    "Content-Type": "application/json",
+                },
+            )
+            logger.info(f"WhatsApp ruleta enviado a {tel_wa}: {r.status_code}")
+    except Exception as e:
+        logger.error(f"Error enviando WhatsApp ruleta: {e}")
+
+    return {"ok": True}
 
 
 @app.get("/webhook")
