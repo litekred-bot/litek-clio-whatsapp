@@ -68,8 +68,8 @@ def detectar_estado(mensajes: list[dict]) -> str:
         if señal in todo_el_texto:
             return "sin_interes"
 
-    # Si hubo intercambio real (más de 2 mensajes) → pendiente
-    if len(mensajes) >= 4:
+    # Cualquier intercambio real (al menos una pregunta y respuesta) → pendiente
+    if len(mensajes) >= 2:
         return "pendiente"
 
     return "sin_interes"

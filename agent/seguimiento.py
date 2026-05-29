@@ -25,10 +25,10 @@ HORA_INICIO = 9                # No enviar antes de las 9am
 HORA_FIN = 21                  # No enviar después de las 9pm
 
 MENSAJE_SEGUIMIENTO = (
-    "Hola, soy Clio de LiTek 👋 Solo quería asegurarme de que no te quedaron dudas "
-    "sobre tu cotización. ¡Estoy aquí cuando me necesites!\n\n"
-    "Y recuerda: puedes girar nuestra ruleta 🎡 y ganarte un descuento para tu pedido. "
-    "Es gratis y tarda 10 segundos → *litek.mx/ruleta*"
+    "¡Hola! 👋 Soy Clio de LiTek. Seguimos pendientes de tu proyecto — "
+    "cuando quieras continuamos con tu cotización, aquí estamos 😊\n\n"
+    "Y recuerda que puedes girar nuestra ruleta 🎡 y ganar un descuento para tu pedido. "
+    "Es gratis → *litek.mx/ruleta*"
 )
 
 # Marcador sin caracteres especiales para evitar problemas en SQLite LIKE
