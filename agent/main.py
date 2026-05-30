@@ -88,9 +88,9 @@ app = FastAPI(
 # CORS — permite llamadas desde litek.mx a los endpoints de ruleta
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://litek.mx", "https://www.litek.mx"],
-    allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type"],
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
