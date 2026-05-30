@@ -93,11 +93,26 @@ async def obtener_historial(telefono: str, limite: int = 20) -> list[dict]:
         ]
 
 
+# Números de prueba — pueden jugar la ruleta infinitas veces (sin bloqueo).
+# Se comparan solo los últimos 10 dígitos para ignorar prefijos (52, 521, +).
+NUMEROS_PRUEBA_RULETA = {"9812710000", "9811125510"}
+
+
+def _es_numero_prueba(telefono: str) -> bool:
+    """True si el teléfono está en la lista de prueba (compara últimos 10 dígitos)."""
+    solo_digitos = "".join(c for c in telefono if c.isdigit())
+    return solo_digitos[-10:] in NUMEROS_PRUEBA_RULETA
+
+
 async def registrar_ruleta(telefono: str, nombre: str, premio: str, descripcion: str) -> bool:
     """
     Registra una participación en la ruleta. Retorna False si ya participó.
-    Premio válido por 30 días.
+    Premio válido por 30 días. Los números de prueba siempre pueden jugar.
     """
+    # Números de prueba: no se registran, siempre permiten jugar
+    if _es_numero_prueba(telefono):
+        return True
+
     async with async_session() as session:
         existente = await session.execute(
             select(RuletaParticipacion).where(RuletaParticipacion.telefono == telefono)
@@ -118,6 +133,10 @@ async def registrar_ruleta(telefono: str, nombre: str, premio: str, descripcion:
 
 async def verificar_ruleta(telefono: str) -> dict | None:
     """Retorna los datos del premio si el teléfono ya participó, None si no."""
+    # Números de prueba: siempre aparecen como "no han jugado"
+    if _es_numero_prueba(telefono):
+        return None
+
     async with async_session() as session:
         resultado = await session.execute(
             select(RuletaParticipacion).where(RuletaParticipacion.telefono == telefono)
