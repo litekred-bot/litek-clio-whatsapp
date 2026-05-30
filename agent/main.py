@@ -18,6 +18,10 @@ from zoneinfo import ZoneInfo
 _ids_procesados: OrderedDict[str, bool] = OrderedDict()
 MAX_IDS_CACHE = 500
 
+# Archivo de diseño/arte que el cliente mandó para imprimir (telefono → media_url).
+# Se guarda cuando manda el diseño y se reenvía al asesor cuando confirma el pago.
+_archivo_diseno: dict[str, str] = {}
+
 from agent.brain import generar_respuesta
 from agent.memory import inicializar_db, guardar_mensaje, obtener_historial, registrar_ruleta, verificar_ruleta
 from agent.providers import obtener_proveedor
@@ -351,6 +355,14 @@ async def webhook_handler(request: Request):
                 enviar_copia_admin = True
                 respuesta = respuesta.replace("[COPIA_ADMIN]", "").strip()
 
+            # Detectar [GUARDAR_ARCHIVO] — el cliente mandó su diseño/arte para imprimir
+            # Guardamos la URL para reenviarla al asesor cuando confirme el pago
+            if "[GUARDAR_ARCHIVO]" in respuesta:
+                respuesta = respuesta.replace("[GUARDAR_ARCHIVO]", "").strip()
+                if media_original and tipo_original in ("image", "document"):
+                    _archivo_diseno[msg.telefono] = f"{tipo_original}|{media_original}"
+                    logger.info(f"Archivo de diseño guardado para {msg.telefono}")
+
             # Detectar [COMPROBANTE] — pedido confirmado + comprobante para el asesor
             # Formato: [COMPROBANTE]resumen del pedido[/COMPROBANTE]
             resumen_pedido = None
@@ -455,13 +467,25 @@ async def webhook_handler(request: Request):
                 try:
                     await proveedor.enviar_mensaje(ASESOR_WHATSAPP, msg_asesor)
                     logger.info(f"Pedido confirmado enviado al asesor ({ASESOR_WHATSAPP})")
-                    # Si el cliente mandó comprobante (imagen/documento) en este turno, reenviarlo
+
+                    # 1) Reenviar el COMPROBANTE de pago (imagen/documento del turno actual)
                     if media_original and tipo_original == "image" and hasattr(proveedor, 'enviar_imagen_url'):
                         await proveedor.enviar_imagen_url(ASESOR_WHATSAPP, media_original, caption=f"🧾 Comprobante de pago — {nombre_cli}")
                         logger.info("Comprobante (imagen) reenviado al asesor")
                     elif media_original and tipo_original == "document" and hasattr(proveedor, 'enviar_documento_url'):
                         await proveedor.enviar_documento_url(ASESOR_WHATSAPP, media_original, caption=f"🧾 Comprobante de pago — {nombre_cli}")
                         logger.info("Comprobante (documento) reenviado al asesor")
+
+                    # 2) Reenviar el ARCHIVO DE DISEÑO para imprimir (guardado de un turno anterior)
+                    archivo_guardado = _archivo_diseno.pop(msg.telefono, None)
+                    if archivo_guardado:
+                        tipo_arch, _, url_arch = archivo_guardado.partition("|")
+                        if tipo_arch == "image" and hasattr(proveedor, 'enviar_imagen_url'):
+                            await proveedor.enviar_imagen_url(ASESOR_WHATSAPP, url_arch, caption=f"🎨 Archivo para imprimir — {nombre_cli}")
+                            logger.info("Archivo de diseño (imagen) reenviado al asesor")
+                        elif tipo_arch == "document" and hasattr(proveedor, 'enviar_documento_url'):
+                            await proveedor.enviar_documento_url(ASESOR_WHATSAPP, url_arch, caption=f"🎨 Archivo para imprimir — {nombre_cli}")
+                            logger.info("Archivo de diseño (documento) reenviado al asesor")
                 except Exception as e:
                     logger.error(f"Error enviando pedido al asesor: {e}")
 
