@@ -37,8 +37,8 @@ from agent.seguimiento import enviar_seguimientos, cargar_cache_desde_db
 
 # Número del dueño para recibir copia de cotizaciones de productos que no son lonas
 ADMIN_WHATSAPP = os.getenv("ADMIN_WHATSAPP", "529812710000")
-# Número del asesor (Anna) para recibir pedidos confirmados + comprobantes de pago
-ASESOR_WHATSAPP = os.getenv("ASESOR_WHATSAPP", "529818290272")
+# Grupo de alertas de Clio (equipo LiTek) — recibe pedidos confirmados, comprobantes y archivos
+ASESOR_WHATSAPP = os.getenv("ASESOR_WHATSAPP", "120363425558631008@g.us")
 
 load_dotenv()
 
