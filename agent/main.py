@@ -22,6 +22,10 @@ MAX_IDS_CACHE = 500
 # Se guarda cuando manda el diseño y se reenvía al asesor cuando confirma el pago.
 _archivo_diseno: dict[str, str] = {}
 
+# Clientes que YA pagaron pero NO han mandado su archivo de impresión (telefono → nombre).
+# Cuando el archivo llegue después, se reenvía al asesor de inmediato.
+_pago_sin_archivo: dict[str, str] = {}
+
 from agent.brain import generar_respuesta
 from agent.memory import inicializar_db, guardar_mensaje, obtener_historial, registrar_ruleta, verificar_ruleta
 from agent.providers import obtener_proveedor
@@ -356,12 +360,29 @@ async def webhook_handler(request: Request):
                 respuesta = respuesta.replace("[COPIA_ADMIN]", "").strip()
 
             # Detectar [GUARDAR_ARCHIVO] — el cliente mandó su diseño/arte para imprimir
-            # Guardamos la URL para reenviarla al asesor cuando confirme el pago
             if "[GUARDAR_ARCHIVO]" in respuesta:
                 respuesta = respuesta.replace("[GUARDAR_ARCHIVO]", "").strip()
                 if media_original and tipo_original in ("image", "document"):
-                    _archivo_diseno[msg.telefono] = f"{tipo_original}|{media_original}"
-                    logger.info(f"Archivo de diseño guardado para {msg.telefono}")
+                    # ¿El cliente ya pagó y solo faltaba el archivo? → reenviar al asesor YA
+                    if msg.telefono in _pago_sin_archivo:
+                        nombre_cli = _pago_sin_archivo.pop(msg.telefono) or (msg.nombre_perfil or "Cliente")
+                        cap = f"🎨 Archivo para imprimir (el que faltaba) — {nombre_cli}"
+                        try:
+                            if tipo_original == "image" and hasattr(proveedor, 'enviar_imagen_url'):
+                                await proveedor.enviar_imagen_url(ASESOR_WHATSAPP, media_original, caption=cap)
+                            elif tipo_original == "document" and hasattr(proveedor, 'enviar_documento_url'):
+                                await proveedor.enviar_documento_url(ASESOR_WHATSAPP, media_original, caption=cap)
+                            await proveedor.enviar_mensaje(
+                                ASESOR_WHATSAPP,
+                                f"✅ {nombre_cli} ya mandó su archivo para imprimir. Pedido completo, listo para producción."
+                            )
+                            logger.info(f"Archivo tardío reenviado al asesor para {msg.telefono}")
+                        except Exception as e:
+                            logger.error(f"Error reenviando archivo tardío: {e}")
+                    else:
+                        # Aún no paga — guardar para reenviar cuando confirme el pago
+                        _archivo_diseno[msg.telefono] = f"{tipo_original}|{media_original}"
+                        logger.info(f"Archivo de diseño guardado para {msg.telefono}")
 
             # Detectar [COMPROBANTE] — pedido confirmado + comprobante para el asesor
             # Formato: [COMPROBANTE]resumen del pedido[/COMPROBANTE]
@@ -486,6 +507,15 @@ async def webhook_handler(request: Request):
                         elif tipo_arch == "document" and hasattr(proveedor, 'enviar_documento_url'):
                             await proveedor.enviar_documento_url(ASESOR_WHATSAPP, url_arch, caption=f"🎨 Archivo para imprimir — {nombre_cli}")
                             logger.info("Archivo de diseño (documento) reenviado al asesor")
+                    else:
+                        # El cliente pagó pero NO ha mandado su archivo de impresión
+                        _pago_sin_archivo[msg.telefono] = nombre_cli
+                        await proveedor.enviar_mensaje(
+                            ASESOR_WHATSAPP,
+                            f"⚠️ *{nombre_cli} YA PAGÓ pero falta su archivo para imprimir.*\n"
+                            f"Clio se lo está pidiendo. Si no lo manda pronto, contáctalo: wa.me/{numero_limpio}"
+                        )
+                        logger.info(f"Pago sin archivo — avisado al asesor, pendiente {msg.telefono}")
                 except Exception as e:
                     logger.error(f"Error enviando pedido al asesor: {e}")
 

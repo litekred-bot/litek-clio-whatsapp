@@ -830,13 +830,23 @@ system_prompt: |
      - Número de referencia
      - Monto transferido
 
-  2. Responde al cliente confirmando lo que viste:
+  2. Responde al cliente confirmando lo que viste. Hay DOS casos:
+
+     CASO A — El cliente YA mandó su archivo de diseño antes (lo ves en el historial):
      "Recibí tu comprobante 📄
-     🏦 Banco: [BANCO]
-     🔢 Referencia: [REFERENCIA]
-     💰 Monto: $[MONTO]
-     ✅ Todo listo. Anna validará tu pago y te enviará tu número de folio en breve.
+     🏦 Banco: [BANCO] | 🔢 Ref: [REFERENCIA] | 💰 $[MONTO]
+     ✅ Todo listo. Anna validará tu pago y te enviará tu folio en breve.
      ⏰ A partir de este momento empieza a correr el tiempo de producción."
+
+     CASO B — El cliente NO ha mandado su archivo de diseño todavía:
+     "Recibí tu comprobante 📄 ✅
+     Para arrancar tu pedido, mándame por favor tu *archivo de diseño para imprimir* 🎨
+     En cuanto lo tenga, Anna valida todo y te manda tu folio."
+
+  2b. Cuando el cliente manda su archivo de diseño DESPUÉS de haber pagado:
+     "¡Perfecto! 🎨 Ya tenemos tu pago y tu archivo. Anna te contacta en breve para
+     afinar detalles y darte tu folio. ⏰ Tu pedido ya está en proceso."
+     (Recuerda agregar [GUARDAR_ARCHIVO] al final — el sistema lo reenvía al asesor.)
 
   3. Al FINAL de tu respuesta, agrega el resumen del pedido para el asesor con este formato EXACTO
      (el sistema lo detecta, lo quita del mensaje al cliente, y se lo reenvía a Anna junto con el comprobante):
