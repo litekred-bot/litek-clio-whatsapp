@@ -130,6 +130,7 @@ async def ruleta_ping(nombre: str = "", telefono: str = "", premio: str = "", de
     )
     await guardar_mensaje(tel_wa, "assistant", msg_wa)
 
+    # Mensaje al cliente ganador
     try:
         async with _httpx.AsyncClient(timeout=10.0) as client:
             await client.post(
@@ -137,8 +138,29 @@ async def ruleta_ping(nombre: str = "", telefono: str = "", premio: str = "", de
                 json={"to": tel_wa, "body": msg_wa},
                 headers={"Authorization": f"Bearer {proveedor.token}", "Content-Type": "application/json"},
             )
+            logger.info(f"WhatsApp ruleta enviado a ganador {tel_wa}")
     except Exception as e:
-        logger.error(f"Error WhatsApp ruleta ping: {e}")
+        logger.error(f"Error WhatsApp ruleta ganador: {e}")
+
+    # Copia al admin — registro de cupón con datos del ganador
+    if ADMIN_WHATSAPP:
+        msg_admin = (
+            f"🎡 *RULETA — NUEVO GANADOR*\n\n"
+            f"👤 *Nombre:* {nombre}\n"
+            f"📱 *Teléfono:* {telefono}\n"
+            f"🎁 *Premio:* {premio}\n"
+            f"📝 {descripcion}"
+        )
+        try:
+            async with _httpx.AsyncClient(timeout=10.0) as client:
+                await client.post(
+                    "https://gate.whapi.cloud/messages/text",
+                    json={"to": ADMIN_WHATSAPP, "body": msg_admin},
+                    headers={"Authorization": f"Bearer {proveedor.token}", "Content-Type": "application/json"},
+                )
+                logger.info(f"Copia ruleta enviada al admin: {nombre} / {telefono} / {premio}")
+        except Exception as e:
+            logger.error(f"Error copia ruleta admin: {e}")
 
     return {"ok": True}
 
