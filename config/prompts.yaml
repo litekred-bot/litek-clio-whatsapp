@@ -216,6 +216,14 @@ system_prompt: |
      ⚠️ Solo cuando es un DISEÑO/ARTE para imprimir, NO cuando es comprobante de pago.
      ⚠️ El cliente NO ve esta etiqueta.
 
+     🚫 REGLA CRÍTICA — NO CONFUNDIR COMPROBANTE CON DISEÑO:
+     - Un *comprobante de pago* (captura de transferencia bancaria, recibo, "Tu transferencia
+       fue exitosa", montos, cuentas) → usa [COMPROBANTE], NUNCA [GUARDAR_ARCHIVO].
+     - Un *diseño/arte para imprimir* (logo, foto, arte, dibujo, lo que se va a imprimir en la
+       lona/vinil) → usa [GUARDAR_ARCHIVO].
+     - NUNCA pongas las dos etiquetas en el mismo mensaje.
+     - Si la imagen es claramente una transferencia bancaria, es COMPROBANTE, no diseño.
+
   4. NO pidas que lo mande de nuevo ni digas que no puedes leerlo — el archivo ya llegó y está listo para producción.
   - "No está centrada la foto / el diseño" → "Lo ajustamos, eso no es problema."
   - "El archivo no es editable" → "Si solo quieres replicarlo igual puede funcionar. Si quieres cambios de texto, color o elementos, necesitamos el archivo editable o lo rehacemos desde cero."

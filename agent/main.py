@@ -366,10 +366,14 @@ async def webhook_handler(request: Request):
                 enviar_copia_admin = True
                 respuesta = respuesta.replace("[COPIA_ADMIN]", "").strip()
 
+            # Si este turno es de PAGO (tiene comprobante), NO tratar el archivo como diseño
+            hay_comprobante_en_turno = "[COMPROBANTE]" in respuesta
+
             # Detectar [GUARDAR_ARCHIVO] — el cliente mandó su diseño/arte para imprimir
+            # (solo si NO es un turno de pago — un comprobante no es un diseño)
             if "[GUARDAR_ARCHIVO]" in respuesta:
                 respuesta = respuesta.replace("[GUARDAR_ARCHIVO]", "").strip()
-                if media_original and tipo_original in ("image", "document"):
+                if media_original and tipo_original in ("image", "document") and not hay_comprobante_en_turno:
                     # ¿El cliente ya pagó y solo faltaba el archivo? → reenviar al asesor YA
                     if msg.telefono in _pago_sin_archivo:
                         nombre_cli = _pago_sin_archivo.pop(msg.telefono) or (msg.nombre_perfil or "Cliente")
@@ -506,8 +510,13 @@ async def webhook_handler(request: Request):
 
                     # 2) Reenviar el ARCHIVO DE DISEÑO para imprimir (guardado de un turno anterior)
                     archivo_guardado = _archivo_diseno.pop(msg.telefono, None)
+                    tipo_arch, _, url_arch = (archivo_guardado or "").partition("|")
+                    # Red de seguridad: si el "diseño" guardado es el MISMO archivo que el
+                    # comprobante actual, es un comprobante mal etiquetado — no reenviar duplicado
+                    if archivo_guardado and url_arch == media_original:
+                        logger.info("Archivo guardado == comprobante actual — se omite (evita duplicado)")
+                        archivo_guardado = None
                     if archivo_guardado:
-                        tipo_arch, _, url_arch = archivo_guardado.partition("|")
                         if tipo_arch == "image" and hasattr(proveedor, 'enviar_imagen_url'):
                             await proveedor.enviar_imagen_url(ASESOR_WHATSAPP, url_arch, caption=f"🎨 Archivo para imprimir — {nombre_cli}")
                             logger.info("Archivo de diseño (imagen) reenviado al asesor")
