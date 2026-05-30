@@ -100,6 +100,49 @@ async def health_check():
     return {"status": "ok", "service": "agentkit-litek", "agente": "Clio"}
 
 
+@app.get("/ruleta/ping")
+async def ruleta_ping(nombre: str = "", telefono: str = "", premio: str = "", descripcion: str = ""):
+    """
+    Endpoint GET sin preflight CORS — llamado via Image pixel desde la ruleta.
+    Registra al ganador y manda WhatsApp automáticamente.
+    """
+    import httpx as _httpx
+    if not all([nombre, telefono, premio]):
+        return {"ok": False}
+
+    tel = telefono.replace("+", "").replace(" ", "").replace("-", "")
+    if len(tel) == 10:
+        tel_wa = f"521{tel}"
+    elif tel.startswith("52") and len(tel) == 12:
+        tel_wa = f"521{tel[2:]}"
+    elif tel.startswith("521") and len(tel) == 13:
+        tel_wa = tel
+    else:
+        tel_wa = f"521{tel[-10:]}"
+
+    ok = await registrar_ruleta(telefono, nombre, premio, descripcion)
+    if not ok:
+        return {"ok": False, "razon": "ya_jugo"}
+
+    msg_wa = (
+        f"¡Hola {nombre}! 🎡 Ganaste en nuestra ruleta LiTek: *{premio}* 🎉\n\n"
+        f"¿Te gustaría aprovechar y ordenar algo? 😊"
+    )
+    await guardar_mensaje(tel_wa, "assistant", msg_wa)
+
+    try:
+        async with _httpx.AsyncClient(timeout=10.0) as client:
+            await client.post(
+                "https://gate.whapi.cloud/messages/text",
+                json={"to": tel_wa, "body": msg_wa},
+                headers={"Authorization": f"Bearer {proveedor.token}", "Content-Type": "application/json"},
+            )
+    except Exception as e:
+        logger.error(f"Error WhatsApp ruleta ping: {e}")
+
+    return {"ok": True}
+
+
 @app.get("/anuncio")
 async def redirigir_anuncio():
     """
