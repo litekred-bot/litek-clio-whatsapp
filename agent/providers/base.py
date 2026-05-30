@@ -15,6 +15,7 @@ class MensajeEntrante:
     es_propio: bool         # True si lo envió el agente (se ignora)
     tipo: str = "text"      # "text" | "audio" | "image"
     media_url: str = ""     # URL del archivo de media (audio o imagen)
+    nombre_perfil: str = "" # Nombre del perfil de WhatsApp del cliente (push name)
 
 
 class ProveedorWhatsApp(ABC):

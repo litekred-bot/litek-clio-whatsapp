@@ -138,6 +138,7 @@ async def generar_respuesta(
     media_url: str = "",
     whapi_token: str = "",
     tipo: str = "text",
+    nombre_perfil: str = "",
 ) -> str:
     """
     Genera una respuesta usando Claude API con soporte de tool_use.
@@ -149,6 +150,15 @@ async def generar_respuesta(
         return obtener_mensaje_fallback()
 
     system_prompt = cargar_system_prompt()
+
+    # Inyectar el nombre del cliente (de su perfil de WhatsApp) al system prompt
+    if nombre_perfil:
+        system_prompt += (
+            f"\n\n## Nombre del cliente actual\n"
+            f"El cliente con quien hablas se llama (según su perfil de WhatsApp): {nombre_perfil}\n"
+            f"Dirígete a él por su nombre de forma natural cuando sea apropiado, "
+            f"sin repetirlo en cada mensaje. Si su nombre parece un negocio o algo genérico, úsalo con criterio."
+        )
 
     # Construir historial de mensajes
     mensajes: list[dict] = []

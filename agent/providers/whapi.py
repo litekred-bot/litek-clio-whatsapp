@@ -69,6 +69,7 @@ class ProveedorWhapi(ProveedorWhatsApp):
             telefono = msg.get("chat_id", "")
             mensaje_id = msg.get("id", "")
             es_propio = msg.get("from_me", False)
+            nombre_perfil = msg.get("from_name", "")  # push name del contacto
 
             if tipo_msg == "text":
                 # Mensaje de texto normal
@@ -78,6 +79,7 @@ class ProveedorWhapi(ProveedorWhatsApp):
                     mensaje_id=mensaje_id,
                     es_propio=es_propio,
                     tipo="text",
+                    nombre_perfil=nombre_perfil,
                 ))
 
             elif tipo_msg in ("audio", "voice", "ptt"):
@@ -96,6 +98,7 @@ class ProveedorWhapi(ProveedorWhatsApp):
                     es_propio=es_propio,
                     tipo="audio",
                     media_url=media_url,
+                    nombre_perfil=nombre_perfil,
                 ))
 
             elif tipo_msg == "image":
@@ -118,6 +121,7 @@ class ProveedorWhapi(ProveedorWhatsApp):
                     es_propio=es_propio,
                     tipo="image",
                     media_url=media_url,
+                    nombre_perfil=nombre_perfil,
                 ))
 
             elif tipo_msg == "document":
@@ -139,6 +143,7 @@ class ProveedorWhapi(ProveedorWhatsApp):
                     es_propio=es_propio,
                     tipo="document",
                     media_url=media_url,
+                    nombre_perfil=nombre_perfil,
                 ))
 
             elif tipo_msg == "sticker":
@@ -149,6 +154,7 @@ class ProveedorWhapi(ProveedorWhatsApp):
                     mensaje_id=mensaje_id,
                     es_propio=es_propio,
                     tipo="sticker",
+                    nombre_perfil=nombre_perfil,
                 ))
 
         return mensajes
@@ -195,6 +201,38 @@ class ProveedorWhapi(ProveedorWhatsApp):
                 headers=headers,
             )
             logger.info(f"Imagen '{nombre}': {r.status_code} — {r.text[:100]}")
+            return r.status_code in (200, 201)
+
+    async def enviar_imagen_url(self, telefono: str, url_imagen: str, caption: str = "") -> bool:
+        """Reenvía una imagen por su URL (ej. comprobante de pago) a otro número."""
+        if not self.token or not url_imagen:
+            return False
+        headers = {"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"}
+        payload = {"to": telefono, "media": url_imagen}
+        if caption:
+            payload["caption"] = caption
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            r = await client.post(
+                "https://gate.whapi.cloud/messages/image",
+                json=payload, headers=headers,
+            )
+            logger.info(f"Reenvío imagen a {telefono}: {r.status_code} — {r.text[:100]}")
+            return r.status_code in (200, 201)
+
+    async def enviar_documento_url(self, telefono: str, url_doc: str, caption: str = "") -> bool:
+        """Reenvía un documento por su URL (ej. comprobante PDF) a otro número."""
+        if not self.token or not url_doc:
+            return False
+        headers = {"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"}
+        payload = {"to": telefono, "media": url_doc}
+        if caption:
+            payload["caption"] = caption
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            r = await client.post(
+                "https://gate.whapi.cloud/messages/document",
+                json=payload, headers=headers,
+            )
+            logger.info(f"Reenvío documento a {telefono}: {r.status_code} — {r.text[:100]}")
             return r.status_code in (200, 201)
 
     async def enviar_mensaje(self, telefono: str, mensaje: str) -> bool:

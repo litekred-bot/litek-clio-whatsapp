@@ -29,6 +29,8 @@ from agent.seguimiento import enviar_seguimientos, cargar_cache_desde_db
 
 # Número del dueño para recibir copia de cotizaciones de productos que no son lonas
 ADMIN_WHATSAPP = os.getenv("ADMIN_WHATSAPP", "529812710000")
+# Número del asesor (Anna) para recibir pedidos confirmados + comprobantes de pago
+ASESOR_WHATSAPP = os.getenv("ASESOR_WHATSAPP", "529818290272")
 
 load_dotenv()
 
@@ -288,6 +290,10 @@ async def webhook_handler(request: Request):
                 if len(_ids_procesados) > MAX_IDS_CACHE:
                     _ids_procesados.popitem(last=False)  # elimina el más viejo
 
+            # Guardar media y tipo ORIGINALES antes de modificarlos (para reenviar comprobantes)
+            media_original = msg.media_url
+            tipo_original = msg.tipo
+
             # Si es nota de voz, transcribir primero
             if msg.tipo in ("audio", "voice", "ptt") and msg.media_url:
                 logger.info(f"Nota de voz de {msg.telefono} — transcribiendo...")
@@ -317,6 +323,7 @@ async def webhook_handler(request: Request):
                 media_url=msg.media_url,
                 whapi_token=proveedor.token,
                 tipo=msg.tipo,
+                nombre_perfil=msg.nombre_perfil,
             )
 
             # Guardar usuario y respuesta en memoria
@@ -343,6 +350,14 @@ async def webhook_handler(request: Request):
             if "[COPIA_ADMIN]" in respuesta:
                 enviar_copia_admin = True
                 respuesta = respuesta.replace("[COPIA_ADMIN]", "").strip()
+
+            # Detectar [COMPROBANTE] — pedido confirmado + comprobante para el asesor
+            # Formato: [COMPROBANTE]resumen del pedido[/COMPROBANTE]
+            resumen_pedido = None
+            match_comp = re.search(r'\[COMPROBANTE\](.*?)\[/COMPROBANTE\]', respuesta, re.DOTALL)
+            if match_comp:
+                resumen_pedido = match_comp.group(1).strip()
+                respuesta = re.sub(r'\[COMPROBANTE\].*?\[/COMPROBANTE\]', '', respuesta, flags=re.DOTALL).strip()
 
             # Detectar comando de imagen [IMAGEN:nombre]
             imagen_nombre = None
@@ -421,6 +436,34 @@ async def webhook_handler(request: Request):
                     logger.info(f"Copia de cotización enviada al admin ({ADMIN_WHATSAPP})")
                 except Exception as e:
                     logger.error(f"Error enviando copia al admin: {e}")
+
+            # Pedido confirmado + comprobante → reenviar al asesor (Anna)
+            if resumen_pedido and ASESOR_WHATSAPP:
+                numero_limpio = msg.telefono.replace('@s.whatsapp.net', '')
+                if numero_limpio.startswith("521") and len(numero_limpio) == 13:
+                    num_display = f"+52 {numero_limpio[3:6]} {numero_limpio[6:9]} {numero_limpio[9:]}"
+                else:
+                    num_display = f"+{numero_limpio}"
+                nombre_cli = msg.nombre_perfil or "Cliente"
+                msg_asesor = (
+                    f"✅ *PEDIDO CONFIRMADO — CLIO*\n\n"
+                    f"👤 *Cliente:* {nombre_cli}\n"
+                    f"📱 *WhatsApp:* {num_display}\n\n"
+                    f"{resumen_pedido}\n\n"
+                    f"👉 Contactar: wa.me/{numero_limpio}"
+                )
+                try:
+                    await proveedor.enviar_mensaje(ASESOR_WHATSAPP, msg_asesor)
+                    logger.info(f"Pedido confirmado enviado al asesor ({ASESOR_WHATSAPP})")
+                    # Si el cliente mandó comprobante (imagen/documento) en este turno, reenviarlo
+                    if media_original and tipo_original == "image" and hasattr(proveedor, 'enviar_imagen_url'):
+                        await proveedor.enviar_imagen_url(ASESOR_WHATSAPP, media_original, caption=f"🧾 Comprobante de pago — {nombre_cli}")
+                        logger.info("Comprobante (imagen) reenviado al asesor")
+                    elif media_original and tipo_original == "document" and hasattr(proveedor, 'enviar_documento_url'):
+                        await proveedor.enviar_documento_url(ASESOR_WHATSAPP, media_original, caption=f"🧾 Comprobante de pago — {nombre_cli}")
+                        logger.info("Comprobante (documento) reenviado al asesor")
+                except Exception as e:
+                    logger.error(f"Error enviando pedido al asesor: {e}")
 
             # Enviar alerta al asesor si hay escalación
             if area_escalar:
