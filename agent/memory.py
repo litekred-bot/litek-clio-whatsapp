@@ -104,27 +104,49 @@ def _es_numero_prueba(telefono: str) -> bool:
     return solo_digitos[-10:] in NUMEROS_PRUEBA_RULETA
 
 
+# Días que un cliente debe esperar para volver a jugar la ruleta
+DIAS_ESPERA_RULETA = 15
+
+
 async def registrar_ruleta(telefono: str, nombre: str, premio: str, descripcion: str) -> bool:
     """
-    Registra una participación en la ruleta. Retorna False si ya participó.
-    Premio válido por 30 días. Los números de prueba siempre pueden jugar.
+    Registra una participación en la ruleta. Retorna False si jugó hace menos
+    de DIAS_ESPERA_RULETA días. Si ya pasaron, actualiza el registro y permite jugar.
+    Los números de prueba siempre pueden jugar.
     """
     # Números de prueba: no se registran, siempre permiten jugar
     if _es_numero_prueba(telefono):
         return True
 
+    ahora = datetime.utcnow()
     async with async_session() as session:
-        existente = await session.execute(
+        resultado = await session.execute(
             select(RuletaParticipacion).where(RuletaParticipacion.telefono == telefono)
         )
-        if existente.scalar_one_or_none():
-            return False
+        existente = resultado.scalar_one_or_none()
+
+        if existente:
+            # ¿Ya pasaron los días de espera?
+            dias_transcurridos = (ahora - existente.timestamp).days
+            if dias_transcurridos < DIAS_ESPERA_RULETA:
+                return False  # todavía bloqueado
+            # Ya pasó el tiempo — actualizar registro y permitir jugar de nuevo
+            existente.nombre = nombre
+            existente.premio = premio
+            existente.descripcion = descripcion
+            existente.timestamp = ahora
+            existente.vence_en = ahora + timedelta(days=30)
+            await session.commit()
+            return True
+
+        # Primera vez que juega
         participacion = RuletaParticipacion(
             telefono=telefono,
             nombre=nombre,
             premio=premio,
             descripcion=descripcion,
-            vence_en=datetime.utcnow() + timedelta(days=30),
+            timestamp=ahora,
+            vence_en=ahora + timedelta(days=30),
         )
         session.add(participacion)
         await session.commit()
@@ -132,7 +154,11 @@ async def registrar_ruleta(telefono: str, nombre: str, premio: str, descripcion:
 
 
 async def verificar_ruleta(telefono: str) -> dict | None:
-    """Retorna los datos del premio si el teléfono ya participó, None si no."""
+    """
+    Retorna datos si el teléfono jugó hace menos de DIAS_ESPERA_RULETA días.
+    Incluye 'dias_faltantes' para avisar cuándo puede volver a jugar.
+    None si nunca jugó o si ya pasó el tiempo de espera.
+    """
     # Números de prueba: siempre aparecen como "no han jugado"
     if _es_numero_prueba(telefono):
         return None
@@ -144,7 +170,15 @@ async def verificar_ruleta(telefono: str) -> dict | None:
         p = resultado.scalar_one_or_none()
         if not p:
             return None
-        return {"premio": p.premio, "descripcion": p.descripcion, "vence_en": str(p.vence_en)}
+        dias_transcurridos = (datetime.utcnow() - p.timestamp).days
+        if dias_transcurridos >= DIAS_ESPERA_RULETA:
+            return None  # ya puede volver a jugar
+        dias_faltantes = DIAS_ESPERA_RULETA - dias_transcurridos
+        return {
+            "premio": p.premio,
+            "descripcion": p.descripcion,
+            "dias_faltantes": dias_faltantes,
+        }
 
 
 async def limpiar_historial(telefono: str):

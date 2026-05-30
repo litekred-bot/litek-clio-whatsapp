@@ -193,7 +193,11 @@ async def ruleta_verificar(request: Request):
         return {"ya_jugo": False}
     resultado = await verificar_ruleta(telefono)
     if resultado:
-        return {"ya_jugo": True, "premio": resultado["premio"]}
+        return {
+            "ya_jugo": True,
+            "premio": resultado["premio"],
+            "dias_faltantes": resultado.get("dias_faltantes", 0),
+        }
     return {"ya_jugo": False}
 
 
