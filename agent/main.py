@@ -353,6 +353,13 @@ async def webhook_handler(request: Request):
                     area_escalar = match.group(1)
                     respuesta = re.sub(r'\[ESCALAR:\w+\]', '', respuesta).strip()
 
+            # Detectar [MOTIVO] — resumen conciso del motivo de escalación (lo genera Clio)
+            motivo_escalacion = None
+            match_motivo = re.search(r'\[MOTIVO\](.*?)\[/MOTIVO\]', respuesta, re.DOTALL)
+            if match_motivo:
+                motivo_escalacion = match_motivo.group(1).strip()
+                respuesta = re.sub(r'\[MOTIVO\].*?\[/MOTIVO\]', '', respuesta, flags=re.DOTALL).strip()
+
             # Detectar [COPIA_ADMIN] — copia de cotización al dueño
             enviar_copia_admin = False
             if "[COPIA_ADMIN]" in respuesta:
@@ -546,13 +553,18 @@ async def webhook_handler(request: Request):
                 if texto_actual and texto_actual not in mensajes_vistos:
                     resumen_lineas.append(f"👤 Cliente: {texto_actual}")
 
-                resumen_completo = "\n".join(resumen_lineas) if resumen_lineas else "(sin historial)"
+                # Usar el motivo conciso de Clio si existe; si no, el historial resumido
+                if motivo_escalacion:
+                    resumen_completo = motivo_escalacion
+                else:
+                    resumen_completo = "\n".join(resumen_lineas) if resumen_lineas else "(sin historial)"
 
                 await enviar_alerta_asesor(
                     area=area_escalar,
                     telefono_cliente=msg.telefono,
                     resumen=resumen_completo,
                     whapi_token=proveedor.token,
+                    nombre_cliente=msg.nombre_perfil,
                 )
                 logger.info(f"Escalación enviada a área: {area_escalar}")
 

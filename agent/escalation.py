@@ -29,6 +29,7 @@ async def enviar_alerta_asesor(
     telefono_cliente: str,
     resumen: str,
     whapi_token: str,
+    nombre_cliente: str = "",
 ) -> bool:
     """
     Envía un mensaje de alerta al grupo del equipo LiTek.
@@ -38,6 +39,7 @@ async def enviar_alerta_asesor(
         telefono_cliente: Número del cliente (para que el asesor lo contacte)
         resumen: Resumen de lo que necesita el cliente
         whapi_token: Token de Whapi para enviar el mensaje
+        nombre_cliente: Nombre del perfil de WhatsApp del cliente
 
     Returns:
         True si el mensaje fue enviado exitosamente
@@ -62,11 +64,13 @@ async def enviar_alerta_asesor(
     else:
         numero_display = f"+{numero_limpio}"
 
+    linea_cliente = f"🙋 *Cliente:* {nombre_cliente}\n" if nombre_cliente else ""
     mensaje = (
         f"🔔 *ALERTA CLIO — {area.upper()}*\n\n"
-        f"👤 *Para:* {nombre_area}\n"
-        f"📱 *Cliente:* {numero_display}\n"
-        f"📋 *Solicita:* {resumen}\n\n"
+        f"👤 *Atender:* {nombre_area}\n"
+        f"{linea_cliente}"
+        f"📱 *Tel:* {numero_display}\n"
+        f"📋 *Necesita:* {resumen}\n\n"
         f"👉 *Contactar:* wa.me/{numero_limpio}"
     )
 
