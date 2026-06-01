@@ -27,6 +27,11 @@ _archivo_diseno: dict[str, str] = {}
 # Cuando el archivo llegue después, se reenvía al asesor de inmediato.
 _pago_sin_archivo: dict[str, str] = {}
 
+# Última imagen/documento que mandó el cliente (telefono → "tipo|url").
+# Red de seguridad: si Clio confirma el pago en un turno sin imagen, usamos esta
+# como comprobante (el cliente la mandó un mensaje antes).
+_ultima_imagen: dict[str, str] = {}
+
 from agent.brain import generar_respuesta
 from agent.memory import inicializar_db, guardar_mensaje, obtener_historial, registrar_ruleta, verificar_ruleta
 from agent.providers import obtener_proveedor
@@ -302,6 +307,10 @@ async def _procesar_mensaje(msg):
 
         logger.info(f"Mensaje de {msg.telefono} [{msg.tipo}]: {msg.texto}")
 
+        # Recordar la última imagen/documento del cliente (red de seguridad para comprobantes)
+        if media_original and tipo_original in ("image", "document"):
+            _ultima_imagen[msg.telefono] = f"{tipo_original}|{media_original}"
+
         # Obtener historial ANTES de guardar el mensaje actual
         historial = await obtener_historial(msg.telefono)
         es_primer_mensaje = len(historial) == 0
@@ -482,21 +491,34 @@ async def _procesar_mensaje(msg):
                 await proveedor.enviar_mensaje(ASESOR_WHATSAPP, msg_asesor)
                 logger.info(f"Pedido confirmado enviado al asesor ({ASESOR_WHATSAPP})")
 
-                # 1) Reenviar el COMPROBANTE de pago (imagen/documento del turno actual)
-                if media_original and tipo_original == "image" and hasattr(proveedor, 'enviar_imagen_url'):
-                    await proveedor.enviar_imagen_url(ASESOR_WHATSAPP, media_original, caption=f"🧾 Comprobante de pago — {nombre_cli}")
+                # 1) Reenviar el COMPROBANTE de pago.
+                # Si el turno actual trae imagen/doc, ese es el comprobante.
+                # Si no (Clio confirmó el pago en un turno de texto), usar la última
+                # imagen que mandó el cliente (la mandó un mensaje antes).
+                comp_tipo, comp_url = "", ""
+                if media_original and tipo_original in ("image", "document"):
+                    comp_tipo, comp_url = tipo_original, media_original
+                else:
+                    ult = _ultima_imagen.get(msg.telefono, "")
+                    if ult:
+                        comp_tipo, _, comp_url = ult.partition("|")
+
+                if comp_url and comp_tipo == "image" and hasattr(proveedor, 'enviar_imagen_url'):
+                    await proveedor.enviar_imagen_url(ASESOR_WHATSAPP, comp_url, caption=f"🧾 Comprobante de pago — {nombre_cli}")
                     logger.info("Comprobante (imagen) reenviado al asesor")
-                elif media_original and tipo_original == "document" and hasattr(proveedor, 'enviar_documento_url'):
-                    await proveedor.enviar_documento_url(ASESOR_WHATSAPP, media_original, caption=f"🧾 Comprobante de pago — {nombre_cli}")
+                elif comp_url and comp_tipo == "document" and hasattr(proveedor, 'enviar_documento_url'):
+                    await proveedor.enviar_documento_url(ASESOR_WHATSAPP, comp_url, caption=f"🧾 Comprobante de pago — {nombre_cli}")
                     logger.info("Comprobante (documento) reenviado al asesor")
+                else:
+                    logger.warning(f"No se encontró imagen de comprobante para {msg.telefono}")
 
                 # 2) Reenviar el ARCHIVO DE DISEÑO para imprimir (guardado de un turno anterior)
                 archivo_guardado = _archivo_diseno.pop(msg.telefono, None)
                 tipo_arch, _, url_arch = (archivo_guardado or "").partition("|")
                 # Red de seguridad: si el "diseño" guardado es el MISMO archivo que el
-                # comprobante actual, es un comprobante mal etiquetado — no reenviar duplicado
-                if archivo_guardado and url_arch == media_original:
-                    logger.info("Archivo guardado == comprobante actual — se omite (evita duplicado)")
+                # comprobante, es un comprobante mal etiquetado — no reenviar duplicado
+                if archivo_guardado and url_arch == comp_url:
+                    logger.info("Archivo guardado == comprobante — se omite (evita duplicado)")
                     archivo_guardado = None
                 if archivo_guardado:
                     if tipo_arch == "image" and hasattr(proveedor, 'enviar_imagen_url'):
@@ -514,6 +536,9 @@ async def _procesar_mensaje(msg):
                         f"Clio se lo está pidiendo. Si no lo manda pronto, contáctalo: wa.me/{numero_limpio}"
                     )
                     logger.info(f"Pago sin archivo — avisado al asesor, pendiente {msg.telefono}")
+
+                # Limpiar la última imagen ya usada como comprobante
+                _ultima_imagen.pop(msg.telefono, None)
             except Exception as e:
                 logger.error(f"Error enviando pedido al asesor: {e}")
 

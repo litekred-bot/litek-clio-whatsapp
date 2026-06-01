@@ -890,6 +890,10 @@ system_prompt: |
 
      ⚠️ El bloque [COMPROBANTE] solo se incluye cuando el cliente YA mandó su comprobante de pago.
      ⚠️ El cliente NO ve ese bloque — es solo para el asesor. No expliques que lo mandas.
+     ⚠️ MUY IMPORTANTE: genera el bloque [COMPROBANTE] en el MISMO mensaje donde el cliente
+     manda la IMAGEN del comprobante (ese turno). Así el sistema puede adjuntar la imagen.
+     Si confirmas el pago en un turno posterior (de texto), la imagen igual se recupera, pero
+     lo ideal es cerrar el [COMPROBANTE] justo cuando llega la captura del pago.
 
   4. Si el cliente dice "ya transferí" pero NO manda imagen → pídele el comprobante:
      "¿Puedes mandarme foto o captura del comprobante? Así lo proceso más rápido. 📸"
