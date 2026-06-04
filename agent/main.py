@@ -76,20 +76,19 @@ async def lifespan(app: FastAPI):
         name="Reporte diario de clientes pendientes",
         replace_existing=True,
     )
-    # ⚠️ SEGUIMIENTO DESACTIVADO — la DB de Railway es efímera, el marcador de
-    # "ya envié seguimiento" se pierde en cada reinicio y reenvía cada 30 min (spam).
-    # NO reactivar hasta tener volumen persistente o PostgreSQL en Railway.
-    # scheduler.add_job(
-    #     enviar_seguimientos,
-    #     "interval",
-    #     minutes=30,
-    #     args=[proveedor.token],
-    #     id="seguimiento_inactivos",
-    #     name="Seguimiento clientes inactivos cada 30 minutos",
-    #     replace_existing=True,
-    # )
+    # Seguimiento automático: 1 mensaje a clientes inactivos por más de 1 hora.
+    # Seguro con PostgreSQL persistente: el marcador "ya envié" sobrevive reinicios.
+    scheduler.add_job(
+        enviar_seguimientos,
+        "interval",
+        minutes=30,
+        args=[proveedor.token],
+        id="seguimiento_inactivos",
+        name="Seguimiento clientes inactivos cada 30 minutos",
+        replace_existing=True,
+    )
     scheduler.start()
-    logger.info("Scheduler iniciado — solo reporte diario 5:00 AM (Campeche)")
+    logger.info("Scheduler iniciado — reporte diario 5:00 AM + seguimiento cada 30 min (Campeche)")
 
     yield
 
