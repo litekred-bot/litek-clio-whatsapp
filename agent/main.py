@@ -4,6 +4,7 @@
 import os
 import asyncio
 import logging
+from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 from collections import OrderedDict
 from fastapi import FastAPI, Request, HTTPException
@@ -26,6 +27,11 @@ _archivo_diseno: dict[str, str] = {}
 # Clientes que YA pagaron pero NO han mandado su archivo de impresión (telefono → nombre).
 # Cuando el archivo llegue después, se reenvía al asesor de inmediato.
 _pago_sin_archivo: dict[str, str] = {}
+
+# Pedidos ya confirmados al grupo (telefono → datetime), para no reenviar el mismo
+# pedido varias veces cuando el cliente manda detalles del pago en mensajes seguidos.
+_pedido_confirmado_ts: dict[str, datetime] = {}
+VENTANA_PEDIDO_MIN = 60  # no reenviar el pedido confirmado del mismo cliente en 60 min
 
 # Última imagen/documento que mandó el cliente (telefono → "tipo|url").
 # Red de seguridad: si Clio confirma el pago en un turno sin imagen, usamos esta
@@ -470,6 +476,16 @@ async def _procesar_mensaje(msg):
                 logger.info(f"Copia de cotización enviada al admin ({ADMIN_WHATSAPP})")
             except Exception as e:
                 logger.error(f"Error enviando copia al admin: {e}")
+
+        # Dedup: si ya se confirmó un pedido de este cliente hace poco, no reenviar
+        # (Clio a veces genera [COMPROBANTE] en varios mensajes seguidos)
+        if resumen_pedido and ASESOR_WHATSAPP:
+            ultimo = _pedido_confirmado_ts.get(msg.telefono)
+            if ultimo and (datetime.utcnow() - ultimo) < timedelta(minutes=VENTANA_PEDIDO_MIN):
+                logger.info(f"Pedido confirmado duplicado ignorado para {msg.telefono}")
+                resumen_pedido = None
+            else:
+                _pedido_confirmado_ts[msg.telefono] = datetime.utcnow()
 
         # Pedido confirmado + comprobante → reenviar al asesor (Anna)
         if resumen_pedido and ASESOR_WHATSAPP:
