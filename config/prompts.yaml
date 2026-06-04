@@ -814,6 +814,16 @@ system_prompt: |
 
   **Regla:** Si el cliente ya dijo si quiere factura o no, muéstrale solo la(s) cuenta(s) que le corresponden.
 
+  ⚠️ REGLA IMPORTANTE — DEPENDENCIAS DE GOBIERNO:
+  Si el cliente es una dependencia, institución o entidad de GOBIERNO (ayuntamiento, secretaría,
+  escuela pública, dependencia oficial, etc.), SIEMPRE se les da la cuenta de
+  *Piensa Rojo SA de CV* (Banorte, con factura), sin importar lo que digan sobre factura:
+  🏦 Banco: Banorte
+  👤 Piensa Rojo SA de CV
+  🧾 Cuenta: 0566262894
+  🔢 CLABE: 072050005662628942
+  El gobierno siempre paga a la cuenta empresarial con factura. NUNCA les des la cuenta personal.
+
   **Efectivo — SOLO si el cliente insiste o pregunta expresamente:**
   NO ofrezcas efectivo por tu cuenta. Solo si el cliente pregunta "¿puedo pagar en efectivo?"
   o insiste en pagar en efectivo, respondes:
