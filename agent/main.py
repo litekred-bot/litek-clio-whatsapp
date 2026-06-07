@@ -287,12 +287,31 @@ async def webhook_verificacion(request: Request):
     return {"status": "ok"}
 
 
+async def _reenviar_media(destino: str, tipo: str, media_url: str, media_id: str, caption: str = "") -> bool:
+    """
+    Reenvía una imagen/documento a otro número. Compatible con ambos proveedores:
+    Meta usa media_id (preferido, no expira); Whapi usa media_url directa.
+    """
+    if tipo == "image":
+        if media_id and hasattr(proveedor, "enviar_imagen_id"):
+            return await proveedor.enviar_imagen_id(destino, media_id, caption=caption)
+        if media_url and hasattr(proveedor, "enviar_imagen_url"):
+            return await proveedor.enviar_imagen_url(destino, media_url, caption=caption)
+    elif tipo == "document":
+        if media_id and hasattr(proveedor, "enviar_documento_id"):
+            return await proveedor.enviar_documento_id(destino, media_id, caption=caption)
+        if media_url and hasattr(proveedor, "enviar_documento_url"):
+            return await proveedor.enviar_documento_url(destino, media_url, caption=caption)
+    return False
+
+
 async def _procesar_mensaje(msg):
     """Procesa un mensaje en segundo plano (responder rápido evita reintentos de Whapi)."""
     try:
         # Guardar media y tipo ORIGINALES antes de modificarlos (para reenviar comprobantes)
         media_original = msg.media_url
         tipo_original = msg.tipo
+        media_id_original = getattr(msg, "media_id", "")  # vacío en Whapi, lleno en Meta
 
         # Si es nota de voz, transcribir primero
         if msg.tipo in ("audio", "voice", "ptt") and msg.media_url:
@@ -314,7 +333,7 @@ async def _procesar_mensaje(msg):
 
         # Recordar la última imagen/documento del cliente (red de seguridad para comprobantes)
         if media_original and tipo_original in ("image", "document"):
-            _ultima_imagen[msg.telefono] = f"{tipo_original}|{media_original}"
+            _ultima_imagen[msg.telefono] = f"{tipo_original}|{media_original}|{media_id_original}"
 
         # Obtener historial ANTES de guardar el mensaje actual
         historial = await obtener_historial(msg.telefono)
@@ -375,10 +394,7 @@ async def _procesar_mensaje(msg):
                     nombre_cli = _pago_sin_archivo.pop(msg.telefono) or (msg.nombre_perfil or "Cliente")
                     cap = f"🎨 Archivo para imprimir (el que faltaba) — {nombre_cli}"
                     try:
-                        if tipo_original == "image" and hasattr(proveedor, 'enviar_imagen_url'):
-                            await proveedor.enviar_imagen_url(ASESOR_WHATSAPP, media_original, caption=cap)
-                        elif tipo_original == "document" and hasattr(proveedor, 'enviar_documento_url'):
-                            await proveedor.enviar_documento_url(ASESOR_WHATSAPP, media_original, caption=cap)
+                        await _reenviar_media(ASESOR_WHATSAPP, tipo_original, media_original, media_id_original, caption=cap)
                         await proveedor.enviar_mensaje(
                             ASESOR_WHATSAPP,
                             f"✅ {nombre_cli} ya mandó su archivo para imprimir. Pedido completo, listo para producción."
@@ -388,7 +404,7 @@ async def _procesar_mensaje(msg):
                         logger.error(f"Error reenviando archivo tardío: {e}")
                 else:
                     # Aún no paga — guardar para reenviar cuando confirme el pago
-                    _archivo_diseno[msg.telefono] = f"{tipo_original}|{media_original}"
+                    _archivo_diseno[msg.telefono] = f"{tipo_original}|{media_original}|{media_id_original}"
                     logger.info(f"Archivo de diseño guardado para {msg.telefono}")
 
         # Detectar [COMPROBANTE] — pedido confirmado + comprobante para el asesor
@@ -510,38 +526,37 @@ async def _procesar_mensaje(msg):
                 # Si el turno actual trae imagen/doc, ese es el comprobante.
                 # Si no (Clio confirmó el pago en un turno de texto), usar la última
                 # imagen que mandó el cliente (la mandó un mensaje antes).
-                comp_tipo, comp_url = "", ""
+                comp_tipo, comp_url, comp_id = "", "", ""
                 if media_original and tipo_original in ("image", "document"):
-                    comp_tipo, comp_url = tipo_original, media_original
+                    comp_tipo, comp_url, comp_id = tipo_original, media_original, media_id_original
                 else:
                     ult = _ultima_imagen.get(msg.telefono, "")
                     if ult:
-                        comp_tipo, _, comp_url = ult.partition("|")
+                        partes = ult.split("|", 2)
+                        comp_tipo = partes[0] if len(partes) > 0 else ""
+                        comp_url = partes[1] if len(partes) > 1 else ""
+                        comp_id = partes[2] if len(partes) > 2 else ""
 
-                if comp_url and comp_tipo == "image" and hasattr(proveedor, 'enviar_imagen_url'):
-                    await proveedor.enviar_imagen_url(ASESOR_WHATSAPP, comp_url, caption=f"🧾 Comprobante de pago — {nombre_cli}")
-                    logger.info("Comprobante (imagen) reenviado al asesor")
-                elif comp_url and comp_tipo == "document" and hasattr(proveedor, 'enviar_documento_url'):
-                    await proveedor.enviar_documento_url(ASESOR_WHATSAPP, comp_url, caption=f"🧾 Comprobante de pago — {nombre_cli}")
-                    logger.info("Comprobante (documento) reenviado al asesor")
+                if (comp_url or comp_id) and comp_tipo in ("image", "document"):
+                    ok_comp = await _reenviar_media(ASESOR_WHATSAPP, comp_tipo, comp_url, comp_id, caption=f"🧾 Comprobante de pago — {nombre_cli}")
+                    logger.info(f"Comprobante reenviado al asesor: {ok_comp}")
                 else:
-                    logger.warning(f"No se encontró imagen de comprobante para {msg.telefono}")
+                    logger.warning(f"No se encontró comprobante para {msg.telefono}")
 
                 # 2) Reenviar el ARCHIVO DE DISEÑO para imprimir (guardado de un turno anterior)
                 archivo_guardado = _archivo_diseno.pop(msg.telefono, None)
-                tipo_arch, _, url_arch = (archivo_guardado or "").partition("|")
+                partes_a = (archivo_guardado or "").split("|", 2)
+                tipo_arch = partes_a[0] if len(partes_a) > 0 else ""
+                url_arch = partes_a[1] if len(partes_a) > 1 else ""
+                id_arch = partes_a[2] if len(partes_a) > 2 else ""
                 # Red de seguridad: si el "diseño" guardado es el MISMO archivo que el
                 # comprobante, es un comprobante mal etiquetado — no reenviar duplicado
-                if archivo_guardado and url_arch == comp_url:
+                if archivo_guardado and ((url_arch and url_arch == comp_url) or (id_arch and id_arch == comp_id)):
                     logger.info("Archivo guardado == comprobante — se omite (evita duplicado)")
                     archivo_guardado = None
                 if archivo_guardado:
-                    if tipo_arch == "image" and hasattr(proveedor, 'enviar_imagen_url'):
-                        await proveedor.enviar_imagen_url(ASESOR_WHATSAPP, url_arch, caption=f"🎨 Archivo para imprimir — {nombre_cli}")
-                        logger.info("Archivo de diseño (imagen) reenviado al asesor")
-                    elif tipo_arch == "document" and hasattr(proveedor, 'enviar_documento_url'):
-                        await proveedor.enviar_documento_url(ASESOR_WHATSAPP, url_arch, caption=f"🎨 Archivo para imprimir — {nombre_cli}")
-                        logger.info("Archivo de diseño (documento) reenviado al asesor")
+                    ok_arch = await _reenviar_media(ASESOR_WHATSAPP, tipo_arch, url_arch, id_arch, caption=f"🎨 Archivo para imprimir — {nombre_cli}")
+                    logger.info(f"Archivo de diseño reenviado al asesor: {ok_arch}")
                 else:
                     # El cliente pagó pero NO ha mandado su archivo de impresión
                     _pago_sin_archivo[msg.telefono] = nombre_cli

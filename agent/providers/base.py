@@ -16,6 +16,7 @@ class MensajeEntrante:
     tipo: str = "text"      # "text" | "audio" | "image"
     media_url: str = ""     # URL del archivo de media (audio o imagen)
     nombre_perfil: str = "" # Nombre del perfil de WhatsApp del cliente (push name)
+    media_id: str = ""      # ID del media en Meta (Cloud API usa IDs, no URLs directas)
 
 
 class ProveedorWhatsApp(ABC):
