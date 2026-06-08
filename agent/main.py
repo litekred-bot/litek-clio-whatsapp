@@ -42,6 +42,7 @@ from agent.brain import generar_respuesta
 from agent.memory import (
     inicializar_db, guardar_mensaje, obtener_historial, registrar_ruleta, verificar_ruleta,
     registrar_crm, listar_crm, actualizar_crm, verificar_usuario_crm,
+    minutos_desde_ultimo_mensaje,
 )
 from agent.providers import obtener_proveedor
 from agent.transcription import transcribir_audio
@@ -413,17 +414,32 @@ async def _procesar_mensaje(msg):
         historial = await obtener_historial(msg.telefono)
         es_primer_mensaje = len(historial) == 0
 
-        # Registrar cliente NUEVO en el CRM (solo en su primer mensaje)
-        if es_primer_mensaje:
-            try:
+        # Registrar en el CRM:
+        #  • Cliente NUEVO → en su primer mensaje
+        #  • Cliente RECURRENTE → si regresa tras +6h de silencio
+        # (no se registra cada mensaje, solo cuando hay actividad relevante)
+        SILENCIO_RECURRENTE_MIN = 360  # 6 horas
+        try:
+            tel_limpio = msg.telefono.replace("@s.whatsapp.net", "")
+            if es_primer_mensaje:
                 await registrar_crm(
                     tipo="cliente",
                     nombre=msg.nombre_perfil or "Cliente nuevo",
-                    telefono=msg.telefono.replace("@s.whatsapp.net", ""),
-                    descripcion=f"Primer mensaje: {msg.texto[:200]}",
+                    telefono=tel_limpio,
+                    descripcion=f"🆕 Cliente nuevo. Primer mensaje: {msg.texto[:200]}",
                 )
-            except Exception as e:
-                logger.error(f"Error registrando cliente nuevo en CRM: {e}")
+            else:
+                mins = await minutos_desde_ultimo_mensaje(msg.telefono)
+                if mins is not None and mins >= SILENCIO_RECURRENTE_MIN:
+                    horas = int(mins // 60)
+                    await registrar_crm(
+                        tipo="cliente",
+                        nombre=msg.nombre_perfil or "Cliente",
+                        telefono=tel_limpio,
+                        descripcion=f"🔄 Cliente regresó (tras {horas}h sin escribir): {msg.texto[:200]}",
+                    )
+        except Exception as e:
+            logger.error(f"Error registrando cliente en CRM: {e}")
 
         # Generar respuesta con Claude (con soporte de imagen si aplica)
         respuesta = await generar_respuesta(

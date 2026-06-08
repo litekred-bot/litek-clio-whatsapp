@@ -121,6 +121,26 @@ async def obtener_historial(telefono: str, limite: int = 20) -> list[dict]:
         ]
 
 
+async def minutos_desde_ultimo_mensaje(telefono: str) -> float | None:
+    """
+    Minutos transcurridos desde el último mensaje de esta conversación.
+    Retorna None si no hay mensajes previos. Sirve para detectar clientes
+    que regresan tras un silencio largo.
+    """
+    async with async_session() as session:
+        query = (
+            select(Mensaje.timestamp)
+            .where(Mensaje.telefono == telefono)
+            .order_by(Mensaje.timestamp.desc())
+            .limit(1)
+        )
+        result = await session.execute(query)
+        ts = result.scalar_one_or_none()
+        if ts is None:
+            return None
+        return (datetime.utcnow() - ts).total_seconds() / 60.0
+
+
 # Números de prueba — pueden jugar la ruleta infinitas veces (sin bloqueo).
 # Se comparan solo los últimos 10 dígitos para ignorar prefijos (52, 521, +).
 NUMEROS_PRUEBA_RULETA = {"9812710000", "9811125510"}
