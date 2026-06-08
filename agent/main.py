@@ -39,13 +39,17 @@ VENTANA_PEDIDO_MIN = 60  # no reenviar el pedido confirmado del mismo cliente en
 _ultima_imagen: dict[str, str] = {}
 
 from agent.brain import generar_respuesta
-from agent.memory import inicializar_db, guardar_mensaje, obtener_historial, registrar_ruleta, verificar_ruleta
+from agent.memory import (
+    inicializar_db, guardar_mensaje, obtener_historial, registrar_ruleta, verificar_ruleta,
+    registrar_crm, listar_crm, actualizar_crm, verificar_usuario_crm,
+)
 from agent.providers import obtener_proveedor
 from agent.transcription import transcribir_audio
 from agent.document_reader import leer_documento
 from agent.escalation import enviar_alerta_asesor, AREAS
 from agent.reporte_diario import generar_reporte_diario
 from agent.seguimiento import enviar_seguimientos, cargar_cache_desde_db
+from agent.crm import HTML_PANEL, crear_token, verificar_token
 
 # Número del dueño para recibir copia de cotizaciones de productos que no son lonas
 ADMIN_WHATSAPP = os.getenv("ADMIN_WHATSAPP", "529812710000")
@@ -123,6 +127,69 @@ async def health_check():
     return {"status": "ok", "service": "agentkit-litek", "agente": "Clio"}
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# CRM — panel de seguimiento del equipo
+# ─────────────────────────────────────────────────────────────────────────────
+from fastapi.responses import HTMLResponse
+
+
+def _crm_usuario_de_request(request: Request) -> dict | None:
+    """Extrae y valida el token del header Authorization."""
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        return verificar_token(auth[7:])
+    return None
+
+
+@app.get("/crm")
+async def crm_panel():
+    """Página del panel CRM (login + tablero)."""
+    return HTMLResponse(HTML_PANEL)
+
+
+@app.post("/crm/login")
+async def crm_login(request: Request):
+    """Autenticación del CRM. Retorna token de sesión."""
+    data = await request.json()
+    usuario = data.get("usuario", "")
+    password = data.get("password", "")
+    u = await verificar_usuario_crm(usuario, password)
+    if u:
+        return {"ok": True, "token": crear_token(u["usuario"], u["nombre"]), "nombre": u["nombre"]}
+    return {"ok": False}
+
+
+@app.get("/crm/api/registros")
+async def crm_registros(request: Request, estado: str = "", tipo: str = ""):
+    """Lista registros del CRM (requiere token)."""
+    u = _crm_usuario_de_request(request)
+    if not u:
+        raise HTTPException(status_code=401, detail="No autorizado")
+    registros = await listar_crm(estado=estado, tipo=tipo)
+    # Stats por estado (sin filtro de estado)
+    todos = await listar_crm(tipo=tipo, limite=1000)
+    stats = {"nuevo": 0, "asignado": 0, "proceso": 0, "cerrado": 0}
+    for r in todos:
+        stats[r["estado"]] = stats.get(r["estado"], 0) + 1
+    return {"registros": registros, "stats": stats, "nombre": u["nombre"]}
+
+
+@app.post("/crm/api/registro/{registro_id}")
+async def crm_actualizar(registro_id: int, request: Request):
+    """Actualiza estado, asesor o notas de un registro (requiere token)."""
+    u = _crm_usuario_de_request(request)
+    if not u:
+        raise HTTPException(status_code=401, detail="No autorizado")
+    data = await request.json()
+    ok = await actualizar_crm(
+        registro_id,
+        estado=data.get("estado"),
+        asesor=data.get("asesor"),
+        notas=data.get("notas"),
+    )
+    return {"ok": ok}
+
+
 @app.get("/ruleta/ping")
 async def ruleta_ping(nombre: str = "", telefono: str = "", premio: str = "", descripcion: str = ""):
     """
@@ -146,6 +213,13 @@ async def ruleta_ping(nombre: str = "", telefono: str = "", premio: str = "", de
     ok = await registrar_ruleta(telefono, nombre, premio, descripcion)
     if not ok:
         return {"ok": False, "razon": "ya_jugo"}
+
+    # Registrar en el CRM
+    try:
+        await registrar_crm(tipo="ruleta", nombre=nombre, telefono=telefono,
+                            descripcion=f"🎁 Premio: {premio}. {descripcion}")
+    except Exception as e:
+        logger.error(f"Error registrando ruleta en CRM: {e}")
 
     msg_wa = (
         f"¡Hola {nombre}! 🎡 Ganaste en nuestra ruleta LiTek: *{premio}* 🎉\n\n"
@@ -339,6 +413,18 @@ async def _procesar_mensaje(msg):
         historial = await obtener_historial(msg.telefono)
         es_primer_mensaje = len(historial) == 0
 
+        # Registrar cliente NUEVO en el CRM (solo en su primer mensaje)
+        if es_primer_mensaje:
+            try:
+                await registrar_crm(
+                    tipo="cliente",
+                    nombre=msg.nombre_perfil or "Cliente nuevo",
+                    telefono=msg.telefono.replace("@s.whatsapp.net", ""),
+                    descripcion=f"Primer mensaje: {msg.texto[:200]}",
+                )
+            except Exception as e:
+                logger.error(f"Error registrando cliente nuevo en CRM: {e}")
+
         # Generar respuesta con Claude (con soporte de imagen si aplica)
         respuesta = await generar_respuesta(
             msg.texto,
@@ -511,6 +597,12 @@ async def _procesar_mensaje(msg):
             else:
                 num_display = f"+{numero_limpio}"
             nombre_cli = msg.nombre_perfil or "Cliente"
+            # Registrar el pedido en el CRM
+            try:
+                await registrar_crm(tipo="pedido", nombre=nombre_cli,
+                                    telefono=numero_limpio, descripcion=resumen_pedido)
+            except Exception as e:
+                logger.error(f"Error registrando pedido en CRM: {e}")
             msg_asesor = (
                 f"✅ *PEDIDO CONFIRMADO — CLIO*\n\n"
                 f"👤 *Cliente:* {nombre_cli}\n"
@@ -613,6 +705,22 @@ async def _procesar_mensaje(msg):
                 nombre_cliente=msg.nombre_perfil,
             )
             logger.info(f"Escalación enviada a área: {area_escalar}")
+
+            # Registrar la escalación en el CRM, asignada al asesor correspondiente
+            _asesor_area = {
+                "asesor": "Anna", "director": "Chino",
+                "letreros": "Brayan", "administracion": "Tere",
+            }.get(area_escalar, "")
+            try:
+                await registrar_crm(
+                    tipo="escalacion",
+                    nombre=msg.nombre_perfil or "Cliente",
+                    telefono=msg.telefono.replace("@s.whatsapp.net", ""),
+                    descripcion=resumen_completo,
+                    asesor=_asesor_area,
+                )
+            except Exception as e:
+                logger.error(f"Error registrando escalación en CRM: {e}")
 
             # Enviar foto del asesor al cliente según el área
             # Solo si Clio no la envió ya via [IMAGEN:] para evitar duplicado

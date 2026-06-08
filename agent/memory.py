@@ -47,10 +47,38 @@ class RuletaParticipacion(Base):
     vence_en: Mapped[datetime] = mapped_column(DateTime)
 
 
+class CrmRegistro(Base):
+    """Registro del CRM: leads, escalaciones, pedidos, ganadores de ruleta."""
+    __tablename__ = "crm_registros"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tipo: Mapped[str] = mapped_column(String(30), index=True)   # escalacion | pedido | cliente | ruleta
+    nombre: Mapped[str] = mapped_column(String(200), default="")
+    telefono: Mapped[str] = mapped_column(String(50), index=True)
+    descripcion: Mapped[str] = mapped_column(Text, default="")
+    asesor: Mapped[str] = mapped_column(String(100), default="")     # a quién se asignó
+    estado: Mapped[str] = mapped_column(String(20), default="nuevo", index=True)  # nuevo|asignado|proceso|cerrado
+    notas: Mapped[str] = mapped_column(Text, default="")
+    creado: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    actualizado: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class CrmUsuario(Base):
+    """Usuarios del panel CRM (login por persona)."""
+    __tablename__ = "crm_usuarios"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    usuario: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(200))
+    nombre: Mapped[str] = mapped_column(String(100))
+    creado: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 async def inicializar_db():
     """Crea las tablas si no existen."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    await _crear_usuarios_crm_iniciales()
 
 
 async def guardar_mensaje(telefono: str, role: str, content: str):
@@ -190,3 +218,114 @@ async def limpiar_historial(telefono: str):
         for msg in mensajes:
             await session.delete(msg)
         await session.commit()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CRM — registros y usuarios
+# ─────────────────────────────────────────────────────────────────────────────
+import hashlib
+import hmac as _hmac
+
+_CRM_SALT = os.getenv("CRM_SALT", "litek-clio-crm-2026")
+
+
+def _hash_password(password: str) -> str:
+    """Hashea una contraseña con PBKDF2."""
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode(), _CRM_SALT.encode(), 100_000)
+    return dk.hex()
+
+
+async def _crear_usuarios_crm_iniciales():
+    """Crea los usuarios del equipo si no existen (solo la primera vez)."""
+    # usuario → (contraseña, nombre). Cambiar contraseñas después.
+    iniciales = {
+        "chino":  ("litek2026", "Chino (Director)"),
+        "anna":   ("anna2026",  "Anna (Asesora)"),
+        "brayan": ("brayan2026", "Brayan (Letreros)"),
+        "tere":   ("tere2026",  "Tere (Administración)"),
+    }
+    async with async_session() as session:
+        for usuario, (pwd, nombre) in iniciales.items():
+            existe = await session.execute(
+                select(CrmUsuario).where(CrmUsuario.usuario == usuario)
+            )
+            if existe.scalar_one_or_none() is None:
+                session.add(CrmUsuario(
+                    usuario=usuario,
+                    password_hash=_hash_password(pwd),
+                    nombre=nombre,
+                ))
+        await session.commit()
+
+
+async def verificar_usuario_crm(usuario: str, password: str) -> dict | None:
+    """Verifica credenciales del CRM. Retorna {usuario, nombre} si son correctas."""
+    async with async_session() as session:
+        resultado = await session.execute(
+            select(CrmUsuario).where(CrmUsuario.usuario == usuario.lower().strip())
+        )
+        u = resultado.scalar_one_or_none()
+        if u and _hmac.compare_digest(u.password_hash, _hash_password(password)):
+            return {"usuario": u.usuario, "nombre": u.nombre}
+    return None
+
+
+async def registrar_crm(tipo: str, nombre: str, telefono: str, descripcion: str, asesor: str = "") -> int:
+    """Agrega un registro al CRM. Retorna el id creado."""
+    async with async_session() as session:
+        reg = CrmRegistro(
+            tipo=tipo,
+            nombre=nombre or "",
+            telefono=telefono or "",
+            descripcion=descripcion or "",
+            asesor=asesor or "",
+            estado="asignado" if asesor else "nuevo",
+        )
+        session.add(reg)
+        await session.commit()
+        await session.refresh(reg)
+        return reg.id
+
+
+async def listar_crm(estado: str = "", tipo: str = "", limite: int = 200) -> list[dict]:
+    """Lista registros del CRM, opcionalmente filtrados por estado y tipo."""
+    async with async_session() as session:
+        query = select(CrmRegistro)
+        if estado:
+            query = query.where(CrmRegistro.estado == estado)
+        if tipo:
+            query = query.where(CrmRegistro.tipo == tipo)
+        query = query.order_by(CrmRegistro.creado.desc()).limit(limite)
+        result = await session.execute(query)
+        registros = result.scalars().all()
+        return [{
+            "id": r.id,
+            "tipo": r.tipo,
+            "nombre": r.nombre,
+            "telefono": r.telefono,
+            "descripcion": r.descripcion,
+            "asesor": r.asesor,
+            "estado": r.estado,
+            "notas": r.notas,
+            "creado": r.creado.strftime("%d/%m/%Y %H:%M"),
+        } for r in registros]
+
+
+async def actualizar_crm(registro_id: int, estado: str = None, asesor: str = None, notas: str = None) -> bool:
+    """Actualiza estado, asesor o notas de un registro del CRM."""
+    async with async_session() as session:
+        resultado = await session.execute(
+            select(CrmRegistro).where(CrmRegistro.id == registro_id)
+        )
+        r = resultado.scalar_one_or_none()
+        if not r:
+            return False
+        if estado is not None:
+            r.estado = estado
+        if asesor is not None:
+            r.asesor = asesor
+        if notas is not None:
+            r.notas = notas
+        r.actualizado = datetime.utcnow()
+        await session.commit()
+        return True

@@ -18,7 +18,9 @@
       "Write",
       "Edit",
       "Glob",
-      "Grep"
+      "Grep",
+      "Bash(brew *)",
+      "Bash(gh auth *)"
     ]
   }
 }
