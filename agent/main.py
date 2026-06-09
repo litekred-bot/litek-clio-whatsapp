@@ -927,7 +927,9 @@ async def _procesar_mensaje(msg):
                     logger.info(f"Foto de asesor enviada al cliente: {foto_asesor}")
 
     except Exception as e:
+        import traceback as _tb
         logger.error(f"Error procesando mensaje en background: {e}")
+        _diag_webhook["ultimo_error"] = _tb.format_exc()[-1200:]
 
 
 @app.get("/diag/webhook")
@@ -936,12 +938,14 @@ async def diag_webhook():
     from datetime import datetime as _dt
     return {
         "total_webhooks_recibidos": _diag_webhook["total"],
+        "mensajes_extraidos": _diag_webhook["mensajes"],
         "ultimo_recibido": _diag_webhook["ultimo"].isoformat() if _diag_webhook["ultimo"] else None,
+        "ultimo_error": _diag_webhook.get("ultimo_error"),
         "ahora": _dt.utcnow().isoformat(),
     }
 
 
-_diag_webhook = {"total": 0, "ultimo": None}
+_diag_webhook = {"total": 0, "mensajes": 0, "ultimo": None, "ultimo_error": None}
 
 
 @app.post("/webhook")
@@ -958,6 +962,7 @@ async def webhook_handler(request: Request):
     except Exception as e:
         logger.error(f"Error parseando webhook: {e}")
         return {"status": "ok"}
+    _diag_webhook["mensajes"] += len(mensajes)
 
     for msg in mensajes:
         if msg.es_propio:
