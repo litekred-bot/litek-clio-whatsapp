@@ -254,6 +254,12 @@ async def crm_control(request: Request):
     return {"ok": True, "control": await estado_control(telefono)}
 
 
+def _wa_destino(telefono: str) -> str:
+    """Normaliza a formato WhatsApp México: 521 + últimos 10 dígitos."""
+    d = "".join(c for c in (telefono or "") if c.isdigit())
+    return ("521" + d[-10:]) if len(d) >= 10 else d
+
+
 @app.post("/crm/api/enviar")
 async def crm_enviar(request: Request):
     """Envía un mensaje al cliente desde el número de Clio (requiere token)."""
@@ -265,11 +271,14 @@ async def crm_enviar(request: Request):
     mensaje = (data.get("mensaje", "") or "").strip()
     if not telefono or not mensaje:
         return {"ok": False, "error": "Falta teléfono o mensaje"}
+    destino = _wa_destino(telefono)  # 521 + 10 dígitos (si no, WhatsApp no entrega)
     # Al responder, el asesor toma el control automáticamente (refresca el timer)
-    await tomar_control(telefono, u["nombre"])
-    ok = await proveedor.enviar_mensaje(telefono, mensaje)
+    await tomar_control(destino, u["nombre"])
+    ok = await proveedor.enviar_mensaje(destino, mensaje)
     # Guardar en el historial marcado como asesor (para distinguirlo de Clio)
-    await guardar_mensaje(telefono, "assistant", f"[Asesor {u['nombre']}] {mensaje}")
+    await guardar_mensaje(destino, "assistant", f"[Asesor {u['nombre']}] {mensaje}")
+    if not ok:
+        logger.error(f"Envío desde panel falló a {destino}")
     return {"ok": ok}
 
 

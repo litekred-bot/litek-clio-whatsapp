@@ -76,6 +76,7 @@ HTML_PANEL = r"""<!DOCTYPE html>
   .carga .a { background: #fff3e0; border: 1px solid #ffcc80; border-radius: 20px; padding: 8px 16px; font-size: 14px; }
   .carga .a b { color: #e65100; font-size: 17px; }
   .carga .titulo { width: 100%; font-size: 12px; color: #888; margin-bottom: 2px; }
+  .buscador { width: 100%; padding: 11px 14px; border: 1px solid #ccc; border-radius: 10px; font-size: 15px; margin: 6px 0 12px; }
   .stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
   .stat { background: #fff; border-radius: 10px; padding: 12px 18px; box-shadow: 0 1px 4px rgba(0,0,0,.05); }
   .stat b { font-size: 22px; display: block; color: #e30613; }
@@ -138,6 +139,7 @@ HTML_PANEL = r"""<!DOCTYPE html>
   </div>
   <div class="wrap">
     <div class="carga" id="carga"></div>
+    <input id="buscar" class="buscador" placeholder="🔍 Buscar por nombre o número..." oninput="aplicarBusqueda()">
     <div class="stats" id="stats"></div>
     <div class="filtros" id="filtros">
       <button data-f="estado" data-v="" class="activo">Todos</button>
@@ -217,8 +219,24 @@ async function cargar(){
     document.getElementById("quien").textContent = "👤 " + (d.nombre || "") + (d.es_director ? "" : " · viendo solo lo tuyo");
     pintarCarga(d.carga);
     pintarStats(d.stats);
-    pintar(d.registros);
+    ULTIMOS_REGISTROS = d.registros || [];
+    aplicarBusqueda();
   }catch(e){ console.log(e); }
+}
+
+var ULTIMOS_REGISTROS = [];
+function aplicarBusqueda(){
+  var q = (document.getElementById("buscar").value || "").toLowerCase().trim();
+  var qDig = q.replace(/\D/g, "");
+  var regs = ULTIMOS_REGISTROS;
+  if (q){
+    regs = regs.filter(function(r){
+      var nom = (r.nombre || "").toLowerCase();
+      var tel = (r.telefono || "").replace(/\D/g, "");
+      return nom.indexOf(q) !== -1 || (qDig && tel.indexOf(qDig) !== -1);
+    });
+  }
+  pintar(regs);
 }
 
 function pintarCarga(c){
