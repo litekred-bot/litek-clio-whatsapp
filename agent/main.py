@@ -509,7 +509,7 @@ async def _procesar_mensaje(msg):
                     nombre=msg.nombre_perfil or "Cliente",
                     descripcion=f"💲 Cotización: {msg.texto[:160]}",
                     tipo="cliente",
-                    estado_minimo="nuevo",
+                    estado_minimo="asignado",  # cotizó → ya tiene dueño → pasa a Asignados
                     asesor_si_nuevo=asesor_turno,
                 )
             except Exception as e:

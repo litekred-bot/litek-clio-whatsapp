@@ -498,6 +498,7 @@ async def asignar_ruletas_sin_avanzar(horas: int = 2, candidatos: tuple = ("Anna
         for r in pendientes:
             asesor = await siguiente_asesor_rueda(candidatos)
             r.asesor = asesor
+            r.estado = "asignado"  # ya tiene dueño → pasa a Asignados
             r.actualizado = datetime.utcnow()
             asignados += 1
         if asignados:
