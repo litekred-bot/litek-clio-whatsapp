@@ -94,7 +94,8 @@ HTML_PANEL = r"""<!DOCTYPE html>
   .card .acciones { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
   .card .acciones select, .card .acciones input { padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
   .card .acciones input.nota { flex: 1; min-width: 140px; }
-  .card a.wa { background: #25D366; color: #fff; text-decoration: none; padding: 6px 12px; border-radius: 6px; font-size: 13px; }
+  .card a.wa, .card button.wa { background: #25D366; color: #fff; text-decoration: none; padding: 6px 12px; border-radius: 6px; font-size: 13px; border: none; cursor: pointer; }
+  .card button.copia { background: #eef; color: #334; border: 1px solid #ccd; padding: 6px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; }
   .vacio { text-align: center; color: #999; padding: 40px; }
 </style>
 </head>
@@ -223,7 +224,8 @@ function pintar(regs){
         '<select onchange="upd('+r.id+',\'estado\',this.value)">'+opcEstado+'</select>'+
         '<select onchange="upd('+r.id+',\'asesor\',this.value)">'+opcAsesor+'</select>'+
         '<input class="nota" placeholder="Nota..." value="'+esc(r.notas||"")+'" onblur="upd('+r.id+',\'notas\',this.value)">'+
-        (num10 ? '<button class="wa" onclick="copiarNum(\''+num10+'\',this)" title="Copiar número y buscarlo en tu WhatsApp">📋 '+numFmt+'</button>' : '')+
+        (num10 ? '<button class="copia" onclick="copiarNum(\''+num10+'\',this)" title="Copiar número para buscarlo en tu WhatsApp">📋 '+numFmt+'</button>'+
+                 '<a class="wa" href="https://wa.me/'+wa+'" target="_blank" title="Abrir chat de WhatsApp">💬 Mandar</a>' : '')+
       '</div></div>';
   }).join("");
 }
