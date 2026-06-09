@@ -688,6 +688,11 @@ async def _procesar_mensaje(msg):
                             ASESOR_WHATSAPP,
                             f"✅ {nombre_cli} ya mandó su archivo para imprimir. Pedido completo, listo para producción."
                         )
+                        # Quitar la alerta del panel: ya mandó el archivo
+                        try:
+                            await marcar_alerta_crm(msg.telefono, "")
+                        except Exception:
+                            pass
                         logger.info(f"Archivo tardío reenviado al asesor para {msg.telefono}")
                     except Exception as e:
                         logger.error(f"Error reenviando archivo tardío: {e}")
@@ -871,6 +876,11 @@ async def _procesar_mensaje(msg):
                         f"⚠️ *{nombre_cli} YA PAGÓ pero falta su archivo para imprimir.*\n"
                         f"Clio se lo está pidiendo. Si no lo manda pronto, contáctalo: wa.me/{numero_limpio}"
                     )
+                    # Prender alerta ⚠️ en el panel para que el asesor lo revise
+                    try:
+                        await marcar_alerta_crm(msg.telefono, "⚠️ Pagó pero falta archivo")
+                    except Exception as e:
+                        logger.error(f"Error marcando alerta pago-sin-archivo: {e}")
                     logger.info(f"Pago sin archivo — avisado al asesor, pendiente {msg.telefono}")
 
                 # Limpiar la última imagen ya usada como comprobante
