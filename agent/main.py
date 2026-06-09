@@ -930,12 +930,29 @@ async def _procesar_mensaje(msg):
         logger.error(f"Error procesando mensaje en background: {e}")
 
 
+@app.get("/diag/webhook")
+async def diag_webhook():
+    """Diagnóstico: cuántos webhooks ha recibido y cuándo el último."""
+    from datetime import datetime as _dt
+    return {
+        "total_webhooks_recibidos": _diag_webhook["total"],
+        "ultimo_recibido": _diag_webhook["ultimo"].isoformat() if _diag_webhook["ultimo"] else None,
+        "ahora": _dt.utcnow().isoformat(),
+    }
+
+
+_diag_webhook = {"total": 0, "ultimo": None}
+
+
 @app.post("/webhook")
 async def webhook_handler(request: Request):
     """
     Recibe mensajes de WhatsApp. Responde 200 de inmediato y procesa en
     segundo plano, para que Whapi no reintente (evita alertas duplicadas).
     """
+    from datetime import datetime as _dt
+    _diag_webhook["total"] += 1
+    _diag_webhook["ultimo"] = _dt.utcnow()
     try:
         mensajes = await proveedor.parsear_webhook(request)
     except Exception as e:
