@@ -535,11 +535,13 @@ async def consolidar_duplicados_crm() -> dict:
     return {"grupos": grupos_borrados, "borrados": total_borrados}
 
 
-async def asignar_ruletas_sin_avanzar(horas: int = 2, candidatos: tuple = ("Anna", "Brayan")) -> int:
+async def asignar_ruletas_sin_avanzar(horas: int = 2, asesor_default: str = "Anna") -> int:
     """
-    Reparte por turnos los ganadores de ruleta que llevan +N horas SIN dueño y
-    sin avanzar (siguen en estado 'nuevo'). Si ya cotizaron/compraron, ya tienen
-    dueño y se ignoran (no se duplican). Retorna cuántos se asignaron.
+    Asigna los ganadores de ruleta que llevan +N horas SIN dueño y sin avanzar
+    (siguen en 'nuevo'). Como aún no identifican producto, van al asesor por
+    defecto (Anna, impresión general) para que alguien les dé seguimiento.
+    Si ya cotizaron/compraron, ya tienen dueño por su producto y se ignoran.
+    Retorna cuántos se asignaron.
     """
     limite = datetime.utcnow() - timedelta(hours=horas)
     asignados = 0
@@ -554,8 +556,7 @@ async def asignar_ruletas_sin_avanzar(horas: int = 2, candidatos: tuple = ("Anna
         )
         pendientes = result.scalars().all()
         for r in pendientes:
-            asesor = await siguiente_asesor_rueda(candidatos)
-            r.asesor = asesor
+            r.asesor = asesor_default
             r.estado = "asignado"  # ya tiene dueño → pasa a Asignados
             r.actualizado = datetime.utcnow()
             asignados += 1

@@ -229,9 +229,12 @@ async def generar_respuesta(
                 try:
                     if block.name == "calcular_precio":
                         resultado = calcular_precio(**block.input)
-                        # Señal: hubo cotización exitosa → producto identificado
+                        # Señal: hubo cotización exitosa → producto identificado.
+                        # Guardamos el PRIMER producto cotizado: define el asesor por producto.
                         if señales is not None and isinstance(resultado, dict) and "precio" in resultado:
                             señales["cotizo"] = True
+                            if "producto" not in señales:
+                                señales["producto"] = block.input.get("producto", "")
                     else:
                         resultado = {"accion": "error", "mensaje": f"Herramienta desconocida: {block.name}"}
 

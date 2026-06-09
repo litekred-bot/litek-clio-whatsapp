@@ -42,9 +42,25 @@ from agent.brain import generar_respuesta
 from agent.memory import (
     inicializar_db, guardar_mensaje, obtener_historial, registrar_ruleta, verificar_ruleta,
     registrar_crm, registrar_o_actualizar_crm, listar_crm, actualizar_crm, verificar_usuario_crm,
-    minutos_desde_ultimo_mensaje, siguiente_asesor_rueda, asignar_ruletas_sin_avanzar,
+    minutos_desde_ultimo_mensaje, asignar_ruletas_sin_avanzar,
     carga_por_asesor, consolidar_duplicados_crm,
 )
+
+# ── Reparto POR PRODUCTO (no por turnos) ──────────────────────────────────────
+# El primer producto que identifica el cliente define su asesor; luego no cambia.
+PRODUCTO_A_ASESOR = {
+    # Anna — impresión general
+    "lona": "Anna", "vinil_impreso": "Anna", "vinil_pvc": "Anna",
+    "coroplast": "Anna", "microperforado": "Anna", "papel_couche": "Anna",
+    "papel_bond": "Anna", "tabloide_laser": "Anna", "corte_vinil": "Anna",
+    # Brayan — letreros, rótulos y etiquetas
+    "etiqueta_5x5": "Brayan", "etiqueta_personalizada": "Brayan",
+}
+
+
+def asesor_por_producto(producto: str) -> str:
+    """Asesor según el producto. Por defecto Anna (impresión general)."""
+    return PRODUCTO_A_ASESOR.get(producto, "Anna")
 from agent.providers import obtener_proveedor
 from agent.transcription import transcribir_audio
 from agent.document_reader import leer_documento
@@ -513,14 +529,15 @@ async def _procesar_mensaje(msg):
         # (Anna/Brayan). Solo asigna dueño si la tarjeta aún no tiene uno.
         if señales.get("cotizo"):
             try:
-                asesor_turno = await siguiente_asesor_rueda(("Anna", "Brayan"))
+                producto = señales.get("producto", "")
+                asesor_prod = asesor_por_producto(producto)
                 await registrar_o_actualizar_crm(
                     telefono=tel_limpio,
                     nombre=msg.nombre_perfil or "Cliente",
-                    descripcion=f"💲 Cotización: {msg.texto[:160]}",
+                    descripcion=f"💲 Cotización ({producto or 'producto'}): {msg.texto[:140]}",
                     tipo="cliente",
                     estado_minimo="asignado",  # cotizó → ya tiene dueño → pasa a Asignados
-                    asesor_si_nuevo=asesor_turno,
+                    asesor_si_nuevo=asesor_prod,  # dueño fijo según el producto
                 )
             except Exception as e:
                 logger.error(f"Error asignando lead cotizado en CRM: {e}")
@@ -688,17 +705,16 @@ async def _procesar_mensaje(msg):
                 num_display = f"+{numero_limpio}"
             nombre_cli = msg.nombre_perfil or "Cliente"
             # Registrar el pedido en el CRM → la tarjeta del cliente pasa a "En proceso".
-            # Si la tarjeta ya tenía dueño (cotización/escalación), lo conserva.
-            # Si no tenía (llegó directo a pedido), se asigna por turnos — nunca sin dueño.
+            # Si la tarjeta ya tenía dueño (por el producto que cotizó/escaló), lo conserva.
+            # Si llegó directo a pedido sin dueño, default Anna (impresión general).
             try:
-                asesor_turno = await siguiente_asesor_rueda(("Anna", "Brayan"))
                 await registrar_o_actualizar_crm(
                     telefono=numero_limpio,
                     nombre=nombre_cli,
                     descripcion=resumen_pedido,
                     tipo="pedido",
                     estado_minimo="proceso",
-                    asesor_si_nuevo=asesor_turno,
+                    asesor_si_nuevo="Anna",
                 )
             except Exception as e:
                 logger.error(f"Error registrando pedido en CRM: {e}")
