@@ -44,7 +44,7 @@ from agent.memory import (
     registrar_crm, registrar_o_actualizar_crm, listar_crm, actualizar_crm, verificar_usuario_crm,
     minutos_desde_ultimo_mensaje, asignar_ruletas_sin_avanzar,
     carga_por_asesor, consolidar_duplicados_crm, obtener_conversacion_crm,
-    tomar_control, devolver_clio, estado_control,
+    tomar_control, devolver_clio, estado_control, esta_en_modo_humano,
 )
 
 # ── Reparto POR PRODUCTO (no por turnos) ──────────────────────────────────────
@@ -582,7 +582,13 @@ async def _procesar_mensaje(msg):
 
         # ── BANDEJA: si un asesor tomó el control, Clio NO responde ──────────
         # Guardamos el mensaje del cliente (para que el asesor lo vea) y salimos.
-        if await esta_en_modo_humano(msg.telefono):
+        # Defensivo: si el check falla, Clio responde igual (nunca se queda muda).
+        try:
+            en_modo_humano = await esta_en_modo_humano(msg.telefono)
+        except Exception as e:
+            logger.error(f"Error checando modo humano (Clio responde igual): {e}")
+            en_modo_humano = False
+        if en_modo_humano:
             await guardar_mensaje(msg.telefono, "user", msg.texto)
             logger.info(f"Modo humano activo para {msg.telefono} — Clio no responde")
             return
