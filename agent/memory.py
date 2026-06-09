@@ -477,6 +477,64 @@ async def registrar_o_actualizar_crm(
         return existente.id
 
 
+async def consolidar_duplicados_crm() -> dict:
+    """
+    Une tarjetas duplicadas del MISMO cliente (mismo teléfono) en una sola.
+    Necesario para limpiar data vieja creada antes del sistema de upsert.
+
+    Por cada grupo de duplicados conserva UNA tarjeta:
+    - estado = el más avanzado (proceso > asignado > nuevo)
+    - tipo = el más avanzado (pedido > escalacion > ruleta > cliente)
+    - asesor = el de cualquiera que tenga dueño (prioriza el más avanzado)
+    - nombre = el más largo/completo
+    - descripcion = la del registro más avanzado
+    Borra las tarjetas sobrantes. Retorna {grupos, borrados}.
+    """
+    grupos_borrados = 0
+    total_borrados = 0
+    async with async_session() as session:
+        result = await session.execute(select(CrmRegistro))
+        todos = result.scalars().all()
+
+        # Agrupar por sufijo de teléfono
+        grupos: dict = {}
+        for r in todos:
+            grupos.setdefault(_sufijo_tel(r.telefono), []).append(r)
+
+        for sufijo, registros in grupos.items():
+            if len(registros) < 2:
+                continue
+            # Elegir el "ganador": más avanzado en estado, luego en tipo, luego más reciente
+            ganador = max(registros, key=lambda r: (
+                _ORDEN_ESTADO.get(r.estado, 0),
+                _ORDEN_TIPO.get(r.tipo, 0),
+                r.creado,
+            ))
+            # Fusionar datos de todo el grupo en el ganador
+            mejor_asesor = ""
+            for r in sorted(registros, key=lambda r: _ORDEN_ESTADO.get(r.estado, 0), reverse=True):
+                if r.asesor:
+                    mejor_asesor = r.asesor
+                    break
+            if mejor_asesor:
+                ganador.asesor = mejor_asesor
+            mejor_nombre = max((r.nombre or "" for r in registros), key=len)
+            if mejor_nombre and len(mejor_nombre) > len(ganador.nombre or ""):
+                ganador.nombre = mejor_nombre
+            ganador.actualizado = datetime.utcnow()
+
+            # Borrar los demás
+            for r in registros:
+                if r.id != ganador.id:
+                    await session.delete(r)
+                    total_borrados += 1
+            grupos_borrados += 1
+
+        if total_borrados:
+            await session.commit()
+    return {"grupos": grupos_borrados, "borrados": total_borrados}
+
+
 async def asignar_ruletas_sin_avanzar(horas: int = 2, candidatos: tuple = ("Anna", "Brayan")) -> int:
     """
     Reparte por turnos los ganadores de ruleta que llevan +N horas SIN dueño y

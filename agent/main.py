@@ -43,7 +43,7 @@ from agent.memory import (
     inicializar_db, guardar_mensaje, obtener_historial, registrar_ruleta, verificar_ruleta,
     registrar_crm, registrar_o_actualizar_crm, listar_crm, actualizar_crm, verificar_usuario_crm,
     minutos_desde_ultimo_mensaje, siguiente_asesor_rueda, asignar_ruletas_sin_avanzar,
-    carga_por_asesor,
+    carga_por_asesor, consolidar_duplicados_crm,
 )
 from agent.providers import obtener_proveedor
 from agent.transcription import transcribir_audio
@@ -208,6 +208,16 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = ""):
         "es_director": ve_todo,
         "carga": carga,
     }
+
+
+@app.post("/crm/api/consolidar")
+async def crm_consolidar(request: Request):
+    """Une tarjetas duplicadas del mismo cliente (solo director/admin)."""
+    u = _crm_usuario_de_request(request)
+    if not u or u["usuario"] not in CRM_VEN_TODO:
+        raise HTTPException(status_code=401, detail="No autorizado")
+    resultado = await consolidar_duplicados_crm()
+    return {"ok": True, **resultado}
 
 
 @app.post("/crm/api/registro/{registro_id}")
@@ -677,14 +687,18 @@ async def _procesar_mensaje(msg):
             else:
                 num_display = f"+{numero_limpio}"
             nombre_cli = msg.nombre_perfil or "Cliente"
-            # Registrar el pedido en el CRM → la tarjeta del cliente pasa a "En proceso"
+            # Registrar el pedido en el CRM → la tarjeta del cliente pasa a "En proceso".
+            # Si la tarjeta ya tenía dueño (cotización/escalación), lo conserva.
+            # Si no tenía (llegó directo a pedido), se asigna por turnos — nunca sin dueño.
             try:
+                asesor_turno = await siguiente_asesor_rueda(("Anna", "Brayan"))
                 await registrar_o_actualizar_crm(
                     telefono=numero_limpio,
                     nombre=nombre_cli,
                     descripcion=resumen_pedido,
                     tipo="pedido",
                     estado_minimo="proceso",
+                    asesor_si_nuevo=asesor_turno,
                 )
             except Exception as e:
                 logger.error(f"Error registrando pedido en CRM: {e}")
