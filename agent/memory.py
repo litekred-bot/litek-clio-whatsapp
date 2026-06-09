@@ -457,3 +457,31 @@ async def registrar_o_actualizar_crm(
         existente.actualizado = datetime.utcnow()
         await session.commit()
         return existente.id
+
+
+async def asignar_ruletas_sin_avanzar(horas: int = 2, candidatos: tuple = ("Anna", "Brayan")) -> int:
+    """
+    Reparte por turnos los ganadores de ruleta que llevan +N horas SIN dueño y
+    sin avanzar (siguen en estado 'nuevo'). Si ya cotizaron/compraron, ya tienen
+    dueño y se ignoran (no se duplican). Retorna cuántos se asignaron.
+    """
+    limite = datetime.utcnow() - timedelta(hours=horas)
+    asignados = 0
+    async with async_session() as session:
+        result = await session.execute(
+            select(CrmRegistro).where(
+                CrmRegistro.tipo == "ruleta",
+                CrmRegistro.estado == "nuevo",
+                (CrmRegistro.asesor == "") | (CrmRegistro.asesor.is_(None)),
+                CrmRegistro.creado <= limite,
+            )
+        )
+        pendientes = result.scalars().all()
+        for r in pendientes:
+            asesor = await siguiente_asesor_rueda(candidatos)
+            r.asesor = asesor
+            r.actualizado = datetime.utcnow()
+            asignados += 1
+        if asignados:
+            await session.commit()
+    return asignados

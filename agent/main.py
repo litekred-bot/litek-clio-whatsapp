@@ -42,7 +42,7 @@ from agent.brain import generar_respuesta
 from agent.memory import (
     inicializar_db, guardar_mensaje, obtener_historial, registrar_ruleta, verificar_ruleta,
     registrar_crm, registrar_o_actualizar_crm, listar_crm, actualizar_crm, verificar_usuario_crm,
-    minutos_desde_ultimo_mensaje, siguiente_asesor_rueda,
+    minutos_desde_ultimo_mensaje, siguiente_asesor_rueda, asignar_ruletas_sin_avanzar,
 )
 from agent.providers import obtener_proveedor
 from agent.transcription import transcribir_audio
@@ -98,8 +98,18 @@ async def lifespan(app: FastAPI):
         name="Seguimiento clientes inactivos cada 30 minutos",
         replace_existing=True,
     )
+    # Reparto de ganadores de ruleta que llevan +2h sin avanzar (sin dueño).
+    # Si compraron antes, ya tienen dueño y se ignoran (no se duplica).
+    scheduler.add_job(
+        asignar_ruletas_sin_avanzar,
+        "interval",
+        minutes=30,
+        id="reparto_ruleta",
+        name="Repartir ganadores de ruleta sin avanzar (+2h) entre Anna y Brayan",
+        replace_existing=True,
+    )
     scheduler.start()
-    logger.info("Scheduler iniciado — reporte diario 5:00 AM + seguimiento cada 30 min (Campeche)")
+    logger.info("Scheduler iniciado — reporte 5AM + seguimiento 30min + reparto ruleta 30min (Campeche)")
 
     yield
 
@@ -235,17 +245,16 @@ async def ruleta_ping(nombre: str = "", telefono: str = "", premio: str = "", de
     if not ok:
         return {"ok": False, "razon": "ya_jugo"}
 
-    # Registrar en el CRM (si ya es cliente, suma el premio a su tarjeta;
-    # si es nuevo, se reparte por turnos entre Anna y Brayan)
+    # Registrar en el CRM SIN dueño todavía. Si el cliente avanza (cotiza/compra),
+    # se le asigna por el flujo normal. Si NO avanza en 2h, un job lo reparte por
+    # turnos (ver asignar_ruletas_sin_avanzar). Así no se duplica si compra rápido.
     try:
-        asesor_turno = await siguiente_asesor_rueda(("Anna", "Brayan"))
         await registrar_o_actualizar_crm(
             telefono=telefono,
             nombre=nombre,
             descripcion=f"🎁 Ganó en ruleta: {premio}. {descripcion}",
             tipo="ruleta",
             estado_minimo="nuevo",
-            asesor_si_nuevo=asesor_turno,
         )
     except Exception as e:
         logger.error(f"Error registrando ruleta en CRM: {e}")
@@ -442,24 +451,21 @@ async def _procesar_mensaje(msg):
         historial = await obtener_historial(msg.telefono)
         es_primer_mensaje = len(historial) == 0
 
-        # Registrar en el CRM:
+        # Registrar en el CRM SIN dueño todavía (un "hola" no se reparte):
         #  • Cliente NUEVO → en su primer mensaje
         #  • Cliente RECURRENTE → si regresa tras +6h de silencio
-        # (no se registra cada mensaje, solo cuando hay actividad relevante)
+        # El reparto por turnos se hace MÁS ABAJO, solo cuando Clio da un precio
+        # (producto identificado = interés real). Así no se reparten saludos vacíos.
         SILENCIO_RECURRENTE_MIN = 360  # 6 horas
+        tel_limpio = msg.telefono.replace("@s.whatsapp.net", "")
         try:
-            tel_limpio = msg.telefono.replace("@s.whatsapp.net", "")
             if es_primer_mensaje:
-                # Reparto por turnos entre Anna y Brayan (dueño en el CRM).
-                # Clio sigue atendiendo normal; esto solo define quién le da seguimiento.
-                asesor_turno = await siguiente_asesor_rueda(("Anna", "Brayan"))
                 await registrar_o_actualizar_crm(
                     telefono=tel_limpio,
                     nombre=msg.nombre_perfil or "Cliente nuevo",
                     descripcion=f"🆕 Cliente nuevo. Primer mensaje: {msg.texto[:200]}",
                     tipo="cliente",
                     estado_minimo="nuevo",
-                    asesor_si_nuevo=asesor_turno,
                 )
             else:
                 mins = await minutos_desde_ultimo_mensaje(msg.telefono)
@@ -475,7 +481,9 @@ async def _procesar_mensaje(msg):
         except Exception as e:
             logger.error(f"Error registrando cliente en CRM: {e}")
 
-        # Generar respuesta con Claude (con soporte de imagen si aplica)
+        # Generar respuesta con Claude (con soporte de imagen si aplica).
+        # `señales` nos dice si Clio cotizó en este turno (producto identificado).
+        señales: dict = {}
         respuesta = await generar_respuesta(
             msg.texto,
             historial,
@@ -483,7 +491,24 @@ async def _procesar_mensaje(msg):
             whapi_token=proveedor.token,
             tipo=msg.tipo,
             nombre_perfil=msg.nombre_perfil,
+            señales=señales,
         )
+
+        # Si Clio dio un precio → producto identificado → repartir por turnos
+        # (Anna/Brayan). Solo asigna dueño si la tarjeta aún no tiene uno.
+        if señales.get("cotizo"):
+            try:
+                asesor_turno = await siguiente_asesor_rueda(("Anna", "Brayan"))
+                await registrar_o_actualizar_crm(
+                    telefono=tel_limpio,
+                    nombre=msg.nombre_perfil or "Cliente",
+                    descripcion=f"💲 Cotización: {msg.texto[:160]}",
+                    tipo="cliente",
+                    estado_minimo="nuevo",
+                    asesor_si_nuevo=asesor_turno,
+                )
+            except Exception as e:
+                logger.error(f"Error asignando lead cotizado en CRM: {e}")
 
         # Guardar usuario y respuesta en memoria
         # Si era imagen, guardar con contexto para que no se pierda en turnos siguientes

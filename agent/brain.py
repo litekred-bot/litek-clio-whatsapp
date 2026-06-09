@@ -139,12 +139,16 @@ async def generar_respuesta(
     whapi_token: str = "",
     tipo: str = "text",
     nombre_perfil: str = "",
+    señales: dict | None = None,
 ) -> str:
     """
     Genera una respuesta usando Claude API con soporte de tool_use.
 
     El modelo llama automáticamente a calcular_precio() cuando necesita
     cotizar un producto — garantizando exactitud matemática en precios.
+
+    `señales` (opcional): si se pasa un dict, se rellena con banderas del turno.
+    Hoy: señales["cotizo"] = True si Clio dio un precio (producto identificado).
     """
     if not mensaje or len(mensaje.strip()) < 2:
         return obtener_mensaje_fallback()
@@ -225,6 +229,9 @@ async def generar_respuesta(
                 try:
                     if block.name == "calcular_precio":
                         resultado = calcular_precio(**block.input)
+                        # Señal: hubo cotización exitosa → producto identificado
+                        if señales is not None and isinstance(resultado, dict) and "precio" in resultado:
+                            señales["cotizo"] = True
                     else:
                         resultado = {"accion": "error", "mensaje": f"Herramienta desconocida: {block.name}"}
 
