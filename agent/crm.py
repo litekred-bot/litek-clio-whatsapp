@@ -138,7 +138,7 @@ HTML_PANEL = r"""<!DOCTYPE html>
 <div id="app" style="display:none">
   <div class="top">
     <h1>🤖 CRM LiTek</h1>
-    <div><span class="user" id="quien"></span> &nbsp; <button onclick="salir()">Salir</button></div>
+    <div><span class="user" id="quien"></span> &nbsp; <button id="btnEquipo" onclick="abrirEquipo()" style="display:none">👥 Equipo</button> &nbsp; <button onclick="salir()">Salir</button></div>
   </div>
   <div class="wrap">
     <div class="carga" id="carga"></div>
@@ -174,6 +174,13 @@ HTML_PANEL = r"""<!DOCTYPE html>
       <input id="msgInput" placeholder="Escribe para responder al cliente..." onkeydown="if(event.key==='Enter')enviarMensaje()">
       <button onclick="enviarMensaje()">Enviar</button>
     </div>
+  </div>
+</div>
+
+<div class="modal" id="modalEquipo" onclick="if(event.target===this)cerrarEquipo()">
+  <div class="box">
+    <div class="mhead"><b>👥 Equipo — Contraseñas</b><button onclick="cerrarEquipo()">✕ Cerrar</button></div>
+    <div class="chat" id="equipoLista" style="background:#fff;"></div>
   </div>
 </div>
 
@@ -223,6 +230,7 @@ async function cargar(){
     if (r.status === 401){ salir(); return; }
     var d = await r.json();
     document.getElementById("quien").textContent = "👤 " + (d.nombre || "") + (d.es_director ? "" : " · viendo solo lo tuyo");
+    document.getElementById("btnEquipo").style.display = d.es_director ? "inline-block" : "none";
     pintarCarga(d.carga);
     pintarStats(d.stats);
     ULTIMOS_REGISTROS = d.registros || [];
@@ -336,6 +344,34 @@ async function cargarChat(){
     }).join("");
     cuerpo.scrollTop = cuerpo.scrollHeight;
   }catch(e){ cuerpo.innerHTML = '<div class="vacio">Error al cargar</div>'; }
+}
+
+async function abrirEquipo(){
+  document.getElementById("modalEquipo").style.display = "flex";
+  var cont = document.getElementById("equipoLista");
+  cont.innerHTML = '<div class="vacio">Cargando...</div>';
+  var r = await fetch("/crm/api/usuarios", {headers:{"Authorization":"Bearer "+TOKEN}});
+  var d = await r.json();
+  cont.innerHTML = (d.usuarios||[]).map(function(u){
+    return '<div style="padding:12px;border-bottom:1px solid #eee;">'+
+      '<div style="font-weight:bold;margin-bottom:6px;">'+esc(u.nombre)+' <span style="color:#999;font-weight:normal;">('+esc(u.usuario)+')</span></div>'+
+      '<div style="display:flex;gap:6px;">'+
+        '<input id="pwd_'+u.usuario+'" type="text" placeholder="Nueva contraseña" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:6px;">'+
+        '<button onclick="cambiarPwd(\''+u.usuario+'\')" style="background:#e30613;color:#fff;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;font-weight:bold;">Cambiar</button>'+
+      '</div></div>';
+  }).join("");
+}
+
+function cerrarEquipo(){ document.getElementById("modalEquipo").style.display = "none"; }
+
+async function cambiarPwd(usuario){
+  var inp = document.getElementById("pwd_"+usuario);
+  var nueva = inp.value.trim();
+  if (nueva.length < 4){ alert("La contraseña debe tener al menos 4 caracteres"); return; }
+  var r = await fetch("/crm/api/usuario/password", {method:"POST", headers:{"Authorization":"Bearer "+TOKEN, "Content-Type":"application/json"}, body: JSON.stringify({usuario: usuario, password: nueva})});
+  var d = await r.json();
+  if (d.ok){ inp.value = ""; alert("✅ Contraseña de "+usuario+" cambiada"); }
+  else { alert("❌ "+(d.error||"No se pudo cambiar")); }
 }
 
 function pintarControl(c){

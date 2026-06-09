@@ -45,7 +45,7 @@ from agent.memory import (
     minutos_desde_ultimo_mensaje, asignar_ruletas_sin_avanzar,
     carga_por_asesor, consolidar_duplicados_crm, obtener_conversacion_crm,
     tomar_control, devolver_clio, estado_control, esta_en_modo_humano,
-    marcar_alerta_crm,
+    marcar_alerta_crm, listar_usuarios_crm, cambiar_password_crm,
 )
 from zoneinfo import ZoneInfo as _ZI
 
@@ -294,6 +294,30 @@ async def crm_enviar(request: Request):
     await guardar_mensaje(destino, "assistant", f"[Asesor {u['nombre']}] {mensaje}")
     if not ok:
         logger.error(f"Envío desde panel falló a {destino}")
+    return {"ok": ok}
+
+
+@app.get("/crm/api/usuarios")
+async def crm_usuarios(request: Request):
+    """Lista usuarios del equipo (solo director/admin)."""
+    u = _crm_usuario_de_request(request)
+    if not u or u["usuario"] not in CRM_VEN_TODO:
+        raise HTTPException(status_code=401, detail="No autorizado")
+    return {"usuarios": await listar_usuarios_crm()}
+
+
+@app.post("/crm/api/usuario/password")
+async def crm_cambiar_password(request: Request):
+    """Cambia la contraseña de un usuario del equipo (solo director/admin)."""
+    u = _crm_usuario_de_request(request)
+    if not u or u["usuario"] not in CRM_VEN_TODO:
+        raise HTTPException(status_code=401, detail="No autorizado")
+    data = await request.json()
+    usuario = (data.get("usuario", "") or "").strip()
+    nueva = (data.get("password", "") or "").strip()
+    if not usuario or len(nueva) < 4:
+        return {"ok": False, "error": "La contraseña debe tener al menos 4 caracteres"}
+    ok = await cambiar_password_crm(usuario, nueva)
     return {"ok": ok}
 
 

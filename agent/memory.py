@@ -385,6 +385,26 @@ async def _crear_usuarios_crm_iniciales():
         await session.commit()
 
 
+async def listar_usuarios_crm() -> list[dict]:
+    """Lista los usuarios del equipo (sin exponer contraseñas)."""
+    async with async_session() as session:
+        result = await session.execute(select(CrmUsuario).order_by(CrmUsuario.id))
+        return [{"usuario": u.usuario, "nombre": u.nombre} for u in result.scalars().all()]
+
+
+async def cambiar_password_crm(usuario: str, nueva_password: str) -> bool:
+    """Cambia la contraseña de un usuario del equipo."""
+    async with async_session() as session:
+        u = (await session.execute(
+            select(CrmUsuario).where(CrmUsuario.usuario == usuario.lower().strip())
+        )).scalar_one_or_none()
+        if not u:
+            return False
+        u.password_hash = _hash_password(nueva_password)
+        await session.commit()
+        return True
+
+
 async def verificar_usuario_crm(usuario: str, password: str) -> dict | None:
     """Verifica credenciales del CRM. Retorna {usuario, nombre} si son correctas."""
     async with async_session() as session:
