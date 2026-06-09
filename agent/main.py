@@ -150,18 +150,6 @@ app.add_middleware(
 )
 
 
-@app.get("/diag/clio")
-async def diag_clio():
-    """Diagnóstico temporal: prueba generar_respuesta y reporta el error real."""
-    import traceback
-    try:
-        señales = {}
-        resp = await generar_respuesta("hola, ¿cuánto una lona de 1x1?", [], señales=señales)
-        return {"ok": True, "respuesta": resp[:300], "señales": señales}
-    except Exception as e:
-        return {"ok": False, "error": str(e), "traceback": traceback.format_exc()[-1500:]}
-
-
 @app.get("/")
 async def health_check():
     """Endpoint de salud para Railway/monitoreo."""
