@@ -43,7 +43,7 @@ from agent.memory import (
     inicializar_db, guardar_mensaje, obtener_historial, registrar_ruleta, verificar_ruleta,
     registrar_crm, registrar_o_actualizar_crm, listar_crm, actualizar_crm, verificar_usuario_crm,
     minutos_desde_ultimo_mensaje, asignar_ruletas_sin_avanzar,
-    carga_por_asesor, consolidar_duplicados_crm,
+    carga_por_asesor, consolidar_duplicados_crm, obtener_conversacion_crm,
 )
 
 # ── Reparto POR PRODUCTO (no por turnos) ──────────────────────────────────────
@@ -224,6 +224,16 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = ""):
         "es_director": ve_todo,
         "carga": carga,
     }
+
+
+@app.get("/crm/api/chat")
+async def crm_chat(request: Request, telefono: str = ""):
+    """Devuelve la conversación de un cliente para verla en el panel (requiere token)."""
+    u = _crm_usuario_de_request(request)
+    if not u:
+        raise HTTPException(status_code=401, detail="No autorizado")
+    mensajes = await obtener_conversacion_crm(telefono)
+    return {"mensajes": mensajes}
 
 
 @app.post("/crm/api/consolidar")

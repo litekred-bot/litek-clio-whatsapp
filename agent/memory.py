@@ -121,6 +121,31 @@ async def obtener_historial(telefono: str, limite: int = 20) -> list[dict]:
         ]
 
 
+async def obtener_conversacion_crm(telefono: str, limite: int = 150) -> list[dict]:
+    """
+    Historial completo de la conversación de un cliente para verlo en el CRM.
+    Empareja por los últimos 10 dígitos (ignora prefijos/@s.whatsapp.net).
+    Devuelve mensajes en orden cronológico con rol y hora (Campeche).
+    """
+    sufijo = _sufijo_tel(telefono)
+    if not sufijo:
+        return []
+    async with async_session() as session:
+        query = (
+            select(Mensaje)
+            .where(Mensaje.telefono.like(f"%{sufijo}%"))
+            .order_by(Mensaje.timestamp.asc())
+            .limit(limite)
+        )
+        result = await session.execute(query)
+        msgs = result.scalars().all()
+        return [{
+            "role": m.role,
+            "content": m.content,
+            "hora": (m.timestamp - timedelta(hours=6)).strftime("%d/%m %H:%M"),  # UTC→Campeche
+        } for m in msgs]
+
+
 async def minutos_desde_ultimo_mensaje(telefono: str) -> float | None:
     """
     Minutos transcurridos desde el último mensaje de esta conversación.

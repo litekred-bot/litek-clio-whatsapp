@@ -97,6 +97,17 @@ HTML_PANEL = r"""<!DOCTYPE html>
   .card a.wa, .card button.wa { background: #25D366; color: #fff; text-decoration: none; padding: 6px 12px; border-radius: 6px; font-size: 13px; border: none; cursor: pointer; }
   .card button.copia { background: #eef; color: #334; border: 1px solid #ccd; padding: 6px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; }
   .vacio { text-align: center; color: #999; padding: 40px; }
+  /* Modal de chat */
+  .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 100; align-items: center; justify-content: center; }
+  .modal .box { background: #fff; border-radius: 12px; width: 92%; max-width: 520px; max-height: 82vh; display: flex; flex-direction: column; overflow: hidden; }
+  .modal .mhead { padding: 14px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+  .modal .mhead b { font-size: 16px; }
+  .modal .mhead button { background: #eee; border: none; border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 14px; }
+  .modal .chat { padding: 14px; overflow-y: auto; flex: 1; background: #ece5dd; }
+  .burb { max-width: 82%; padding: 8px 11px; border-radius: 8px; margin-bottom: 8px; font-size: 14px; white-space: pre-wrap; box-shadow: 0 1px 1px rgba(0,0,0,.1); }
+  .burb .quien { font-size: 10px; color: #777; margin-bottom: 3px; font-weight: bold; }
+  .bcli { background: #fff; margin-right: auto; }
+  .bclio { background: #dcf8c6; margin-left: auto; }
 </style>
 </head>
 <body>
@@ -133,6 +144,13 @@ HTML_PANEL = r"""<!DOCTYPE html>
       <button data-f="tipo" data-v="ruleta">Ruleta</button>
     </div>
     <div id="lista"></div>
+  </div>
+</div>
+
+<div class="modal" id="modal" onclick="if(event.target===this)cerrarModal()">
+  <div class="box">
+    <div class="mhead"><b id="modalNombre">Conversación</b><button onclick="cerrarModal()">✕ Cerrar</button></div>
+    <div class="chat" id="modalChat"></div>
   </div>
 </div>
 
@@ -224,11 +242,33 @@ function pintar(regs){
         '<select onchange="upd('+r.id+',\'estado\',this.value)">'+opcEstado+'</select>'+
         '<select onchange="upd('+r.id+',\'asesor\',this.value)">'+opcAsesor+'</select>'+
         '<input class="nota" placeholder="Nota..." value="'+esc(r.notas||"")+'" onblur="upd('+r.id+',\'notas\',this.value)">'+
+        (wa ? '<button class="copia" onclick="verChat(\''+wa+'\',\''+(r.nombre||"Cliente").replace(/[\\\\\x27"]/g,"")+'\')" title="Ver la conversación con Clio">👁️ Ver chat</button>' : '')+
         (num10 ? '<button class="copia" onclick="copiarNum(\''+num10+'\',this)" title="Copiar número para buscarlo en tu WhatsApp">📋 '+numFmt+'</button>'+
                  '<a class="wa" href="https://wa.me/'+wa+'" target="_blank" title="Abrir chat de WhatsApp">💬 Mandar</a>' : '')+
       '</div></div>';
   }).join("");
 }
+
+async function verChat(tel, nombre){
+  var modal = document.getElementById("modal");
+  var cuerpo = document.getElementById("modalChat");
+  document.getElementById("modalNombre").textContent = "💬 " + (nombre || "Conversación");
+  cuerpo.innerHTML = '<div class="vacio">Cargando conversación...</div>';
+  modal.style.display = "flex";
+  try{
+    var r = await fetch("/crm/api/chat?telefono=" + encodeURIComponent(tel), {headers:{"Authorization":"Bearer "+TOKEN}});
+    var d = await r.json();
+    if(!d.mensajes || !d.mensajes.length){ cuerpo.innerHTML = '<div class="vacio">Sin mensajes guardados de este cliente</div>'; return; }
+    cuerpo.innerHTML = d.mensajes.map(function(m){
+      var cls = m.role === "user" ? "bcli" : "bclio";
+      var quien = m.role === "user" ? "Cliente" : "Clio";
+      return '<div class="burb '+cls+'"><div class="quien">'+quien+' · '+m.hora+'</div>'+esc(m.content)+'</div>';
+    }).join("");
+    cuerpo.scrollTop = cuerpo.scrollHeight;
+  }catch(e){ cuerpo.innerHTML = '<div class="vacio">Error al cargar</div>'; }
+}
+
+function cerrarModal(){ document.getElementById("modal").style.display = "none"; }
 
 function copiarNum(num, btn){
   var orig = btn.innerHTML;
