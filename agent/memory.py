@@ -5,7 +5,7 @@ import os
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import String, Text, DateTime, select, Integer, func
+from sqlalchemy import String, Text, DateTime, select, Integer, func, Boolean
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -60,6 +60,17 @@ class CrmRegistro(Base):
     estado: Mapped[str] = mapped_column(String(20), default="nuevo", index=True)  # nuevo|asignado|proceso|cerrado
     notas: Mapped[str] = mapped_column(Text, default="")
     creado: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    actualizado: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ControlHumano(Base):
+    """Conversaciones donde un asesor tomó el control (Clio en pausa)."""
+    __tablename__ = "control_humano"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    telefono: Mapped[str] = mapped_column(String(20), unique=True, index=True)  # últimos 10 dígitos
+    asesor: Mapped[str] = mapped_column(String(100), default="")
+    activo: Mapped[bool] = mapped_column(Boolean, default=True)
     actualizado: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
@@ -144,6 +155,66 @@ async def obtener_conversacion_crm(telefono: str, limite: int = 150) -> list[dic
             "content": m.content,
             "hora": (m.timestamp - timedelta(hours=6)).strftime("%d/%m %H:%M"),  # UTC→Campeche
         } for m in msgs]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Control humano (bandeja): un asesor pausa a Clio y atiende él
+# ─────────────────────────────────────────────────────────────────────────────
+EXPIRA_CONTROL_MIN = 30  # Clio retoma sola tras 30 min sin actividad del humano
+
+
+async def tomar_control(telefono: str, asesor: str):
+    """Un asesor toma el control de la conversación (Clio se pausa)."""
+    suf = _sufijo_tel(telefono)
+    async with async_session() as session:
+        r = (await session.execute(
+            select(ControlHumano).where(ControlHumano.telefono == suf)
+        )).scalar_one_or_none()
+        if r:
+            r.activo = True
+            r.asesor = asesor
+            r.actualizado = datetime.utcnow()
+        else:
+            session.add(ControlHumano(telefono=suf, asesor=asesor, activo=True))
+        await session.commit()
+
+
+async def devolver_clio(telefono: str):
+    """Devuelve la conversación a Clio (quita la pausa)."""
+    suf = _sufijo_tel(telefono)
+    async with async_session() as session:
+        r = (await session.execute(
+            select(ControlHumano).where(ControlHumano.telefono == suf)
+        )).scalar_one_or_none()
+        if r:
+            r.activo = False
+            r.actualizado = datetime.utcnow()
+            await session.commit()
+
+
+async def estado_control(telefono: str) -> dict:
+    """
+    Estado del control de la conversación, aplicando expiración automática.
+    Si el humano lleva +30 min sin actividad, Clio retoma sola.
+    Retorna {activo, asesor}.
+    """
+    suf = _sufijo_tel(telefono)
+    async with async_session() as session:
+        r = (await session.execute(
+            select(ControlHumano).where(ControlHumano.telefono == suf)
+        )).scalar_one_or_none()
+        if not r or not r.activo:
+            return {"activo": False, "asesor": ""}
+        if datetime.utcnow() - r.actualizado > timedelta(minutes=EXPIRA_CONTROL_MIN):
+            r.activo = False  # expiró → Clio retoma
+            await session.commit()
+            return {"activo": False, "asesor": ""}
+        return {"activo": True, "asesor": r.asesor}
+
+
+async def esta_en_modo_humano(telefono: str) -> bool:
+    """True si un asesor tiene el control (Clio debe quedarse callada)."""
+    return (await estado_control(telefono))["activo"]
 
 
 async def minutos_desde_ultimo_mensaje(telefono: str) -> float | None:

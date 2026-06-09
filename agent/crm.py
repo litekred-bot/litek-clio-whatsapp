@@ -108,6 +108,16 @@ HTML_PANEL = r"""<!DOCTYPE html>
   .burb .quien { font-size: 10px; color: #777; margin-bottom: 3px; font-weight: bold; }
   .bcli { background: #fff; margin-right: auto; }
   .bclio { background: #dcf8c6; margin-left: auto; }
+  .basesor { background: #cfe8ff; margin-left: auto; }
+  .modal .mctrl { padding: 10px 14px; background: #fafafa; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .modal .mctrl .est { font-size: 13px; }
+  .modal .mctrl .est b { color: #e30613; }
+  .modal .mctrl button { border: none; border-radius: 6px; padding: 7px 12px; cursor: pointer; font-size: 13px; font-weight: bold; }
+  .modal .mctrl .tomar { background: #FF9800; color: #fff; }
+  .modal .mctrl .devolver { background: #2196F3; color: #fff; }
+  .modal .msend { display: flex; gap: 6px; padding: 10px; border-top: 1px solid #eee; }
+  .modal .msend input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; }
+  .modal .msend button { background: #25D366; color: #fff; border: none; border-radius: 8px; padding: 10px 16px; cursor: pointer; font-weight: bold; }
 </style>
 </head>
 <body>
@@ -150,7 +160,12 @@ HTML_PANEL = r"""<!DOCTYPE html>
 <div class="modal" id="modal" onclick="if(event.target===this)cerrarModal()">
   <div class="box">
     <div class="mhead"><b id="modalNombre">Conversación</b><button onclick="cerrarModal()">✕ Cerrar</button></div>
+    <div class="mctrl" id="modalCtrl"></div>
     <div class="chat" id="modalChat"></div>
+    <div class="msend">
+      <input id="msgInput" placeholder="Escribe para responder al cliente..." onkeydown="if(event.key==='Enter')enviarMensaje()">
+      <button onclick="enviarMensaje()">Enviar</button>
+    </div>
   </div>
 </div>
 
@@ -249,23 +264,62 @@ function pintar(regs){
   }).join("");
 }
 
+var chatTel = "", chatNombre = "";
+
 async function verChat(tel, nombre){
-  var modal = document.getElementById("modal");
-  var cuerpo = document.getElementById("modalChat");
+  chatTel = tel; chatNombre = nombre;
   document.getElementById("modalNombre").textContent = "💬 " + (nombre || "Conversación");
+  document.getElementById("modal").style.display = "flex";
+  await cargarChat();
+}
+
+async function cargarChat(){
+  var cuerpo = document.getElementById("modalChat");
   cuerpo.innerHTML = '<div class="vacio">Cargando conversación...</div>';
-  modal.style.display = "flex";
   try{
-    var r = await fetch("/crm/api/chat?telefono=" + encodeURIComponent(tel), {headers:{"Authorization":"Bearer "+TOKEN}});
+    var r = await fetch("/crm/api/chat?telefono=" + encodeURIComponent(chatTel), {headers:{"Authorization":"Bearer "+TOKEN}});
     var d = await r.json();
+    pintarControl(d.control);
     if(!d.mensajes || !d.mensajes.length){ cuerpo.innerHTML = '<div class="vacio">Sin mensajes guardados de este cliente</div>'; return; }
     cuerpo.innerHTML = d.mensajes.map(function(m){
-      var cls = m.role === "user" ? "bcli" : "bclio";
-      var quien = m.role === "user" ? "Cliente" : "Clio";
-      return '<div class="burb '+cls+'"><div class="quien">'+quien+' · '+m.hora+'</div>'+esc(m.content)+'</div>';
+      var esAsesor = m.role === "assistant" && m.content.indexOf("[Asesor ") === 0;
+      var cls = m.role === "user" ? "bcli" : (esAsesor ? "basesor" : "bclio");
+      var quien, texto = m.content;
+      if (m.role === "user"){ quien = "Cliente"; }
+      else if (esAsesor){
+        var mm = m.content.match(/^\[Asesor ([^\]]*)\]\s*/);
+        quien = "✍️ " + (mm ? mm[1] : "Asesor");
+        texto = m.content.replace(/^\[Asesor [^\]]*\]\s*/, "");
+      } else { quien = "🤖 Clio"; }
+      return '<div class="burb '+cls+'"><div class="quien">'+quien+' · '+m.hora+'</div>'+esc(texto)+'</div>';
     }).join("");
     cuerpo.scrollTop = cuerpo.scrollHeight;
   }catch(e){ cuerpo.innerHTML = '<div class="vacio">Error al cargar</div>'; }
+}
+
+function pintarControl(c){
+  var el = document.getElementById("modalCtrl");
+  if (c && c.activo){
+    el.innerHTML = '<span class="est">✋ Control: <b>'+esc(c.asesor||"Asesor")+'</b> (Clio en pausa)</span>'+
+      '<button class="devolver" onclick="toggleControl(\'devolver\')">🤖 Devolver a Clio</button>';
+  } else {
+    el.innerHTML = '<span class="est">🤖 Clio está atendiendo</span>'+
+      '<button class="tomar" onclick="toggleControl(\'tomar\')">✋ Tomar control</button>';
+  }
+}
+
+async function toggleControl(accion){
+  await fetch("/crm/api/control", {method:"POST", headers:{"Authorization":"Bearer "+TOKEN, "Content-Type":"application/json"}, body: JSON.stringify({telefono: chatTel, accion: accion})});
+  await cargarChat();
+}
+
+async function enviarMensaje(){
+  var inp = document.getElementById("msgInput");
+  var msg = inp.value.trim();
+  if (!msg) return;
+  inp.value = "";
+  await fetch("/crm/api/enviar", {method:"POST", headers:{"Authorization":"Bearer "+TOKEN, "Content-Type":"application/json"}, body: JSON.stringify({telefono: chatTel, mensaje: msg})});
+  await cargarChat();
 }
 
 function cerrarModal(){ document.getElementById("modal").style.display = "none"; }
