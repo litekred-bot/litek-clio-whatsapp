@@ -5,7 +5,7 @@ import os
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import String, Text, DateTime, select, Integer
+from sqlalchemy import String, Text, DateTime, select, Integer, func
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -364,6 +364,25 @@ def _sufijo_tel(telefono: str) -> str:
     return "".join(c for c in (telefono or "") if c.isdigit())[-10:]
 
 
+async def siguiente_asesor_rueda(candidatos: tuple = ("Anna", "Brayan")) -> str:
+    """
+    Devuelve el asesor que debe recibir el siguiente lead, repartiendo por
+    turnos (uno y uno). Asigna al que tenga MENOS clientes/ruleta acumulados,
+    así queda balanceado. En empate, el primero de la lista.
+    """
+    async with async_session() as session:
+        conteos = {}
+        for a in candidatos:
+            res = await session.execute(
+                select(func.count(CrmRegistro.id)).where(
+                    CrmRegistro.asesor == a,
+                    CrmRegistro.tipo.in_(["cliente", "ruleta"]),
+                )
+            )
+            conteos[a] = res.scalar_one() or 0
+        return min(candidatos, key=lambda a: conteos[a])
+
+
 async def registrar_o_actualizar_crm(
     telefono: str,
     nombre: str = "",
@@ -371,13 +390,20 @@ async def registrar_o_actualizar_crm(
     tipo: str = "cliente",
     estado_minimo: str = "nuevo",
     asesor: str = "",
+    asesor_si_nuevo: str = "",
 ) -> int:
     """
     Una tarjeta por cliente que AVANZA de estado (nuevo→asignado→proceso→cerrado).
 
     Si ya existe una tarjeta NO cerrada de ese teléfono, la actualiza (sube de
-    estado solo si corresponde, refresca descripción, nombre, asesor y tipo).
+    estado solo si corresponde, refresca descripción, nombre y tipo).
     Si no existe (o la última está cerrada), crea una nueva. Retorna el id.
+
+    Asesor:
+    - `asesor`: dueño explícito. Se aplica SIEMPRE (sobrescribe al existente).
+      Lo usa la escalación, que manda al área correspondiente.
+    - `asesor_si_nuevo`: dueño SOLO si se crea tarjeta nueva (no reasigna a quien
+      ya tiene dueño). Lo usa el reparto por turnos de clientes nuevos / ruleta.
     """
     sufijo = _sufijo_tel(telefono)
     tel_guardar = (telefono or "").replace("@s.whatsapp.net", "")
@@ -397,14 +423,13 @@ async def registrar_o_actualizar_crm(
 
         if existente is None:
             # Crear tarjeta nueva
-            estado_inicial = estado_minimo if asesor == "" else "asignado"
             reg = CrmRegistro(
                 tipo=tipo,
                 nombre=nombre or "",
                 telefono=tel_guardar,
                 descripcion=descripcion or "",
-                asesor=asesor or "",
-                estado=estado_inicial,
+                asesor=asesor or asesor_si_nuevo or "",
+                estado=estado_minimo,
             )
             session.add(reg)
             await session.commit()
@@ -424,11 +449,11 @@ async def registrar_o_actualizar_crm(
         # Nombre: completa si estaba vacío o genérico
         if nombre and existente.nombre.strip().lower() in ("", "cliente", "cliente nuevo"):
             existente.nombre = nombre
-        # Asesor: asigna si viene uno
+        # Asesor: solo el explícito reasigna; asesor_si_nuevo respeta al dueño actual
         if asesor:
             existente.asesor = asesor
-            if _ORDEN_ESTADO.get(existente.estado, 0) < _ORDEN_ESTADO["asignado"]:
-                existente.estado = "asignado"
+        elif asesor_si_nuevo and not existente.asesor:
+            existente.asesor = asesor_si_nuevo
         existente.actualizado = datetime.utcnow()
         await session.commit()
         return existente.id

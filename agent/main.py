@@ -42,7 +42,7 @@ from agent.brain import generar_respuesta
 from agent.memory import (
     inicializar_db, guardar_mensaje, obtener_historial, registrar_ruleta, verificar_ruleta,
     registrar_crm, registrar_o_actualizar_crm, listar_crm, actualizar_crm, verificar_usuario_crm,
-    minutos_desde_ultimo_mensaje,
+    minutos_desde_ultimo_mensaje, siguiente_asesor_rueda,
 )
 from agent.providers import obtener_proveedor
 from agent.transcription import transcribir_audio
@@ -235,14 +235,17 @@ async def ruleta_ping(nombre: str = "", telefono: str = "", premio: str = "", de
     if not ok:
         return {"ok": False, "razon": "ya_jugo"}
 
-    # Registrar en el CRM (si ya es cliente, suma el premio a su tarjeta)
+    # Registrar en el CRM (si ya es cliente, suma el premio a su tarjeta;
+    # si es nuevo, se reparte por turnos entre Anna y Brayan)
     try:
+        asesor_turno = await siguiente_asesor_rueda(("Anna", "Brayan"))
         await registrar_o_actualizar_crm(
             telefono=telefono,
             nombre=nombre,
             descripcion=f"🎁 Ganó en ruleta: {premio}. {descripcion}",
             tipo="ruleta",
             estado_minimo="nuevo",
+            asesor_si_nuevo=asesor_turno,
         )
     except Exception as e:
         logger.error(f"Error registrando ruleta en CRM: {e}")
@@ -447,12 +450,16 @@ async def _procesar_mensaje(msg):
         try:
             tel_limpio = msg.telefono.replace("@s.whatsapp.net", "")
             if es_primer_mensaje:
+                # Reparto por turnos entre Anna y Brayan (dueño en el CRM).
+                # Clio sigue atendiendo normal; esto solo define quién le da seguimiento.
+                asesor_turno = await siguiente_asesor_rueda(("Anna", "Brayan"))
                 await registrar_o_actualizar_crm(
                     telefono=tel_limpio,
                     nombre=msg.nombre_perfil or "Cliente nuevo",
                     descripcion=f"🆕 Cliente nuevo. Primer mensaje: {msg.texto[:200]}",
                     tipo="cliente",
                     estado_minimo="nuevo",
+                    asesor_si_nuevo=asesor_turno,
                 )
             else:
                 mins = await minutos_desde_ultimo_mensaje(msg.telefono)
