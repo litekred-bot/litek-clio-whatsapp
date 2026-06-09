@@ -210,20 +210,32 @@ function pintar(regs){
   if (!regs || !regs.length){ c.innerHTML = '<div class="vacio">No hay registros con este filtro 👍</div>'; return; }
   c.innerHTML = regs.map(function(r){
     var wa = r.telefono ? r.telefono.replace(/\D/g,"") : "";
+    var num10 = wa.slice(-10);  // número local de 10 dígitos (como lo ven en su WhatsApp)
+    var numFmt = num10.replace(/(\d{3})(\d{3})(\d{4})/, "$1 $2 $3") || wa;
     var opcAsesor = ASESORES.map(function(a){ return '<option value="'+a+'"'+(a===r.asesor?' selected':'')+'>'+(a||'— Asignar —')+'</option>'; }).join("");
     var opcEstado = Object.keys(ESTADOS).map(function(e){ return '<option value="'+e+'"'+(e===r.estado?' selected':'')+'>'+ESTADOS[e]+'</option>'; }).join("");
     return '<div class="card '+r.estado+'">'+
       '<div class="head"><span class="nombre">'+esc(r.nombre||"Sin nombre")+'</span>'+
       '<span class="tipo">'+(TIPOS[r.tipo]||r.tipo)+'</span></div>'+
       '<div class="desc">'+esc(r.descripcion||"")+'</div>'+
-      '<div class="meta">📱 '+esc(r.telefono||"")+' &nbsp;•&nbsp; 📅 '+r.creado+'</div>'+
+      '<div class="meta">📅 '+r.creado+'</div>'+
       '<div class="acciones">'+
         '<select onchange="upd('+r.id+',\'estado\',this.value)">'+opcEstado+'</select>'+
         '<select onchange="upd('+r.id+',\'asesor\',this.value)">'+opcAsesor+'</select>'+
         '<input class="nota" placeholder="Nota..." value="'+esc(r.notas||"")+'" onblur="upd('+r.id+',\'notas\',this.value)">'+
-        (wa ? '<a class="wa" href="https://wa.me/'+wa+'" target="_blank">💬 WhatsApp</a>' : '')+
+        (num10 ? '<button class="wa" onclick="copiarNum(\''+num10+'\',this)" title="Copiar número y buscarlo en tu WhatsApp">📋 '+numFmt+'</button>' : '')+
       '</div></div>';
   }).join("");
+}
+
+function copiarNum(num, btn){
+  var orig = btn.innerHTML;
+  function ok(){ btn.innerHTML = "✅ ¡Copiado!"; setTimeout(function(){ btn.innerHTML = orig; }, 1500); }
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(num).then(ok, function(){ prompt("Copia el número:", num); });
+  } else {
+    prompt("Copia el número:", num);
+  }
 }
 
 async function upd(id, campo, valor){
