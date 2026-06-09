@@ -383,6 +383,24 @@ async def siguiente_asesor_rueda(candidatos: tuple = ("Anna", "Brayan")) -> str:
         return min(candidatos, key=lambda a: conteos[a])
 
 
+async def carga_por_asesor(asesores: tuple = ("Anna", "Brayan", "Tere")) -> dict:
+    """
+    Cuenta los clientes PENDIENTES (no cerrados) que tiene cada asesor por atender.
+    Sirve para el resumen de carga del panel (ej. Anna 10, Brayan 15).
+    """
+    out = {}
+    async with async_session() as session:
+        for a in asesores:
+            res = await session.execute(
+                select(func.count(CrmRegistro.id)).where(
+                    CrmRegistro.asesor == a,
+                    CrmRegistro.estado != "cerrado",
+                )
+            )
+            out[a] = res.scalar_one() or 0
+    return out
+
+
 async def registrar_o_actualizar_crm(
     telefono: str,
     nombre: str = "",

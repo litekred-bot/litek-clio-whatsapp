@@ -43,6 +43,7 @@ from agent.memory import (
     inicializar_db, guardar_mensaje, obtener_historial, registrar_ruleta, verificar_ruleta,
     registrar_crm, registrar_o_actualizar_crm, listar_crm, actualizar_crm, verificar_usuario_crm,
     minutos_desde_ultimo_mensaje, siguiente_asesor_rueda, asignar_ruletas_sin_avanzar,
+    carga_por_asesor,
 )
 from agent.providers import obtener_proveedor
 from agent.transcription import transcribir_audio
@@ -152,14 +153,15 @@ def _crm_usuario_de_request(request: Request) -> dict | None:
     return None
 
 
-# Quién ve qué: el director ve TODO; cada asesor ve SOLO lo asignado a él.
-CRM_DIRECTORES = {"chino"}
-CRM_USUARIO_A_ASESOR = {"anna": "Anna", "brayan": "Brayan", "tere": "Tere"}
+# Quién ve qué: director (Chino) y administradora (Tere) ven TODO;
+# cada asesor (Anna, Brayan) ve SOLO lo asignado a él.
+CRM_VEN_TODO = {"chino", "tere"}
+CRM_USUARIO_A_ASESOR = {"anna": "Anna", "brayan": "Brayan"}
 
 
 def _asesor_filtro_de(usuario: str) -> str:
-    """Asesor por el que se filtra. '' = ve todo (director)."""
-    if usuario in CRM_DIRECTORES:
+    """Asesor por el que se filtra. '' = ve todo (director/admin)."""
+    if usuario in CRM_VEN_TODO:
         return ""
     return CRM_USUARIO_A_ASESOR.get(usuario, usuario.capitalize())
 
@@ -188,20 +190,23 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = ""):
     u = _crm_usuario_de_request(request)
     if not u:
         raise HTTPException(status_code=401, detail="No autorizado")
-    # Filtro por persona: el director ve todo, cada asesor solo lo asignado a él
+    # Filtro por persona: director/admin ven todo, cada asesor solo lo asignado a él
     asesor_filtro = _asesor_filtro_de(u["usuario"])
-    es_director = u["usuario"] in CRM_DIRECTORES
+    ve_todo = u["usuario"] in CRM_VEN_TODO
     registros = await listar_crm(estado=estado, tipo=tipo, asesor=asesor_filtro)
     # Stats por estado (respetando el filtro de persona, sin filtro de estado)
     todos = await listar_crm(tipo=tipo, asesor=asesor_filtro, limite=1000)
     stats = {"nuevo": 0, "asignado": 0, "proceso": 0, "cerrado": 0}
     for r in todos:
         stats[r["estado"]] = stats.get(r["estado"], 0) + 1
+    # Carga por asesor (solo para quien ve todo): Anna 10, Brayan 15, Tere 3...
+    carga = await carga_por_asesor() if ve_todo else None
     return {
         "registros": registros,
         "stats": stats,
         "nombre": u["nombre"],
-        "es_director": es_director,
+        "es_director": ve_todo,
+        "carga": carga,
     }
 
 

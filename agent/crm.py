@@ -72,6 +72,10 @@ HTML_PANEL = r"""<!DOCTYPE html>
   .filtros { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
   .filtros button { background: #fff; border: 1px solid #ddd; padding: 8px 14px; border-radius: 20px; cursor: pointer; font-size: 14px; }
   .filtros button.activo { background: #e30613; color: #fff; border-color: #e30613; }
+  .carga { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0 6px; }
+  .carga .a { background: #fff3e0; border: 1px solid #ffcc80; border-radius: 20px; padding: 8px 16px; font-size: 14px; }
+  .carga .a b { color: #e65100; font-size: 17px; }
+  .carga .titulo { width: 100%; font-size: 12px; color: #888; margin-bottom: 2px; }
   .stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
   .stat { background: #fff; border-radius: 10px; padding: 12px 18px; box-shadow: 0 1px 4px rgba(0,0,0,.05); }
   .stat b { font-size: 22px; display: block; color: #e30613; }
@@ -111,6 +115,7 @@ HTML_PANEL = r"""<!DOCTYPE html>
     <div><span class="user" id="quien"></span> &nbsp; <button onclick="salir()">Salir</button></div>
   </div>
   <div class="wrap">
+    <div class="carga" id="carga"></div>
     <div class="stats" id="stats"></div>
     <div class="filtros" id="filtros">
       <button data-f="estado" data-v="" class="activo">Todos</button>
@@ -176,9 +181,19 @@ async function cargar(){
     if (r.status === 401){ salir(); return; }
     var d = await r.json();
     document.getElementById("quien").textContent = "👤 " + (d.nombre || "") + (d.es_director ? "" : " · viendo solo lo tuyo");
+    pintarCarga(d.carga);
     pintarStats(d.stats);
     pintar(d.registros);
   }catch(e){ console.log(e); }
+}
+
+function pintarCarga(c){
+  var el = document.getElementById("carga");
+  if(!c){ el.innerHTML = ""; return; }
+  var chips = Object.keys(c).map(function(a){
+    return '<div class="a">'+a+' <b>'+c[a]+'</b></div>';
+  }).join("");
+  el.innerHTML = '<div class="titulo">Clientes por atender (pendientes):</div>' + chips;
 }
 
 function pintarStats(s){
