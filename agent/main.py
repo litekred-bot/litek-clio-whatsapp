@@ -45,7 +45,22 @@ from agent.memory import (
     minutos_desde_ultimo_mensaje, asignar_ruletas_sin_avanzar,
     carga_por_asesor, consolidar_duplicados_crm, obtener_conversacion_crm,
     tomar_control, devolver_clio, estado_control, esta_en_modo_humano,
+    marcar_alerta_crm,
 )
+from zoneinfo import ZoneInfo as _ZI
+
+
+def es_horario_atencion() -> bool:
+    """True si estamos dentro del horario de LiTek (Campeche).
+    L-V 9-19h, Sáb 9-16h, Dom cerrado."""
+    ahora = datetime.now(_ZI("America/Merida"))
+    dia = ahora.weekday()  # 0=Lun ... 6=Dom
+    h = ahora.hour
+    if dia == 6:            # Domingo
+        return False
+    if dia == 5:            # Sábado hasta las 4pm
+        return 9 <= h < 16
+    return 9 <= h < 19      # Lunes a Viernes hasta las 7pm
 
 # ── Reparto POR PRODUCTO (no por turnos) ──────────────────────────────────────
 # El primer producto que identifica el cliente define su asesor; luego no cambia.
@@ -304,6 +319,7 @@ async def crm_actualizar(registro_id: int, request: Request):
         estado=data.get("estado"),
         asesor=data.get("asesor"),
         notas=data.get("notas"),
+        alerta=data.get("alerta"),
     )
     return {"ok": ok}
 
@@ -630,6 +646,17 @@ async def _procesar_mensaje(msg):
                 area_escalar = match.group(1)
                 respuesta = re.sub(r'\[ESCALAR:\w+\]', '', respuesta).strip()
 
+        # Detectar [ALERTA:motivo] — Clio prende la alerta ⚠️ en el panel
+        # (cliente frustrado, comprobante no cuadra, falta archivo, etc.)
+        match_alerta = re.search(r'\[ALERTA:([^\]]+)\]', respuesta)
+        if match_alerta:
+            motivo_alerta = match_alerta.group(1).strip()
+            respuesta = re.sub(r'\[ALERTA:[^\]]+\]', '', respuesta).strip()
+            try:
+                await marcar_alerta_crm(msg.telefono, f"⚠️ {motivo_alerta}")
+            except Exception as e:
+                logger.error(f"Error marcando alerta CRM: {e}")
+
         # Detectar [MOTIVO] — resumen conciso del motivo de escalación (lo genera Clio)
         motivo_escalacion = None
         match_motivo = re.search(r'\[MOTIVO\](.*?)\[/MOTIVO\]', respuesta, re.DOTALL)
@@ -785,6 +812,9 @@ async def _procesar_mensaje(msg):
                     estado_minimo="proceso",
                     asesor_si_nuevo="Anna",
                 )
+                # Alerta automática si el pedido entró FUERA de horario
+                if not es_horario_atencion():
+                    await marcar_alerta_crm(numero_limpio, "⚠️ Pidió fuera de horario")
             except Exception as e:
                 logger.error(f"Error registrando pedido en CRM: {e}")
             msg_asesor = (

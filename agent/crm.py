@@ -90,6 +90,9 @@ HTML_PANEL = r"""<!DOCTYPE html>
   .card .head { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 8px; }
   .card .nombre { font-weight: bold; font-size: 16px; }
   .card .tipo { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #eee; color: #555; text-transform: uppercase; }
+  .card.alertado { border-left-color: #e30613; background: #fff6f6; }
+  .card .alerta-banner { background: #ffe0e0; color: #b71c1c; border-radius: 8px; padding: 7px 10px; margin: 8px 0; font-size: 13px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .card .alerta-banner button { background: #b71c1c; color: #fff; border: none; border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
   .card .desc { color: #444; font-size: 14px; margin: 8px 0; white-space: pre-wrap; }
   .card .meta { font-size: 12px; color: #999; }
   .card .acciones { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
@@ -154,6 +157,9 @@ HTML_PANEL = r"""<!DOCTYPE html>
       <button data-f="tipo" data-v="pedido">Pedidos</button>
       <button data-f="tipo" data-v="cliente">Clientes nuevos</button>
       <button data-f="tipo" data-v="ruleta">Ruleta</button>
+    </div>
+    <div class="filtros">
+      <button id="btnRevisar" onclick="toggleRevisar()" style="background:#ffe0e0;color:#b71c1c;border-color:#ffb3b3;">⚠️ Solo a revisar</button>
     </div>
     <div id="lista"></div>
   </div>
@@ -225,10 +231,12 @@ async function cargar(){
 }
 
 var ULTIMOS_REGISTROS = [];
+var SOLO_REVISAR = false;
 function aplicarBusqueda(){
   var q = (document.getElementById("buscar").value || "").toLowerCase().trim();
   var qDig = q.replace(/\D/g, "");
   var regs = ULTIMOS_REGISTROS;
+  if (SOLO_REVISAR){ regs = regs.filter(function(r){ return r.alerta; }); }
   if (q){
     regs = regs.filter(function(r){
       var nom = (r.nombre || "").toLowerCase();
@@ -237,6 +245,19 @@ function aplicarBusqueda(){
     });
   }
   pintar(regs);
+}
+
+function toggleRevisar(){
+  SOLO_REVISAR = !SOLO_REVISAR;
+  var b = document.getElementById("btnRevisar");
+  b.style.background = SOLO_REVISAR ? "#b71c1c" : "#ffe0e0";
+  b.style.color = SOLO_REVISAR ? "#fff" : "#b71c1c";
+  aplicarBusqueda();
+}
+
+async function resolverAlerta(id){
+  await fetch("/crm/api/registro/"+id, {method:"POST", headers:{"Authorization":"Bearer "+TOKEN, "Content-Type":"application/json"}, body: JSON.stringify({alerta: ""})});
+  cargar();
 }
 
 function pintarCarga(c){
@@ -266,9 +287,11 @@ function pintar(regs){
     var numFmt = num10.replace(/(\d{3})(\d{3})(\d{4})/, "$1 $2 $3") || wa;
     var opcAsesor = ASESORES.map(function(a){ return '<option value="'+a+'"'+(a===r.asesor?' selected':'')+'>'+(a||'— Asignar —')+'</option>'; }).join("");
     var opcEstado = Object.keys(ESTADOS).map(function(e){ return '<option value="'+e+'"'+(e===r.estado?' selected':'')+'>'+ESTADOS[e]+'</option>'; }).join("");
-    return '<div class="card '+r.estado+'">'+
+    var alertaHtml = r.alerta ? '<div class="alerta-banner"><span>'+esc(r.alerta)+'</span><button onclick="resolverAlerta('+r.id+')">✓ Resuelto</button></div>' : '';
+    return '<div class="card '+r.estado+(r.alerta?' alertado':'')+'">'+
       '<div class="head"><span class="nombre">'+esc(r.nombre||"Sin nombre")+'</span>'+
       '<span class="tipo">'+(TIPOS[r.tipo]||r.tipo)+'</span></div>'+
+      alertaHtml+
       '<div class="desc">'+esc(r.descripcion||"")+'</div>'+
       '<div class="meta">📅 '+r.creado+'</div>'+
       '<div class="acciones">'+

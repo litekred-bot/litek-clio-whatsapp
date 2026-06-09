@@ -5,7 +5,7 @@ import os
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import String, Text, DateTime, select, Integer, func, Boolean
+from sqlalchemy import String, Text, DateTime, select, Integer, func, Boolean, text
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -58,6 +58,7 @@ class CrmRegistro(Base):
     descripcion: Mapped[str] = mapped_column(Text, default="")
     asesor: Mapped[str] = mapped_column(String(100), default="")     # a quién se asignó
     estado: Mapped[str] = mapped_column(String(20), default="nuevo", index=True)  # nuevo|asignado|proceso|cerrado
+    alerta: Mapped[str] = mapped_column(String(200), default="")  # motivo a revisar (⚠️) o vacío
     notas: Mapped[str] = mapped_column(Text, default="")
     creado: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     actualizado: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -86,9 +87,19 @@ class CrmUsuario(Base):
 
 
 async def inicializar_db():
-    """Crea las tablas si no existen."""
+    """Crea las tablas si no existen y aplica migraciones ligeras."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Migración: agregar columnas nuevas a tablas existentes (idempotente).
+        # Sin "IF NOT EXISTS" para que funcione en SQLite y PostgreSQL; si la
+        # columna ya existe, el except lo ignora.
+        for sql in [
+            "ALTER TABLE crm_registros ADD COLUMN alerta VARCHAR(200) DEFAULT ''",
+        ]:
+            try:
+                await conn.execute(text(sql))
+            except Exception:
+                pass  # la columna ya existe
     await _crear_usuarios_crm_iniciales()
 
 
@@ -424,13 +435,33 @@ async def listar_crm(estado: str = "", tipo: str = "", asesor: str = "", limite:
             "descripcion": r.descripcion,
             "asesor": r.asesor,
             "estado": r.estado,
+            "alerta": getattr(r, "alerta", "") or "",
             "notas": r.notas,
             "creado": r.creado.strftime("%d/%m/%Y %H:%M"),
         } for r in registros]
 
 
-async def actualizar_crm(registro_id: int, estado: str = None, asesor: str = None, notas: str = None) -> bool:
-    """Actualiza estado, asesor o notas de un registro del CRM."""
+async def marcar_alerta_crm(telefono: str, motivo: str):
+    """Prende la alerta ⚠️ 'Revisar' en la tarjeta del cliente (la más reciente no cerrada)."""
+    sufijo = _sufijo_tel(telefono)
+    async with async_session() as session:
+        result = await session.execute(
+            select(CrmRegistro)
+            .where(CrmRegistro.estado != "cerrado")
+            .order_by(CrmRegistro.creado.desc())
+        )
+        for r in result.scalars().all():
+            if _sufijo_tel(r.telefono) == sufijo:
+                r.alerta = motivo[:200]
+                r.actualizado = datetime.utcnow()
+                await session.commit()
+                return True
+    return False
+
+
+async def actualizar_crm(registro_id: int, estado: str = None, asesor: str = None,
+                         notas: str = None, alerta: str = None) -> bool:
+    """Actualiza estado, asesor, notas o alerta de un registro del CRM."""
     async with async_session() as session:
         resultado = await session.execute(
             select(CrmRegistro).where(CrmRegistro.id == registro_id)
@@ -444,6 +475,8 @@ async def actualizar_crm(registro_id: int, estado: str = None, asesor: str = Non
             r.asesor = asesor
         if notas is not None:
             r.notas = notas
+        if alerta is not None:
+            r.alerta = alerta
         r.actualizado = datetime.utcnow()
         await session.commit()
         return True
