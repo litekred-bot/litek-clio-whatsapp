@@ -349,3 +349,84 @@ async def actualizar_crm(registro_id: int, estado: str = None, asesor: str = Non
         r.actualizado = datetime.utcnow()
         await session.commit()
         return True
+
+
+# Ciclo de vida de un cliente: el estado solo AVANZA, nunca retrocede.
+_ORDEN_ESTADO = {"nuevo": 0, "asignado": 1, "proceso": 2, "cerrado": 3}
+# Importancia del tipo: se muestra la etiqueta del evento más avanzado alcanzado.
+_ORDEN_TIPO = {"cliente": 0, "ruleta": 1, "escalacion": 2, "pedido": 3}
+
+
+def _sufijo_tel(telefono: str) -> str:
+    """Últimos 10 dígitos del teléfono (para emparejar al mismo cliente sin importar prefijo)."""
+    return "".join(c for c in (telefono or "") if c.isdigit())[-10:]
+
+
+async def registrar_o_actualizar_crm(
+    telefono: str,
+    nombre: str = "",
+    descripcion: str = "",
+    tipo: str = "cliente",
+    estado_minimo: str = "nuevo",
+    asesor: str = "",
+) -> int:
+    """
+    Una tarjeta por cliente que AVANZA de estado (nuevo→asignado→proceso→cerrado).
+
+    Si ya existe una tarjeta NO cerrada de ese teléfono, la actualiza (sube de
+    estado solo si corresponde, refresca descripción, nombre, asesor y tipo).
+    Si no existe (o la última está cerrada), crea una nueva. Retorna el id.
+    """
+    sufijo = _sufijo_tel(telefono)
+    tel_guardar = (telefono or "").replace("@s.whatsapp.net", "")
+
+    async with async_session() as session:
+        # Buscar la tarjeta abierta (no cerrada) más reciente de este cliente
+        result = await session.execute(
+            select(CrmRegistro)
+            .where(CrmRegistro.estado != "cerrado")
+            .order_by(CrmRegistro.creado.desc())
+        )
+        existente = None
+        for r in result.scalars().all():
+            if _sufijo_tel(r.telefono) == sufijo:
+                existente = r
+                break
+
+        if existente is None:
+            # Crear tarjeta nueva
+            estado_inicial = estado_minimo if asesor == "" else "asignado"
+            reg = CrmRegistro(
+                tipo=tipo,
+                nombre=nombre or "",
+                telefono=tel_guardar,
+                descripcion=descripcion or "",
+                asesor=asesor or "",
+                estado=estado_inicial,
+            )
+            session.add(reg)
+            await session.commit()
+            await session.refresh(reg)
+            return reg.id
+
+        # Actualizar la tarjeta existente — el cliente avanza
+        # Estado: solo sube
+        if _ORDEN_ESTADO.get(estado_minimo, 0) > _ORDEN_ESTADO.get(existente.estado, 0):
+            existente.estado = estado_minimo
+        # Tipo: muestra la etiqueta del evento más avanzado
+        if _ORDEN_TIPO.get(tipo, 0) >= _ORDEN_TIPO.get(existente.tipo, 0):
+            existente.tipo = tipo
+        # Descripción: refresca con lo más reciente relevante
+        if descripcion:
+            existente.descripcion = descripcion
+        # Nombre: completa si estaba vacío o genérico
+        if nombre and existente.nombre.strip().lower() in ("", "cliente", "cliente nuevo"):
+            existente.nombre = nombre
+        # Asesor: asigna si viene uno
+        if asesor:
+            existente.asesor = asesor
+            if _ORDEN_ESTADO.get(existente.estado, 0) < _ORDEN_ESTADO["asignado"]:
+                existente.estado = "asignado"
+        existente.actualizado = datetime.utcnow()
+        await session.commit()
+        return existente.id

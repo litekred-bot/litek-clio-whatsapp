@@ -41,7 +41,7 @@ _ultima_imagen: dict[str, str] = {}
 from agent.brain import generar_respuesta
 from agent.memory import (
     inicializar_db, guardar_mensaje, obtener_historial, registrar_ruleta, verificar_ruleta,
-    registrar_crm, listar_crm, actualizar_crm, verificar_usuario_crm,
+    registrar_crm, registrar_o_actualizar_crm, listar_crm, actualizar_crm, verificar_usuario_crm,
     minutos_desde_ultimo_mensaje,
 )
 from agent.providers import obtener_proveedor
@@ -215,10 +215,15 @@ async def ruleta_ping(nombre: str = "", telefono: str = "", premio: str = "", de
     if not ok:
         return {"ok": False, "razon": "ya_jugo"}
 
-    # Registrar en el CRM
+    # Registrar en el CRM (si ya es cliente, suma el premio a su tarjeta)
     try:
-        await registrar_crm(tipo="ruleta", nombre=nombre, telefono=telefono,
-                            descripcion=f"🎁 Premio: {premio}. {descripcion}")
+        await registrar_o_actualizar_crm(
+            telefono=telefono,
+            nombre=nombre,
+            descripcion=f"🎁 Ganó en ruleta: {premio}. {descripcion}",
+            tipo="ruleta",
+            estado_minimo="nuevo",
+        )
     except Exception as e:
         logger.error(f"Error registrando ruleta en CRM: {e}")
 
@@ -422,21 +427,23 @@ async def _procesar_mensaje(msg):
         try:
             tel_limpio = msg.telefono.replace("@s.whatsapp.net", "")
             if es_primer_mensaje:
-                await registrar_crm(
-                    tipo="cliente",
-                    nombre=msg.nombre_perfil or "Cliente nuevo",
+                await registrar_o_actualizar_crm(
                     telefono=tel_limpio,
+                    nombre=msg.nombre_perfil or "Cliente nuevo",
                     descripcion=f"🆕 Cliente nuevo. Primer mensaje: {msg.texto[:200]}",
+                    tipo="cliente",
+                    estado_minimo="nuevo",
                 )
             else:
                 mins = await minutos_desde_ultimo_mensaje(msg.telefono)
                 if mins is not None and mins >= SILENCIO_RECURRENTE_MIN:
                     horas = int(mins // 60)
-                    await registrar_crm(
-                        tipo="cliente",
-                        nombre=msg.nombre_perfil or "Cliente",
+                    await registrar_o_actualizar_crm(
                         telefono=tel_limpio,
+                        nombre=msg.nombre_perfil or "Cliente",
                         descripcion=f"🔄 Cliente regresó (tras {horas}h sin escribir): {msg.texto[:200]}",
+                        tipo="cliente",
+                        estado_minimo="nuevo",
                     )
         except Exception as e:
             logger.error(f"Error registrando cliente en CRM: {e}")
@@ -613,10 +620,15 @@ async def _procesar_mensaje(msg):
             else:
                 num_display = f"+{numero_limpio}"
             nombre_cli = msg.nombre_perfil or "Cliente"
-            # Registrar el pedido en el CRM
+            # Registrar el pedido en el CRM → la tarjeta del cliente pasa a "En proceso"
             try:
-                await registrar_crm(tipo="pedido", nombre=nombre_cli,
-                                    telefono=numero_limpio, descripcion=resumen_pedido)
+                await registrar_o_actualizar_crm(
+                    telefono=numero_limpio,
+                    nombre=nombre_cli,
+                    descripcion=resumen_pedido,
+                    tipo="pedido",
+                    estado_minimo="proceso",
+                )
             except Exception as e:
                 logger.error(f"Error registrando pedido en CRM: {e}")
             msg_asesor = (
@@ -728,11 +740,12 @@ async def _procesar_mensaje(msg):
                 "letreros": "Brayan", "administracion": "Tere",
             }.get(area_escalar, "")
             try:
-                await registrar_crm(
-                    tipo="escalacion",
-                    nombre=msg.nombre_perfil or "Cliente",
+                await registrar_o_actualizar_crm(
                     telefono=msg.telefono.replace("@s.whatsapp.net", ""),
+                    nombre=msg.nombre_perfil or "Cliente",
                     descripcion=resumen_completo,
+                    tipo="escalacion",
+                    estado_minimo="asignado",
                     asesor=_asesor_area,
                 )
             except Exception as e:
