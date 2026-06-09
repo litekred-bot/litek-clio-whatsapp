@@ -175,7 +175,7 @@ async function cargar(){
     var r = await fetch(url, {headers:{"Authorization":"Bearer "+TOKEN}});
     if (r.status === 401){ salir(); return; }
     var d = await r.json();
-    document.getElementById("quien").textContent = "👤 " + (d.nombre || "");
+    document.getElementById("quien").textContent = "👤 " + (d.nombre || "") + (d.es_director ? "" : " · viendo solo lo tuyo");
     pintarStats(d.stats);
     pintar(d.registros);
   }catch(e){ console.log(e); }

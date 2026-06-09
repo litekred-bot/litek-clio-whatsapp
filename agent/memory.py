@@ -307,14 +307,16 @@ async def registrar_crm(tipo: str, nombre: str, telefono: str, descripcion: str,
         return reg.id
 
 
-async def listar_crm(estado: str = "", tipo: str = "", limite: int = 200) -> list[dict]:
-    """Lista registros del CRM, opcionalmente filtrados por estado y tipo."""
+async def listar_crm(estado: str = "", tipo: str = "", asesor: str = "", limite: int = 200) -> list[dict]:
+    """Lista registros del CRM, opcionalmente filtrados por estado, tipo y asesor."""
     async with async_session() as session:
         query = select(CrmRegistro)
         if estado:
             query = query.where(CrmRegistro.estado == estado)
         if tipo:
             query = query.where(CrmRegistro.tipo == tipo)
+        if asesor:
+            query = query.where(CrmRegistro.asesor == asesor)
         query = query.order_by(CrmRegistro.creado.desc()).limit(limite)
         result = await session.execute(query)
         registros = result.scalars().all()

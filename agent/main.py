@@ -142,6 +142,18 @@ def _crm_usuario_de_request(request: Request) -> dict | None:
     return None
 
 
+# Quién ve qué: el director ve TODO; cada asesor ve SOLO lo asignado a él.
+CRM_DIRECTORES = {"chino"}
+CRM_USUARIO_A_ASESOR = {"anna": "Anna", "brayan": "Brayan", "tere": "Tere"}
+
+
+def _asesor_filtro_de(usuario: str) -> str:
+    """Asesor por el que se filtra. '' = ve todo (director)."""
+    if usuario in CRM_DIRECTORES:
+        return ""
+    return CRM_USUARIO_A_ASESOR.get(usuario, usuario.capitalize())
+
+
 @app.get("/crm")
 async def crm_panel():
     """Página del panel CRM (login + tablero)."""
@@ -162,17 +174,25 @@ async def crm_login(request: Request):
 
 @app.get("/crm/api/registros")
 async def crm_registros(request: Request, estado: str = "", tipo: str = ""):
-    """Lista registros del CRM (requiere token)."""
+    """Lista registros del CRM (requiere token). Cada asesor ve solo lo suyo."""
     u = _crm_usuario_de_request(request)
     if not u:
         raise HTTPException(status_code=401, detail="No autorizado")
-    registros = await listar_crm(estado=estado, tipo=tipo)
-    # Stats por estado (sin filtro de estado)
-    todos = await listar_crm(tipo=tipo, limite=1000)
+    # Filtro por persona: el director ve todo, cada asesor solo lo asignado a él
+    asesor_filtro = _asesor_filtro_de(u["usuario"])
+    es_director = u["usuario"] in CRM_DIRECTORES
+    registros = await listar_crm(estado=estado, tipo=tipo, asesor=asesor_filtro)
+    # Stats por estado (respetando el filtro de persona, sin filtro de estado)
+    todos = await listar_crm(tipo=tipo, asesor=asesor_filtro, limite=1000)
     stats = {"nuevo": 0, "asignado": 0, "proceso": 0, "cerrado": 0}
     for r in todos:
         stats[r["estado"]] = stats.get(r["estado"], 0) + 1
-    return {"registros": registros, "stats": stats, "nombre": u["nombre"]}
+    return {
+        "registros": registros,
+        "stats": stats,
+        "nombre": u["nombre"],
+        "es_director": es_director,
+    }
 
 
 @app.post("/crm/api/registro/{registro_id}")
