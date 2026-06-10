@@ -90,16 +90,19 @@ async def inicializar_db():
     """Crea las tablas si no existen y aplica migraciones ligeras."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        # Migración: agregar columnas nuevas a tablas existentes (idempotente).
-        # Sin "IF NOT EXISTS" para que funcione en SQLite y PostgreSQL; si la
-        # columna ya existe, el except lo ignora.
-        for sql in [
-            "ALTER TABLE crm_registros ADD COLUMN alerta VARCHAR(200) DEFAULT ''",
-        ]:
-            try:
+    # Migraciones idempotentes — CADA una en su propia transacción, porque en
+    # PostgreSQL un error aborta la transacción completa (no sirve un try global).
+    migraciones = [
+        "ALTER TABLE crm_registros ADD COLUMN alerta VARCHAR(200) DEFAULT ''",
+        # 'cerrado' viejo = venta concretada → renombrar a 'vendido'
+        "UPDATE crm_registros SET estado='vendido' WHERE estado='cerrado'",
+    ]
+    for sql in migraciones:
+        try:
+            async with engine.begin() as conn:
                 await conn.execute(text(sql))
-            except Exception:
-                pass  # la columna ya existe
+        except Exception:
+            pass  # ya aplicada (columna existe / nada que actualizar)
     await _crear_usuarios_crm_iniciales()
 
 
@@ -467,7 +470,7 @@ async def marcar_alerta_crm(telefono: str, motivo: str):
     async with async_session() as session:
         result = await session.execute(
             select(CrmRegistro)
-            .where(CrmRegistro.estado != "cerrado")
+            .where(CrmRegistro.estado.not_in(ESTADOS_FINALES))
             .order_by(CrmRegistro.creado.desc())
         )
         for r in result.scalars().all():
@@ -477,6 +480,51 @@ async def marcar_alerta_crm(telefono: str, motivo: str):
                 await session.commit()
                 return True
     return False
+
+
+async def reactivar_cliente_no_contesto(telefono: str) -> bool:
+    """
+    Si el cliente estaba marcado 'no_contesto' y vuelve a escribir, lo reactiva:
+    regresa a 'asignado' (si tenía dueño) o 'nuevo'. Devuelve True si reactivó.
+    """
+    sufijo = _sufijo_tel(telefono)
+    async with async_session() as session:
+        result = await session.execute(
+            select(CrmRegistro)
+            .where(CrmRegistro.estado == "no_contesto")
+            .order_by(CrmRegistro.creado.desc())
+        )
+        for r in result.scalars().all():
+            if _sufijo_tel(r.telefono) == sufijo:
+                r.estado = "asignado" if r.asesor else "nuevo"
+                r.descripcion = "🔄 Regresó tras no contestar. " + (r.descripcion or "")
+                r.actualizado = datetime.utcnow()
+                await session.commit()
+                return True
+    return False
+
+
+async def marcar_no_contesto_automatico(dias: int = 2) -> int:
+    """
+    Mueve a 'no_contesto' los leads en 'nuevo'/'asignado' sin actividad en N días.
+    NO toca 'proceso' (ya pagaron) ni los estados finales. Retorna cuántos movió.
+    """
+    limite = datetime.utcnow() - timedelta(days=dias)
+    movidos = 0
+    async with async_session() as session:
+        result = await session.execute(
+            select(CrmRegistro).where(
+                CrmRegistro.estado.in_(["nuevo", "asignado"]),
+                CrmRegistro.actualizado <= limite,
+            )
+        )
+        for r in result.scalars().all():
+            r.estado = "no_contesto"
+            r.actualizado = datetime.utcnow()
+            movidos += 1
+        if movidos:
+            await session.commit()
+    return movidos
 
 
 async def actualizar_crm(registro_id: int, estado: str = None, asesor: str = None,
@@ -503,7 +551,9 @@ async def actualizar_crm(registro_id: int, estado: str = None, asesor: str = Non
 
 
 # Ciclo de vida de un cliente: el estado solo AVANZA, nunca retrocede.
-_ORDEN_ESTADO = {"nuevo": 0, "asignado": 1, "proceso": 2, "cerrado": 3}
+_ORDEN_ESTADO = {"nuevo": 0, "asignado": 1, "proceso": 2, "vendido": 3}
+# Estados FINALES (fuera del embudo activo): venta cerrada o lead perdido.
+ESTADOS_FINALES = ("vendido", "no_contesto", "cerrado")
 # Importancia del tipo: se muestra la etiqueta del evento más avanzado alcanzado.
 _ORDEN_TIPO = {"cliente": 0, "ruleta": 1, "escalacion": 2, "pedido": 3}
 
@@ -543,7 +593,7 @@ async def carga_por_asesor(asesores: tuple = ("Anna", "Brayan", "Tere")) -> dict
             res = await session.execute(
                 select(func.count(CrmRegistro.id)).where(
                     CrmRegistro.asesor == a,
-                    CrmRegistro.estado != "cerrado",
+                    CrmRegistro.estado.not_in(ESTADOS_FINALES),
                 )
             )
             out[a] = res.scalar_one() or 0
@@ -579,7 +629,7 @@ async def registrar_o_actualizar_crm(
         # Buscar la tarjeta abierta (no cerrada) más reciente de este cliente
         result = await session.execute(
             select(CrmRegistro)
-            .where(CrmRegistro.estado != "cerrado")
+            .where(CrmRegistro.estado.not_in(ESTADOS_FINALES))
             .order_by(CrmRegistro.creado.desc())
         )
         existente = None

@@ -46,6 +46,7 @@ from agent.memory import (
     carga_por_asesor, consolidar_duplicados_crm, obtener_conversacion_crm,
     tomar_control, devolver_clio, estado_control, esta_en_modo_humano,
     marcar_alerta_crm, listar_usuarios_crm, cambiar_password_crm,
+    reactivar_cliente_no_contesto, marcar_no_contesto_automatico,
 )
 from zoneinfo import ZoneInfo as _ZI
 
@@ -141,8 +142,17 @@ async def lifespan(app: FastAPI):
         name="Repartir ganadores de ruleta sin avanzar (+2h) entre Anna y Brayan",
         replace_existing=True,
     )
+    # Marcar 'No contestó' los leads sin actividad en 2 días (cada 3 horas).
+    scheduler.add_job(
+        marcar_no_contesto_automatico,
+        "interval",
+        hours=3,
+        id="marcar_no_contesto",
+        name="Mover a 'No contestó' leads sin actividad en 2 días",
+        replace_existing=True,
+    )
     scheduler.start()
-    logger.info("Scheduler iniciado — reporte 5AM + seguimiento 30min + reparto ruleta 30min (Campeche)")
+    logger.info("Scheduler iniciado — reporte 5AM + seguimiento + reparto ruleta + no-contestó (Campeche)")
 
     yield
 
@@ -228,7 +238,7 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = ""):
     registros = await listar_crm(estado=estado, tipo=tipo, asesor=asesor_filtro)
     # Stats por estado (respetando el filtro de persona, sin filtro de estado)
     todos = await listar_crm(tipo=tipo, asesor=asesor_filtro, limite=1000)
-    stats = {"nuevo": 0, "asignado": 0, "proceso": 0, "cerrado": 0}
+    stats = {"nuevo": 0, "asignado": 0, "proceso": 0, "vendido": 0, "no_contesto": 0}
     for r in todos:
         stats[r["estado"]] = stats.get(r["estado"], 0) + 1
     # Carga por asesor (solo para quien ve todo): Anna 10, Brayan 15, Tere 3...
@@ -585,6 +595,11 @@ async def _procesar_mensaje(msg):
         # (producto identificado = interés real). Así no se reparten saludos vacíos.
         SILENCIO_RECURRENTE_MIN = 360  # 6 horas
         tel_limpio = msg.telefono.replace("@s.whatsapp.net", "")
+        # Si estaba marcado 'no contestó' y vuelve a escribir → reactivar
+        try:
+            await reactivar_cliente_no_contesto(tel_limpio)
+        except Exception as e:
+            logger.error(f"Error reactivando cliente: {e}")
         try:
             if es_primer_mensaje:
                 await registrar_o_actualizar_crm(

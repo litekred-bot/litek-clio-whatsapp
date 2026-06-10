@@ -86,7 +86,8 @@ HTML_PANEL = r"""<!DOCTYPE html>
   .card.nuevo { border-left-color: #2196F3; }
   .card.asignado { border-left-color: #FF9800; }
   .card.proceso { border-left-color: #9C27B0; }
-  .card.cerrado { border-left-color: #4CAF50; opacity: .7; }
+  .card.vendido { border-left-color: #4CAF50; opacity: .75; }
+  .card.no_contesto { border-left-color: #555; opacity: .65; }
   .card .head { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 8px; }
   .card .nombre { font-weight: bold; font-size: 16px; }
   .card .tipo { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #eee; color: #555; text-transform: uppercase; }
@@ -149,7 +150,8 @@ HTML_PANEL = r"""<!DOCTYPE html>
       <button data-f="estado" data-v="nuevo">🔵 Nuevos</button>
       <button data-f="estado" data-v="asignado">🟠 Asignados</button>
       <button data-f="estado" data-v="proceso">🟣 En proceso</button>
-      <button data-f="estado" data-v="cerrado">🟢 Cerrados</button>
+      <button data-f="estado" data-v="vendido">✅ Vendidos</button>
+      <button data-f="estado" data-v="no_contesto">⚫ No contestó</button>
     </div>
     <div class="filtros" id="filtros2">
       <button data-f="tipo" data-v="" class="activo">Todos los tipos</button>
@@ -188,7 +190,7 @@ HTML_PANEL = r"""<!DOCTYPE html>
 var TOKEN = localStorage.getItem("crm_token") || "";
 var fEstado = "", fTipo = "";
 var ASESORES = ["", "Anna", "Brayan", "Tere", "Chino"];
-var ESTADOS = {nuevo:"🔵 Nuevo", asignado:"🟠 Asignado", proceso:"🟣 En proceso", cerrado:"🟢 Cerrado"};
+var ESTADOS = {nuevo:"🔵 Nuevo", asignado:"🟠 Asignado", proceso:"🟣 En proceso", vendido:"✅ Vendido", no_contesto:"⚫ No contestó"};
 var TIPOS = {escalacion:"Escalación", pedido:"Pedido", cliente:"Cliente", ruleta:"Ruleta"};
 
 if (TOKEN) mostrarApp();
@@ -283,7 +285,8 @@ function pintarStats(s){
     '<div class="stat"><b>'+(s.nuevo||0)+'</b><span>Nuevos</span></div>'+
     '<div class="stat"><b>'+(s.asignado||0)+'</b><span>Asignados</span></div>'+
     '<div class="stat"><b>'+(s.proceso||0)+'</b><span>En proceso</span></div>'+
-    '<div class="stat"><b>'+(s.cerrado||0)+'</b><span>Cerrados</span></div>';
+    '<div class="stat"><b>'+(s.vendido||0)+'</b><span>Vendidos</span></div>'+
+    '<div class="stat"><b>'+(s.no_contesto||0)+'</b><span>No contestó</span></div>';
 }
 
 function pintar(regs){
