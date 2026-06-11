@@ -101,6 +101,19 @@ logger = logging.getLogger("agentkit")
 proveedor = obtener_proveedor()
 PORT = int(os.getenv("PORT", 8000))
 
+# Canal SECUNDARIO Meta (solo para la revisión de Meta / migración futura).
+# Aislado: vive en /webhook-meta y NO toca el flujo de Whapi (producción).
+# Se activa solo si están las credenciales de Meta en el entorno.
+prov_meta = None
+try:
+    if os.getenv("META_ACCESS_TOKEN") and os.getenv("META_PHONE_NUMBER_ID"):
+        from agent.providers.meta import ProveedorMeta
+        prov_meta = ProveedorMeta()
+        logger.info("Canal Meta ACTIVO en /webhook-meta")
+except Exception as e:
+    logger.error(f"No se pudo activar el canal Meta: {e}")
+    prov_meta = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -1050,3 +1063,58 @@ async def webhook_handler(request: Request):
         asyncio.create_task(_procesar_mensaje(msg))
 
     return {"status": "ok"}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Canal Meta (AISLADO) — /webhook-meta. No toca el flujo de Whapi (producción).
+# Para la revisión de Meta y la migración futura. Flujo esencial: texto→respuesta.
+# ─────────────────────────────────────────────────────────────────────────────
+@app.get("/webhook-meta")
+async def webhook_meta_verif(request: Request):
+    """Verificación GET del webhook de Meta (hub.challenge)."""
+    if prov_meta:
+        resultado = await prov_meta.validar_webhook(request)
+        if resultado is not None:
+            return PlainTextResponse(str(resultado))
+    return PlainTextResponse("error", status_code=403)
+
+
+@app.post("/webhook-meta")
+async def webhook_meta_handler(request: Request):
+    """Recibe mensajes del canal Meta (número de prueba). Responde en background."""
+    if not prov_meta:
+        return {"status": "meta-inactivo"}
+    try:
+        mensajes = await prov_meta.parsear_webhook(request)
+    except Exception as e:
+        logger.error(f"[META] Error parseando webhook: {e}")
+        return {"status": "ok"}
+    for msg in mensajes:
+        if msg.es_propio:
+            continue
+        if msg.mensaje_id and msg.mensaje_id in _ids_procesados:
+            continue
+        if msg.mensaje_id:
+            _ids_procesados[msg.mensaje_id] = True
+            if len(_ids_procesados) > MAX_IDS_CACHE:
+                _ids_procesados.popitem(last=False)
+        asyncio.create_task(_procesar_mensaje_meta(msg))
+    return {"status": "ok"}
+
+
+async def _procesar_mensaje_meta(msg):
+    """Flujo esencial del canal Meta: recibe texto y responde con Clio vía Meta."""
+    try:
+        if not msg.texto:
+            return
+        logger.info(f"[META] Mensaje de {msg.telefono}: {msg.texto}")
+        historial = await obtener_historial(msg.telefono)
+        respuesta = await generar_respuesta(
+            msg.texto, historial, nombre_perfil=msg.nombre_perfil,
+        )
+        await guardar_mensaje(msg.telefono, "user", msg.texto)
+        await guardar_mensaje(msg.telefono, "assistant", respuesta)
+        await prov_meta.enviar_mensaje(msg.telefono, respuesta)
+        logger.info(f"[META] Respondido a {msg.telefono}")
+    except Exception as e:
+        logger.error(f"[META] Error procesando mensaje: {e}")
