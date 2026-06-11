@@ -10,7 +10,7 @@
 
   var CLIO_API = "https://litek-clio-whatsapp-production.up.railway.app";
   var WA_CLIO  = "5219845576964"; // WhatsApp de Clio para el cup\u00f3n
-  var MASCOTA  = "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/mascota_gol.png";
+  var MASCOTA  = "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/mascota_gol.png?v=2";
 
   // Premios (peso = probabilidad relativa). Lona 75\u00d775 \u22481/70, Lona $39 \u22481/50.
   var PREMIOS = [
@@ -59,8 +59,8 @@
       + '.lg-zona .nm{color:#fff;font-size:10px;font-weight:800;line-height:1.1;margin-top:2px;}'
       + '#lg-line{height:3px;background:rgba(255,255,255,.45);margin:0 -16px;}'
       + '#lg-stage{position:relative;display:flex;align-items:flex-end;justify-content:center;margin-top:8px;height:160px;}'
-      + '#lg-perro{height:155px;filter:drop-shadow(2px 4px 3px rgba(0,0,0,.3));transition:transform .18s ease;transform-origin:bottom center;}'
-      + '#lg-balon{font-size:30px;position:absolute;bottom:4px;left:calc(50% + 46px);filter:drop-shadow(2px 3px 2px rgba(0,0,0,.4));transition:transform 0.7s cubic-bezier(.3,-0.2,.5,1);}'
+      + '#lg-perro{height:155px;filter:drop-shadow(2px 4px 3px rgba(0,0,0,.3));transition:transform .18s ease;transform-origin:bottom center;position:relative;z-index:1;}'
+      + '#lg-balon{font-size:32px;position:absolute;bottom:2px;left:calc(50% + 38px);z-index:3;filter:drop-shadow(2px 3px 2px rgba(0,0,0,.45));transition:transform 0.7s cubic-bezier(.3,-0.2,.5,1);}'
       + '#lg-form{margin-top:10px;}'
       + '#lg-form input{width:100%;padding:11px;margin:5px 0;border:none;border-radius:10px;font-size:15px;}'
       + '#lg-btn{display:block;width:100%;margin-top:8px;background:linear-gradient(180deg,#ffe082,#ffc107);border:none;border-radius:14px;padding:14px;font-size:19px;font-weight:900;color:#7a1500;box-shadow:0 6px 0 #d39e00,0 8px 14px rgba(0,0,0,.3);cursor:pointer;}'
