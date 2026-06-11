@@ -762,3 +762,38 @@ async def asignar_ruletas_sin_avanzar(horas: int = 2, asesor_default: str = "Ann
         if asignados:
             await session.commit()
     return asignados
+
+
+async def datos_reporte_crm(horas: int = 24) -> dict:
+    """
+    Datos del reporte diario SACADOS DEL CRM (fuente de verdad, sin duplicados).
+    Considera tarjetas con actividad (creadas o actualizadas) en las últimas N horas.
+    """
+    limite = datetime.utcnow() - timedelta(hours=horas)
+    async with async_session() as session:
+        result = await session.execute(
+            select(CrmRegistro)
+            .where((CrmRegistro.creado >= limite) | (CrmRegistro.actualizado >= limite))
+            .order_by(CrmRegistro.actualizado.desc())
+        )
+        regs = result.scalars().all()
+
+    compraron = [r for r in regs if r.estado in ("vendido", "proceso")]
+    pendientes = [r for r in regs if r.estado in ("nuevo", "asignado")]
+    no_contesto = [r for r in regs if r.estado == "no_contesto"]
+
+    def fmt(r):
+        return {
+            "telefono": (r.telefono or "").replace("@s.whatsapp.net", ""),
+            "nombre": r.nombre or "Cliente",
+            "resumen": (r.descripcion or "Sin detalle")[:120],
+            "asesor": r.asesor or "—",
+            "hora": (r.actualizado - timedelta(hours=6)).strftime("%H:%M"),  # Campeche
+        }
+
+    return {
+        "atendidos": len(regs),
+        "compraron": len(compraron),
+        "no_contesto": len(no_contesto),
+        "pendientes": [fmt(r) for r in pendientes],
+    }
