@@ -30,10 +30,10 @@
     return PREMIOS.length - 1;
   }
 
-  // \u00bfMostrar el juego? Cuando la URL trae "ruleta", "gol" o el hash #jugar
+  // \u00bfMostrar el juego? SOLO en /gool (para no chocar con la ruleta en /ruleta)
   function debeMostrar() {
     var p = (location.pathname + location.hash).toLowerCase();
-    return p.indexOf("ruleta") !== -1 || p.indexOf("gol") !== -1 || p.indexOf("jugar") !== -1;
+    return p.indexOf("gool") !== -1;
   }
 
   function esc(s) { return (s || "").replace(/[<>&"]/g, function (c) { return { "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]; }); }
