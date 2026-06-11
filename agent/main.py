@@ -1079,16 +1079,28 @@ async def webhook_meta_verif(request: Request):
     return PlainTextResponse("error", status_code=403)
 
 
+_diag_meta = {"total": 0, "mensajes": 0, "ultimo_texto": None, "respuesta_ok": None, "ultimo_error": None}
+
+
+@app.get("/diag/meta")
+async def diag_meta():
+    """Diagnóstico del canal Meta (sin auth) para ver el flujo end-to-end."""
+    return {"meta_activo": prov_meta is not None, **_diag_meta}
+
+
 @app.post("/webhook-meta")
 async def webhook_meta_handler(request: Request):
     """Recibe mensajes del canal Meta (número de prueba). Responde en background."""
+    _diag_meta["total"] += 1
     if not prov_meta:
         return {"status": "meta-inactivo"}
     try:
         mensajes = await prov_meta.parsear_webhook(request)
     except Exception as e:
         logger.error(f"[META] Error parseando webhook: {e}")
+        _diag_meta["ultimo_error"] = f"parseo: {e}"
         return {"status": "ok"}
+    _diag_meta["mensajes"] += len(mensajes)
     for msg in mensajes:
         if msg.es_propio:
             continue
@@ -1108,13 +1120,18 @@ async def _procesar_mensaje_meta(msg):
         if not msg.texto:
             return
         logger.info(f"[META] Mensaje de {msg.telefono}: {msg.texto}")
+        _diag_meta["ultimo_texto"] = msg.texto[:80]
         historial = await obtener_historial(msg.telefono)
         respuesta = await generar_respuesta(
             msg.texto, historial, nombre_perfil=msg.nombre_perfil,
         )
         await guardar_mensaje(msg.telefono, "user", msg.texto)
         await guardar_mensaje(msg.telefono, "assistant", respuesta)
-        await prov_meta.enviar_mensaje(msg.telefono, respuesta)
-        logger.info(f"[META] Respondido a {msg.telefono}")
+        ok = await prov_meta.enviar_mensaje(msg.telefono, respuesta)
+        _diag_meta["respuesta_ok"] = ok
+        if not ok:
+            _diag_meta["ultimo_error"] = "enviar_mensaje devolvió False (token/permisos)"
+        logger.info(f"[META] Respondido a {msg.telefono} (ok={ok})")
     except Exception as e:
         logger.error(f"[META] Error procesando mensaje: {e}")
+        _diag_meta["ultimo_error"] = f"procesar: {e}"
