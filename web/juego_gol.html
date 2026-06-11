@@ -58,9 +58,9 @@
       + '.lg-zona .ic{font-size:24px;}'
       + '.lg-zona .nm{color:#fff;font-size:10px;font-weight:800;line-height:1.1;margin-top:2px;}'
       + '#lg-line{height:3px;background:rgba(255,255,255,.45);margin:0 -16px;}'
-      + '#lg-stage{position:relative;display:flex;align-items:flex-end;justify-content:center;gap:4px;margin-top:8px;height:150px;}'
-      + '#lg-perro{height:150px;filter:drop-shadow(0 8px 6px rgba(0,0,0,.45));}'
-      + '#lg-balon{font-size:34px;filter:drop-shadow(0 5px 4px rgba(0,0,0,.4));margin-bottom:10px;transition:transform 0.7s cubic-bezier(.3,-0.2,.5,1);}'
+      + '#lg-stage{position:relative;display:flex;align-items:flex-end;justify-content:center;margin-top:8px;height:160px;}'
+      + '#lg-perro{height:155px;filter:drop-shadow(2px 4px 3px rgba(0,0,0,.3));transition:transform .18s ease;transform-origin:bottom center;}'
+      + '#lg-balon{font-size:30px;position:absolute;bottom:4px;left:calc(50% + 46px);filter:drop-shadow(2px 3px 2px rgba(0,0,0,.4));transition:transform 0.7s cubic-bezier(.3,-0.2,.5,1);}'
       + '#lg-form{margin-top:10px;}'
       + '#lg-form input{width:100%;padding:11px;margin:5px 0;border:none;border-radius:10px;font-size:15px;}'
       + '#lg-btn{display:block;width:100%;margin-top:8px;background:linear-gradient(180deg,#ffe082,#ffc107);border:none;border-radius:14px;padding:14px;font-size:19px;font-weight:900;color:#7a1500;box-shadow:0 6px 0 #d39e00,0 8px 14px rgba(0,0,0,.3);cursor:pointer;}'
@@ -124,18 +124,25 @@
       btn.textContent = "\u26bd ...";
       var idx = premioPorPeso();
       var zona = zonas[idx];
-      // Animar el bal\u00f3n hacia la zona ganadora
-      var rb = balon.getBoundingClientRect(), rz = zona.getBoundingClientRect();
-      var dx = (rz.left + rz.width / 2) - (rb.left + rb.width / 2);
-      var dy = (rz.top + rz.height / 2) - (rb.top + rb.height / 2);
-      balon.style.transform = "translate(" + dx + "px," + dy + "px) scale(.5)";
+      var perro = ov.querySelector("#lg-perro");
+      // Animaci\u00f3n de pateo: el perro se echa atr\u00e1s y luego patea
+      perro.style.transform = "rotate(-7deg) translateX(-7px)";
+      setTimeout(function () { perro.style.transform = "rotate(6deg) translateX(4px)"; }, 170);
+      setTimeout(function () { perro.style.transform = ""; }, 700);
+      // El bal\u00f3n sale volando justo cuando el perro patea (170ms)
+      setTimeout(function () {
+        var rb = balon.getBoundingClientRect(), rz = zona.getBoundingClientRect();
+        var dx = (rz.left + rz.width / 2) - (rb.left + rb.width / 2);
+        var dy = (rz.top + rz.height / 2) - (rb.top + rb.height / 2);
+        balon.style.transform = "translate(" + dx + "px," + dy + "px) scale(.5)";
+      }, 170);
       setTimeout(function () {
         zona.classList.add("win");
         zona.innerHTML = '<span class="ic">' + PREMIOS[idx].icon + '</span><span class="nm">' + esc(PREMIOS[idx].nombre) + '</span>';
         balon.style.opacity = "0";
         registrar(nombre, tel, PREMIOS[idx]);
         setTimeout(function () { mostrarResultado(nombre, tel, PREMIOS[idx], false, 0); }, 900);
-      }, 750);
+      }, 930);
     }
 
     function registrar(nombre, tel, premio) {
