@@ -59,6 +59,7 @@ class CrmRegistro(Base):
     asesor: Mapped[str] = mapped_column(String(100), default="")     # a quién se asignó
     estado: Mapped[str] = mapped_column(String(20), default="nuevo", index=True)  # nuevo|asignado|proceso|cerrado
     alerta: Mapped[str] = mapped_column(String(200), default="")  # motivo a revisar (⚠️) o vacío
+    expres: Mapped[bool] = mapped_column(Boolean, default=False)  # ⚡ pedido exprés (prioritario)
     notas: Mapped[str] = mapped_column(Text, default="")
     creado: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     actualizado: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -94,6 +95,7 @@ async def inicializar_db():
     # PostgreSQL un error aborta la transacción completa (no sirve un try global).
     migraciones = [
         "ALTER TABLE crm_registros ADD COLUMN alerta VARCHAR(200) DEFAULT ''",
+        "ALTER TABLE crm_registros ADD COLUMN expres BOOLEAN DEFAULT false",
         # 'cerrado' viejo = venta concretada → renombrar a 'vendido'
         "UPDATE crm_registros SET estado='vendido' WHERE estado='cerrado'",
     ]
@@ -459,6 +461,7 @@ async def listar_crm(estado: str = "", tipo: str = "", asesor: str = "", limite:
             "asesor": r.asesor,
             "estado": r.estado,
             "alerta": getattr(r, "alerta", "") or "",
+            "expres": bool(getattr(r, "expres", False)),
             "notas": r.notas,
             "creado": r.creado.strftime("%d/%m/%Y %H:%M"),
         } for r in registros]
@@ -476,6 +479,24 @@ async def marcar_alerta_crm(telefono: str, motivo: str):
         for r in result.scalars().all():
             if _sufijo_tel(r.telefono) == sufijo:
                 r.alerta = motivo[:200]
+                r.actualizado = datetime.utcnow()
+                await session.commit()
+                return True
+    return False
+
+
+async def marcar_expres_crm(telefono: str, valor: bool = True) -> bool:
+    """Prende/apaga el ⚡ exprés en la tarjeta del cliente (la más reciente no cerrada)."""
+    sufijo = _sufijo_tel(telefono)
+    async with async_session() as session:
+        result = await session.execute(
+            select(CrmRegistro)
+            .where(CrmRegistro.estado.not_in(ESTADOS_FINALES))
+            .order_by(CrmRegistro.creado.desc())
+        )
+        for r in result.scalars().all():
+            if _sufijo_tel(r.telefono) == sufijo:
+                r.expres = valor
                 r.actualizado = datetime.utcnow()
                 await session.commit()
                 return True
@@ -528,8 +549,8 @@ async def marcar_no_contesto_automatico(dias: int = 2) -> int:
 
 
 async def actualizar_crm(registro_id: int, estado: str = None, asesor: str = None,
-                         notas: str = None, alerta: str = None) -> bool:
-    """Actualiza estado, asesor, notas o alerta de un registro del CRM."""
+                         notas: str = None, alerta: str = None, expres: bool = None) -> bool:
+    """Actualiza estado, asesor, notas, alerta o exprés de un registro del CRM."""
     async with async_session() as session:
         resultado = await session.execute(
             select(CrmRegistro).where(CrmRegistro.id == registro_id)
@@ -545,6 +566,8 @@ async def actualizar_crm(registro_id: int, estado: str = None, asesor: str = Non
             r.notas = notas
         if alerta is not None:
             r.alerta = alerta
+        if expres is not None:
+            r.expres = expres
         r.actualizado = datetime.utcnow()
         await session.commit()
         return True

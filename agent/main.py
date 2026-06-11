@@ -46,7 +46,7 @@ from agent.memory import (
     carga_por_asesor, consolidar_duplicados_crm, obtener_conversacion_crm,
     tomar_control, devolver_clio, estado_control, esta_en_modo_humano,
     marcar_alerta_crm, listar_usuarios_crm, cambiar_password_crm,
-    reactivar_cliente_no_contesto, marcar_no_contesto_automatico,
+    reactivar_cliente_no_contesto, marcar_no_contesto_automatico, marcar_expres_crm,
 )
 from zoneinfo import ZoneInfo as _ZI
 
@@ -367,6 +367,7 @@ async def crm_actualizar(registro_id: int, request: Request):
         asesor=data.get("asesor"),
         notas=data.get("notas"),
         alerta=data.get("alerta"),
+        expres=data.get("expres"),
     )
     return {"ok": ok}
 
@@ -716,6 +717,14 @@ async def _procesar_mensaje(msg):
                 await marcar_alerta_crm(msg.telefono, f"⚠️ {motivo_alerta}")
             except Exception as e:
                 logger.error(f"Error marcando alerta CRM: {e}")
+
+        # Detectar [EXPRES] — Clio marca el pedido como exprés (prioritario) en el panel
+        if "[EXPRES]" in respuesta:
+            respuesta = respuesta.replace("[EXPRES]", "").strip()
+            try:
+                await marcar_expres_crm(msg.telefono, True)
+            except Exception as e:
+                logger.error(f"Error marcando exprés CRM: {e}")
 
         # Detectar [MOTIVO] — resumen conciso del motivo de escalación (lo genera Clio)
         motivo_escalacion = None

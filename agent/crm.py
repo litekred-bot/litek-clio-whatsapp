@@ -92,6 +92,10 @@ HTML_PANEL = r"""<!DOCTYPE html>
   .card .nombre { font-weight: bold; font-size: 16px; }
   .card .tipo { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #eee; color: #555; text-transform: uppercase; }
   .card.alertado { border-left-color: #e30613; background: #fff6f6; }
+  .card.expres-on { box-shadow: 0 0 0 2px #ff9800, 0 1px 4px rgba(0,0,0,.05); }
+  .card .expres-badge { display: inline-block; background: #ff9800; color: #fff; font-size: 11px; font-weight: bold; border-radius: 10px; padding: 2px 9px; margin-left: 6px; }
+  .card .acciones .bexpres { background: #fff3e0; color: #e65100; border: 1px solid #ffb74d; border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
+  .card .acciones .bexpres.on { background: #ff9800; color: #fff; border-color: #ff9800; }
   .card .alerta-banner { background: #ffe0e0; color: #b71c1c; border-radius: 8px; padding: 7px 10px; margin: 8px 0; font-size: 13px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .card .alerta-banner button { background: #b71c1c; color: #fff; border: none; border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
   .card .desc { color: #444; font-size: 14px; margin: 8px 0; white-space: pre-wrap; }
@@ -162,6 +166,7 @@ HTML_PANEL = r"""<!DOCTYPE html>
     </div>
     <div class="filtros">
       <button id="btnRevisar" onclick="toggleRevisar()" style="background:#ffe0e0;color:#b71c1c;border-color:#ffb3b3;">⚠️ Solo a revisar</button>
+      <button id="btnExpres" onclick="toggleSoloExpres()" style="background:#fff3e0;color:#e65100;border-color:#ffb74d;">⚡ Solo exprés</button>
     </div>
     <div id="lista"></div>
   </div>
@@ -242,11 +247,13 @@ async function cargar(){
 
 var ULTIMOS_REGISTROS = [];
 var SOLO_REVISAR = false;
+var SOLO_EXPRES = false;
 function aplicarBusqueda(){
   var q = (document.getElementById("buscar").value || "").toLowerCase().trim();
   var qDig = q.replace(/\D/g, "");
   var regs = ULTIMOS_REGISTROS;
   if (SOLO_REVISAR){ regs = regs.filter(function(r){ return r.alerta; }); }
+  if (SOLO_EXPRES){ regs = regs.filter(function(r){ return r.expres; }); }
   if (q){
     regs = regs.filter(function(r){
       var nom = (r.nombre || "").toLowerCase();
@@ -267,6 +274,19 @@ function toggleRevisar(){
 
 async function resolverAlerta(id){
   await fetch("/crm/api/registro/"+id, {method:"POST", headers:{"Authorization":"Bearer "+TOKEN, "Content-Type":"application/json"}, body: JSON.stringify({alerta: ""})});
+  cargar();
+}
+
+function toggleSoloExpres(){
+  SOLO_EXPRES = !SOLO_EXPRES;
+  var b = document.getElementById("btnExpres");
+  b.style.background = SOLO_EXPRES ? "#ff9800" : "#fff3e0";
+  b.style.color = SOLO_EXPRES ? "#fff" : "#e65100";
+  aplicarBusqueda();
+}
+
+async function toggleExpres(id, valor){
+  await fetch("/crm/api/registro/"+id, {method:"POST", headers:{"Authorization":"Bearer "+TOKEN, "Content-Type":"application/json"}, body: JSON.stringify({expres: valor})});
   cargar();
 }
 
@@ -299,8 +319,9 @@ function pintar(regs){
     var opcAsesor = ASESORES.map(function(a){ return '<option value="'+a+'"'+(a===r.asesor?' selected':'')+'>'+(a||'— Asignar —')+'</option>'; }).join("");
     var opcEstado = Object.keys(ESTADOS).map(function(e){ return '<option value="'+e+'"'+(e===r.estado?' selected':'')+'>'+ESTADOS[e]+'</option>'; }).join("");
     var alertaHtml = r.alerta ? '<div class="alerta-banner"><span>'+esc(r.alerta)+'</span><button onclick="resolverAlerta('+r.id+')">✓ Resuelto</button></div>' : '';
-    return '<div class="card '+r.estado+(r.alerta?' alertado':'')+'">'+
-      '<div class="head"><span class="nombre">'+esc(r.nombre||"Sin nombre")+'</span>'+
+    var badgeExpres = r.expres ? '<span class="expres-badge">⚡ EXPRÉS</span>' : '';
+    return '<div class="card '+r.estado+(r.alerta?' alertado':'')+(r.expres?' expres-on':'')+'">'+
+      '<div class="head"><span class="nombre">'+esc(r.nombre||"Sin nombre")+badgeExpres+'</span>'+
       '<span class="tipo">'+(TIPOS[r.tipo]||r.tipo)+'</span></div>'+
       alertaHtml+
       '<div class="desc">'+esc(r.descripcion||"")+'</div>'+
@@ -308,6 +329,7 @@ function pintar(regs){
       '<div class="acciones">'+
         '<select onchange="upd('+r.id+',\'estado\',this.value)">'+opcEstado+'</select>'+
         '<select onchange="upd('+r.id+',\'asesor\',this.value)">'+opcAsesor+'</select>'+
+        '<button class="bexpres'+(r.expres?' on':'')+'" onclick="toggleExpres('+r.id+','+(r.expres?'false':'true')+')" title="Marcar/quitar exprés">⚡ Exprés</button>'+
         '<input class="nota" placeholder="Nota..." value="'+esc(r.notas||"")+'" onblur="upd('+r.id+',\'notas\',this.value)">'+
         (wa ? '<button class="copia" onclick="verChat(\''+wa+'\',\''+(r.nombre||"Cliente").replace(/[\\\\\x27"]/g,"")+'\')" title="Ver la conversación con Clio">👁️ Ver chat</button>' : '')+
         (num10 ? '<button class="copia" onclick="copiarNum(\''+num10+'\',this)" title="Copiar número para buscarlo en tu WhatsApp">📋 '+numFmt+'</button>'+
