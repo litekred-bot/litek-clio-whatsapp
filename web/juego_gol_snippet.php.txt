@@ -1,8 +1,5 @@
 add_action('wp_footer', function () {
 ?>
-<script> en el Fragmento de Código de WordPress
-  (reemplaza el de la ruleta). Usa los mismos endpoints /ruleta/verificar y /ruleta/ping.
--->
 <script>
 (function () {
   "use strict";
