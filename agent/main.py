@@ -372,10 +372,10 @@ async def crm_actualizar(registro_id: int, request: Request):
 
 
 @app.get("/ruleta/ping")
-async def ruleta_ping(nombre: str = "", telefono: str = "", premio: str = "", descripcion: str = ""):
+async def ruleta_ping(nombre: str = "", telefono: str = "", premio: str = "", descripcion: str = "", juego: str = "ruleta"):
     """
-    Endpoint GET sin preflight CORS — llamado via Image pixel desde la ruleta.
-    Registra al ganador y manda WhatsApp automáticamente.
+    Endpoint GET sin preflight CORS — llamado via Image pixel desde la ruleta o el juego de gol.
+    Registra al ganador y manda WhatsApp automáticamente. `juego`: "ruleta" o "gol".
     """
     import httpx as _httpx
     if not all([nombre, telefono, premio]):
@@ -398,21 +398,29 @@ async def ruleta_ping(nombre: str = "", telefono: str = "", premio: str = "", de
     # Registrar en el CRM SIN dueño todavía. Si el cliente avanza (cotiza/compra),
     # se le asigna por el flujo normal. Si NO avanza en 2h, un job lo reparte por
     # turnos (ver asignar_ruletas_sin_avanzar). Así no se duplica si compra rápido.
+    es_gol = juego == "gol"
     try:
+        origen = "gol" if es_gol else "ruleta"
         await registrar_o_actualizar_crm(
             telefono=telefono,
             nombre=nombre,
-            descripcion=f"🎁 Ganó en ruleta: {premio}. {descripcion}",
+            descripcion=f"🎁 Ganó en {origen}: {premio}. {descripcion}",
             tipo="ruleta",
             estado_minimo="nuevo",
         )
     except Exception as e:
         logger.error(f"Error registrando ruleta en CRM: {e}")
 
-    msg_wa = (
-        f"¡Hola {nombre}! 🎡 Ganaste en nuestra ruleta LiTek: *{premio}* 🎉\n\n"
-        f"¿Te gustaría aprovechar y ordenar algo? 😊"
-    )
+    if es_gol:
+        msg_wa = (
+            f"¡Hola {nombre}! ⚽ *¡GOOOL!* 🎉 Ganaste en LiTek: *{premio}*\n\n"
+            f"¿Te gustaría aprovechar y ordenar algo? 😊"
+        )
+    else:
+        msg_wa = (
+            f"¡Hola {nombre}! 🎡 Ganaste en nuestra ruleta LiTek: *{premio}* 🎉\n\n"
+            f"¿Te gustaría aprovechar y ordenar algo? 😊"
+        )
     await guardar_mensaje(tel_wa, "assistant", msg_wa)
 
     # Mensaje al cliente ganador
