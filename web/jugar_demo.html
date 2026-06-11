@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Juego de Gol LiTek (demo)</title></head><body style="margin:0;background:#333">
+<script> en el Fragmento de Código de WordPress
+  (reemplaza el de la ruleta). Usa los mismos endpoints /ruleta/verificar y /ruleta/ping.
+-->
+<script>
+(function () {
+  "use strict";
+  if (window.__litekGolCargado) return; window.__litekGolCargado = true;
+
+  var CLIO_API = "https://litek-clio-whatsapp-production.up.railway.app";
+  var WA_CLIO  = "5219845576964"; // WhatsApp de Clio para el cup\u00f3n
+  var MASCOTA  = "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/mascota_gol.png";
+
+  // Premios (peso = probabilidad relativa). Lona 75\u00d775 \u22481/70, Lona $39 \u22481/50.
+  var PREMIOS = [
+    { nombre: "Lona 75\u00d775 GRATIS", desc: "Lona 75x75 cm gratis con tu pedido", peso: 14, icon: "\ud83c\udf81", color: "#c20011" },
+    { nombre: "Lona a $39",        desc: "Lona promocional a solo $39",         peso: 20, icon: "\ud83c\udff7\ufe0f", color: "#d35400" },
+    { nombre: "24 tarjetas",       desc: "24 tarjetas de presentaci\u00f3n gratis",  peso: 290, icon: "\ud83c\udf9f\ufe0f", color: "#0d3b80" },
+    { nombre: "Dise\u00f1o gratis",     desc: "Dise\u00f1o gratis con tu pedido",          peso: 250, icon: "\ud83c\udfa8", color: "#0d3b80" },
+    { nombre: "20 stickers",       desc: "20 stickers gratis con tu pedido",     peso: 250, icon: "\u2728", color: "#0d3b80" },
+    { nombre: "10% de descuento",  desc: "10% de descuento en tu pedido",        peso: 176, icon: "\ud83d\udcaf", color: "#0d3b80" }
+  ];
+
+  function premioPorPeso() {
+    var total = 0, i;
+    for (i = 0; i < PREMIOS.length; i++) total += PREMIOS[i].peso;
+    var r = Math.random() * total;
+    for (i = 0; i < PREMIOS.length; i++) { r -= PREMIOS[i].peso; if (r <= 0) return i; }
+    return PREMIOS.length - 1;
+  }
+
+  // \u00bfMostrar el juego? Cuando la URL trae "ruleta", "gol" o el hash #jugar
+  function debeMostrar() {
+    var p = (location.pathname + location.hash).toLowerCase();
+    return true;
+  }
+
+  function esc(s) { return (s || "").replace(/[<>&"]/g, function (c) { return { "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]; }); }
+
+  function construir() {
+    var ov = document.createElement("div");
+    ov.id = "litek-gol";
+    ov.innerHTML = ''
+      + '<style>'
+      + '#litek-gol{position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;padding:14px;font-family:-apple-system,Arial,sans-serif;}'
+      + '#litek-gol *{box-sizing:border-box;}'
+      + '#lg-card{width:100%;max-width:420px;border-radius:20px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.5);position:relative;}'
+      + '#lg-x{position:absolute;top:8px;right:12px;color:#fff;font-size:26px;cursor:pointer;z-index:5;opacity:.85;}'
+      + '#lg-head{background:linear-gradient(135deg,#e30613,#a3000d);padding:14px;text-align:center;}'
+      + '#lg-head .t{color:#fff;font-size:21px;font-weight:900;}'
+      + '#lg-head .s{color:#ffd54f;font-size:12px;font-weight:700;}'
+      + '#lg-field{background:repeating-linear-gradient(90deg,#1f7a3d 0 40px,#1c7138 40px 80px);padding:16px;}'
+      + '#lg-porteria{border:7px solid #fff;border-bottom:none;border-radius:8px 8px 0 0;background:repeating-linear-gradient(0deg,transparent 0 16px,rgba(255,255,255,.10) 16px 17px),repeating-linear-gradient(90deg,transparent 0 16px,rgba(255,255,255,.10) 16px 17px),rgba(0,0,0,.18);padding:7px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;}'
+      + '.lg-zona{background:linear-gradient(160deg,#2b2b2b,#111);border:2px dashed #ffd54f;border-radius:9px;padding:14px 4px;text-align:center;min-height:62px;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:transform .25s,box-shadow .25s;}'
+      + '.lg-zona .q{font-size:26px;color:#ffd54f;font-weight:900;}'
+      + '.lg-zona.win{border:2px solid #fff;box-shadow:0 0 18px #ffd54f;transform:scale(1.08);}'
+      + '.lg-zona .ic{font-size:24px;}'
+      + '.lg-zona .nm{color:#fff;font-size:10px;font-weight:800;line-height:1.1;margin-top:2px;}'
+      + '#lg-line{height:3px;background:rgba(255,255,255,.45);margin:0 -16px;}'
+      + '#lg-stage{position:relative;display:flex;align-items:flex-end;justify-content:center;gap:4px;margin-top:8px;height:150px;}'
+      + '#lg-perro{height:150px;filter:drop-shadow(0 8px 6px rgba(0,0,0,.45));}'
+      + '#lg-balon{font-size:34px;filter:drop-shadow(0 5px 4px rgba(0,0,0,.4));margin-bottom:10px;transition:transform 0.7s cubic-bezier(.3,-0.2,.5,1);}'
+      + '#lg-form{margin-top:10px;}'
+      + '#lg-form input{width:100%;padding:11px;margin:5px 0;border:none;border-radius:10px;font-size:15px;}'
+      + '#lg-btn{display:block;width:100%;margin-top:8px;background:linear-gradient(180deg,#ffe082,#ffc107);border:none;border-radius:14px;padding:14px;font-size:19px;font-weight:900;color:#7a1500;box-shadow:0 6px 0 #d39e00,0 8px 14px rgba(0,0,0,.3);cursor:pointer;}'
+      + '#lg-btn:disabled{opacity:.6;}'
+      + '#lg-nota{text-align:center;color:rgba(255,255,255,.85);font-size:11px;margin-top:7px;}'
+      + '#lg-result{display:none;background:#fff;padding:22px 18px;text-align:center;}'
+      + '#lg-result .gol{font-size:30px;font-weight:900;color:#e30613;}'
+      + '#lg-result .pr{font-size:22px;font-weight:900;margin:8px 0;}'
+      + '#lg-result .cup{border:2px dashed #e30613;border-radius:12px;padding:14px;margin:14px 0;background:#fff8f8;}'
+      + '#lg-result .folio{font-size:13px;color:#777;}'
+      + '#lg-result a{display:block;background:#25D366;color:#fff;text-decoration:none;border-radius:12px;padding:13px;font-weight:800;margin-top:10px;}'
+      + '</style>'
+      + '<div id="lg-card">'
+      +   '<span id="lg-x">&times;</span>'
+      +   '<div id="lg-head"><div class="t">\u26bd \u00a1METE GOL Y GANA!</div><div class="s">\ud83c\uddf2\ud83c\uddfd Calidad Perrona \u00b7 LiTek</div></div>'
+      +   '<div id="lg-field">'
+      +     '<div id="lg-porteria">'
+      +       z() + z() + z() + z() + z() + z()
+      +     '</div>'
+      +     '<div id="lg-line"></div>'
+      +     '<div id="lg-stage"><img id="lg-perro" src="' + MASCOTA + '" alt="Rottweiler LiTek"><span id="lg-balon">\u26bd</span></div>'
+      +     '<div id="lg-form">'
+      +       '<input id="lg-nombre" placeholder="Tu nombre" autocomplete="name">'
+      +       '<input id="lg-tel" placeholder="Tu WhatsApp (10 d\u00edgitos)" inputmode="numeric" autocomplete="tel">'
+      +       '<button id="lg-btn">\u26bd \u00a1PATEAR!</button>'
+      +       '<div id="lg-nota">1 tiro por persona \u00b7 \u00a1descubre tu premio!</div>'
+      +     '</div>'
+      +   '</div>'
+      +   '<div id="lg-result"></div>'
+      + '</div>';
+    function z() { return '<div class="lg-zona"><span class="q">?</span></div>'; }
+    document.body.appendChild(ov);
+
+    var zonas = ov.querySelectorAll(".lg-zona");
+    var btn = ov.querySelector("#lg-btn");
+    var balon = ov.querySelector("#lg-balon");
+
+    ov.querySelector("#lg-x").onclick = function () { ov.remove(); window.__litekGolCargado = false; };
+
+    btn.onclick = function () {
+      var nombre = ov.querySelector("#lg-nombre").value.trim();
+      var tel = ov.querySelector("#lg-tel").value.replace(/\D/g, "");
+      if (nombre.length < 2) { alert("Escribe tu nombre \ud83d\ude42"); return; }
+      if (tel.length < 10) { alert("Escribe tu WhatsApp a 10 d\u00edgitos \ud83d\udcf1"); return; }
+      btn.disabled = true; btn.textContent = "Verificando...";
+
+      // \u00bfYa jug\u00f3? (bloqueo 15 d\u00edas, lo controla el backend)
+      fetch(CLIO_API + "/ruleta/verificar", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ telefono: tel })
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        if (d && d.ya_jugo) {
+          mostrarResultado(nombre, tel, { nombre: d.premio || "tu premio", desc: d.descripcion || "" }, true, d.dias_faltantes);
+          return;
+        }
+        patear(nombre, tel);
+      }).catch(function () { patear(nombre, tel); });
+    };
+
+    function patear(nombre, tel) {
+      btn.textContent = "\u26bd ...";
+      var idx = premioPorPeso();
+      var zona = zonas[idx];
+      // Animar el bal\u00f3n hacia la zona ganadora
+      var rb = balon.getBoundingClientRect(), rz = zona.getBoundingClientRect();
+      var dx = (rz.left + rz.width / 2) - (rb.left + rb.width / 2);
+      var dy = (rz.top + rz.height / 2) - (rb.top + rb.height / 2);
+      balon.style.transform = "translate(" + dx + "px," + dy + "px) scale(.5)";
+      setTimeout(function () {
+        zona.classList.add("win");
+        zona.innerHTML = '<span class="ic">' + PREMIOS[idx].icon + '</span><span class="nm">' + esc(PREMIOS[idx].nombre) + '</span>';
+        balon.style.opacity = "0";
+        registrar(nombre, tel, PREMIOS[idx]);
+        setTimeout(function () { mostrarResultado(nombre, tel, PREMIOS[idx], false, 0); }, 900);
+      }, 750);
+    }
+
+    function registrar(nombre, tel, premio) {
+      // GET por pixel (sin preflight CORS), igual que la ruleta
+      var img = new Image();
+      img.src = CLIO_API + "/ruleta/ping?nombre=" + encodeURIComponent(nombre)
+        + "&telefono=" + encodeURIComponent(tel)
+        + "&premio=" + encodeURIComponent(premio.nombre)
+        + "&descripcion=" + encodeURIComponent(premio.desc)
+        + "&_=" + Date.now();
+    }
+
+    function mostrarResultado(nombre, tel, premio, yaJugo, dias) {
+      var folio = "GOL-" + (nombre.split(" ")[0].toUpperCase().slice(0, 6)) + "-" + Math.floor(1000 + Math.random() * 9000);
+      var venceMs = Date.now() + 30 * 86400000;
+      var vence = new Date(venceMs).toLocaleDateString("es-MX");
+      var res = ov.querySelector("#lg-result");
+      ov.querySelector("#lg-field").style.display = "none";
+      res.style.display = "block";
+      res.innerHTML =
+        (yaJugo
+          ? '<div class="gol">\u00a1Ya jugaste! \u26bd</div><div class="pr">' + esc(premio.nombre) + '</div>'
+            + '<p style="color:#777;font-size:13px;">Ya tienes tu premio guardado.' + (dias ? ' Podr\u00e1s volver a jugar en ' + dias + ' d\u00edas.' : '') + '</p>'
+          : '<div class="gol">\u00a1GOOOOL! \ud83c\udf89\u26bd</div><div class="pr">Ganaste: ' + esc(premio.nombre) + '</div>')
+        + '<div class="cup"><div style="font-weight:800;">\ud83c\udf81 ' + esc(premio.desc) + '</div>'
+        + '<div class="folio">Folio: <b>' + folio + '</b><br>V\u00e1lido hasta: ' + vence + '</div></div>'
+        + '<a href="https://wa.me/' + WA_CLIO + '?text=' + encodeURIComponent("\u00a1Hola! Gan\u00e9 en el juego de gol: " + premio.nombre + " (Folio " + folio + ")") + '" target="_blank">\ud83d\udcac Reclamar con Clio por WhatsApp</a>'
+        + '<div style="margin-top:10px;color:#999;font-size:11px;cursor:pointer;" onclick="document.getElementById(\'litek-gol\').remove();window.__litekGolCargado=false;">Cerrar</div>';
+    }
+  }
+
+  function init() { if (debeMostrar() && !document.getElementById("litek-gol")) construir(); }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+  window.addEventListener("hashchange", init);
+})();
+</script>
+
+</body></html>

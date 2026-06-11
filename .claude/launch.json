@@ -1,11 +1,6 @@
 {
   "version": "0.0.1",
   "configurations": [
-    {
-      "name": "reporte-preview",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "7788", "--directory", "/Users/litek/Downloads"],
-      "port": 7788
-    }
+    { "name": "gol-demo", "runtimeExecutable": "python3", "runtimeArgs": ["-m", "http.server", "8123", "--directory", "web"], "port": 8123 }
   ]
 }
