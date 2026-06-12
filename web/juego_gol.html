@@ -15,11 +15,13 @@
   // Premios (peso = probabilidad relativa). Lona 75\u00d775 \u22481/70, Lona $39 \u22481/50.
   var PREMIOS = [
     { nombre: "Lona 75\u00d775 GRATIS", desc: "Lona 75x75 cm gratis con tu pedido", peso: 14, icon: "\ud83c\udf81", color: "#c20011" },
-    { nombre: "Lona a $39",        desc: "Lona promocional a solo $39",         peso: 20, icon: "\ud83c\udff7\ufe0f", color: "#d35400" },
-    { nombre: "24 tarjetas",       desc: "24 tarjetas de presentaci\u00f3n gratis",  peso: 290, icon: "\ud83c\udf9f\ufe0f", color: "#0d3b80" },
-    { nombre: "Dise\u00f1o gratis",     desc: "Dise\u00f1o gratis con tu pedido",          peso: 250, icon: "\ud83c\udfa8", color: "#0d3b80" },
-    { nombre: "20 stickers",       desc: "20 stickers gratis con tu pedido",     peso: 250, icon: "\u2728", color: "#0d3b80" },
-    { nombre: "10% de descuento",  desc: "10% de descuento en tu pedido",        peso: 176, icon: "\ud83d\udcaf", color: "#0d3b80" }
+    { nombre: "Lona a $39",        desc: "Lona promocional a solo $39", peso: 20, icon: "\ud83c\udff7\ufe0f", color: "#d35400" },
+    { nombre: "Mitad de costo",    desc: "50% de descuento (en compra de 2 lonas se cobra la de mayor precio)", peso: 28, icon: "\ud83d\udcb0", color: "#6a1b9a" },
+    { nombre: "Expr\u00e9s GRATIS",     desc: "Servicio expr\u00e9s gratis (sujeto a disponibilidad)", peso: 33, icon: "\u26a1", color: "#00897b" },
+    { nombre: "24 tarjetas",       desc: "24 tarjetas de presentaci\u00f3n gratis", peso: 260, icon: "\ud83c\udf9f\ufe0f", color: "#0d3b80" },
+    { nombre: "Dise\u00f1o gratis",     desc: "Dise\u00f1o gratis con tu pedido", peso: 230, icon: "\ud83c\udfa8", color: "#0d3b80" },
+    { nombre: "20 stickers",       desc: "20 stickers gratis con tu pedido", peso: 230, icon: "\u2728", color: "#0d3b80" },
+    { nombre: "10% de descuento",  desc: "10% de descuento en tu pedido", peso: 185, icon: "\ud83d\udcaf", color: "#0d3b80" }
   ];
 
   function premioPorPeso() {
@@ -51,12 +53,12 @@
       + '#lg-head .t{color:#fff;font-size:21px;font-weight:900;}'
       + '#lg-head .s{color:#ffd54f;font-size:12px;font-weight:700;}'
       + '#lg-field{background:repeating-linear-gradient(90deg,#1f7a3d 0 40px,#1c7138 40px 80px);padding:16px;}'
-      + '#lg-porteria{border:7px solid #fff;border-bottom:none;border-radius:8px 8px 0 0;background:repeating-linear-gradient(0deg,transparent 0 16px,rgba(255,255,255,.10) 16px 17px),repeating-linear-gradient(90deg,transparent 0 16px,rgba(255,255,255,.10) 16px 17px),rgba(0,0,0,.18);padding:7px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;}'
-      + '.lg-zona{background:linear-gradient(160deg,#2b2b2b,#111);border:2px dashed #ffd54f;border-radius:9px;padding:14px 4px;text-align:center;min-height:62px;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:transform .25s,box-shadow .25s;}'
-      + '.lg-zona .q{font-size:26px;color:#ffd54f;font-weight:900;}'
+      + '#lg-porteria{border:7px solid #fff;border-bottom:none;border-radius:8px 8px 0 0;background:repeating-linear-gradient(0deg,transparent 0 16px,rgba(255,255,255,.10) 16px 17px),repeating-linear-gradient(90deg,transparent 0 16px,rgba(255,255,255,.10) 16px 17px),rgba(0,0,0,.18);padding:6px;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;}'
+      + '.lg-zona{background:linear-gradient(160deg,#2b2b2b,#111);border:2px dashed #ffd54f;border-radius:8px;padding:10px 2px;text-align:center;min-height:54px;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:transform .25s,box-shadow .25s;}'
+      + '.lg-zona .q{font-size:22px;color:#ffd54f;font-weight:900;}'
       + '.lg-zona.win{border:2px solid #fff;box-shadow:0 0 18px #ffd54f;transform:scale(1.08);}'
-      + '.lg-zona .ic{font-size:24px;}'
-      + '.lg-zona .nm{color:#fff;font-size:10px;font-weight:800;line-height:1.1;margin-top:2px;}'
+      + '.lg-zona .ic{font-size:20px;}'
+      + '.lg-zona .nm{color:#fff;font-size:8px;font-weight:800;line-height:1.05;margin-top:2px;}'
       + '#lg-line{height:3px;background:rgba(255,255,255,.45);margin:0 -16px;}'
       + '#lg-stage{position:relative;display:flex;align-items:flex-end;justify-content:center;margin-top:8px;height:160px;}'
       + '#lg-perro{height:155px;filter:drop-shadow(2px 4px 3px rgba(0,0,0,.3));transition:transform .18s ease;transform-origin:bottom center;position:relative;z-index:1;}'
@@ -75,10 +77,10 @@
       + '</style>'
       + '<div id="lg-card">'
       +   '<span id="lg-x">&times;</span>'
-      +   '<div id="lg-head"><div class="t">\u26bd \u00a1METE GOL Y GANA!</div><div class="s">\ud83c\uddf2\ud83c\uddfd Calidad Perrona \u00b7 LiTek</div></div>'
+      +   '<div id="lg-head"><div class="t">\u26bd \u00a1METE GOL Y GANA!</div><div class="s">\ud83c\udf81 \u00a1Gana hasta una LONA GRATIS! \u00b7 LiTek</div></div>'
       +   '<div id="lg-field">'
       +     '<div id="lg-porteria">'
-      +       z() + z() + z() + z() + z() + z()
+      +       z() + z() + z() + z() + z() + z() + z() + z()
       +     '</div>'
       +     '<div id="lg-line"></div>'
       +     '<div id="lg-stage"><img id="lg-perro" src="' + MASCOTA + '" alt="Rottweiler LiTek"><span id="lg-balon">\u26bd</span></div>'
