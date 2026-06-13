@@ -33,8 +33,10 @@ MARCA_GRACIAS = "GRACIAS_AUTO"
 
 MENSAJE_GRACIAS = (
     "¡Hola! 🙏 Aquí Clio de LiTek. Mil gracias por confiar en nosotros para tu pedido. "
-    "¿Cómo calificarías nuestro servicio? Responde con una palabra: "
-    "*Bueno* 😀, *Regular* 😐 o *Malo* 😞.\n\n"
+    "¿Cómo calificarías nuestro servicio? Responde solo con el número:\n\n"
+    "1️⃣ Bueno 😀\n"
+    "2️⃣ Regular 😐\n"
+    "3️⃣ Malo 😞\n\n"
     "Y si quieres, déjanos un comentario — nos ayuda muchísimo a mejorar. 💪"
 )
 
