@@ -15,7 +15,7 @@ import logging
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from sqlalchemy import select, func
-from agent.memory import async_session, Mensaje
+from agent.memory import async_session, Mensaje, estado_crm_por_telefono
 
 logger = logging.getLogger("agentkit")
 
@@ -133,6 +133,16 @@ async def obtener_conversaciones_inactivas() -> list[str]:
 
             if total < 2:
                 continue
+
+            # ③ Si el cliente YA pagó (proceso/vendido), NO le mandamos el
+            # recordatorio de "seguimos pendientes" — a ellos les toca el
+            # agradecimiento + calificación (ver agent/agradecimiento.py).
+            try:
+                estado = await estado_crm_por_telefono(telefono)
+                if estado in ("proceso", "vendido"):
+                    continue
+            except Exception:
+                pass  # si falla la consulta, no bloquear el recordatorio normal
 
             telefonos_inactivos.append(telefono)
 

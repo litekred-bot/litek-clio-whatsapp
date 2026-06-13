@@ -47,6 +47,7 @@ from agent.memory import (
     tomar_control, devolver_clio, estado_control, esta_en_modo_humano,
     marcar_alerta_crm, listar_usuarios_crm, cambiar_password_crm,
     reactivar_cliente_no_contesto, marcar_no_contesto_automatico, marcar_expres_crm,
+    guardar_calificacion_crm,
 )
 from zoneinfo import ZoneInfo as _ZI
 
@@ -84,6 +85,7 @@ from agent.document_reader import leer_documento
 from agent.escalation import enviar_alerta_asesor, AREAS
 from agent.reporte_diario import generar_reporte_diario
 from agent.seguimiento import enviar_seguimientos, cargar_cache_desde_db
+from agent.agradecimiento import enviar_agradecimientos, cargar_cache_agradecidos
 from agent.crm import HTML_PANEL, crear_token, verificar_token
 
 # Número del dueño para recibir copia de cotizaciones de productos que no son lonas
@@ -121,6 +123,7 @@ async def lifespan(app: FastAPI):
     await inicializar_db()
     logger.info("Base de datos inicializada")
     await cargar_cache_desde_db()  # Carga seguimientos recientes para no reenviar tras reinicio
+    await cargar_cache_agradecidos()  # Carga a quién ya se agradeció (no reenviar tras reinicio)
     logger.info(f"Servidor AgentKit — LiTek corriendo en puerto {PORT}")
     logger.info(f"Proveedor de WhatsApp: {proveedor.__class__.__name__}")
 
@@ -143,6 +146,17 @@ async def lifespan(app: FastAPI):
         args=[proveedor.token],
         id="seguimiento_inactivos",
         name="Seguimiento clientes inactivos cada 30 minutos",
+        replace_existing=True,
+    )
+    # Agradecimiento post-venta: a los que pagaron hace +12h, gracias + pedir
+    # calificación (una sola vez). A estos NO les llega el "seguimos pendientes".
+    scheduler.add_job(
+        enviar_agradecimientos,
+        "interval",
+        minutes=30,
+        args=[proveedor.token],
+        id="agradecimiento_postventa",
+        name="Agradecer y pedir calificación a clientes que ya pagaron (+12h)",
         replace_existing=True,
     )
     # Reparto de ganadores de ruleta que llevan +2h sin avanzar (sin dueño).
@@ -725,6 +739,22 @@ async def _procesar_mensaje(msg):
                 await marcar_expres_crm(msg.telefono, True)
             except Exception as e:
                 logger.error(f"Error marcando exprés CRM: {e}")
+
+        # Detectar [CALIFICACION:nivel|comentario] — el cliente calificó el servicio
+        # nivel = bueno|regular|malo. El comentario es opcional (tras el "|").
+        # Se guarda en el CRM; si es malo/regular, prende la alerta ⚠️ (queja).
+        match_calif = re.search(r'\[CALIFICACION:([^\]]+)\]', respuesta, re.IGNORECASE)
+        if match_calif:
+            contenido_calif = match_calif.group(1).strip()
+            respuesta = re.sub(r'\[CALIFICACION:[^\]]+\]', '', respuesta, flags=re.IGNORECASE).strip()
+            partes = contenido_calif.split("|", 1)
+            nivel = partes[0].strip().lower()
+            comentario = partes[1].strip() if len(partes) > 1 else ""
+            try:
+                await guardar_calificacion_crm(msg.telefono, nivel, comentario)
+                logger.info(f"Calificación de {msg.telefono}: {nivel} — {comentario}")
+            except Exception as e:
+                logger.error(f"Error guardando calificación CRM: {e}")
 
         # Detectar [MOTIVO] — resumen conciso del motivo de escalación (lo genera Clio)
         motivo_escalacion = None

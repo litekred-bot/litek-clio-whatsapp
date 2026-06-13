@@ -60,6 +60,7 @@ class CrmRegistro(Base):
     estado: Mapped[str] = mapped_column(String(20), default="nuevo", index=True)  # nuevo|asignado|proceso|cerrado
     alerta: Mapped[str] = mapped_column(String(200), default="")  # motivo a revisar (⚠️) o vacío
     expres: Mapped[bool] = mapped_column(Boolean, default=False)  # ⚡ pedido exprés (prioritario)
+    calificacion: Mapped[str] = mapped_column(String(20), default="")  # bueno|regular|malo (post-venta)
     notas: Mapped[str] = mapped_column(Text, default="")
     creado: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     actualizado: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -96,6 +97,7 @@ async def inicializar_db():
     migraciones = [
         "ALTER TABLE crm_registros ADD COLUMN alerta VARCHAR(200) DEFAULT ''",
         "ALTER TABLE crm_registros ADD COLUMN expres BOOLEAN DEFAULT false",
+        "ALTER TABLE crm_registros ADD COLUMN calificacion VARCHAR(20) DEFAULT ''",
         # 'cerrado' viejo = venta concretada → renombrar a 'vendido'
         "UPDATE crm_registros SET estado='vendido' WHERE estado='cerrado'",
     ]
@@ -462,6 +464,7 @@ async def listar_crm(estado: str = "", tipo: str = "", asesor: str = "", limite:
             "estado": r.estado,
             "alerta": getattr(r, "alerta", "") or "",
             "expres": bool(getattr(r, "expres", False)),
+            "calificacion": getattr(r, "calificacion", "") or "",
             "notas": r.notas,
             "creado": r.creado.strftime("%d/%m/%Y %H:%M"),
         } for r in registros]
@@ -501,6 +504,95 @@ async def marcar_expres_crm(telefono: str, valor: bool = True) -> bool:
                 await session.commit()
                 return True
     return False
+
+
+async def telefono_conversacion(telefono: str) -> str:
+    """
+    Devuelve el identificador EXACTO con el que se guarda la conversación de este
+    cliente en la tabla de mensajes (ej. '5219845576964@s.whatsapp.net'), buscando
+    por los últimos 10 dígitos. Si no hay conversación previa, regresa el de entrada.
+    Sirve para que mensajes automáticos (agradecimiento) caigan en el MISMO historial
+    que ve Clio, y así entienda la respuesta del cliente en contexto.
+    """
+    sufijo = _sufijo_tel(telefono)
+    async with async_session() as session:
+        result = await session.execute(
+            select(Mensaje.telefono)
+            .order_by(Mensaje.timestamp.desc())
+        )
+        for (tel,) in result.fetchall():
+            if _sufijo_tel(tel) == sufijo:
+                return tel
+    return telefono
+
+
+async def estado_crm_por_telefono(telefono: str) -> str:
+    """Devuelve el estado de la tarjeta más reciente de ese cliente, o '' si no tiene."""
+    sufijo = _sufijo_tel(telefono)
+    async with async_session() as session:
+        result = await session.execute(
+            select(CrmRegistro).order_by(CrmRegistro.creado.desc())
+        )
+        for r in result.scalars().all():
+            if _sufijo_tel(r.telefono) == sufijo:
+                return r.estado
+    return ""
+
+
+async def guardar_calificacion_crm(telefono: str, calificacion: str, comentario: str = "") -> bool:
+    """
+    Guarda la calificación post-venta (bueno|regular|malo) en la tarjeta del cliente.
+    Si es 'malo' o 'regular', prende la alerta ⚠️ para que el equipo lo revise (queja).
+    El comentario se agrega a las notas. Toma la tarjeta más reciente del cliente.
+    """
+    calificacion = (calificacion or "").strip().lower()
+    if calificacion not in ("bueno", "regular", "malo"):
+        return False
+    sufijo = _sufijo_tel(telefono)
+    async with async_session() as session:
+        result = await session.execute(
+            select(CrmRegistro).order_by(CrmRegistro.creado.desc())
+        )
+        for r in result.scalars().all():
+            if _sufijo_tel(r.telefono) == sufijo:
+                r.calificacion = calificacion
+                if comentario:
+                    sello = datetime.utcnow().strftime("%d/%m %H:%M")
+                    nota_nueva = f"[{sello}] Calificó {calificacion}: {comentario}"
+                    r.notas = (nota_nueva + ("\n" + r.notas if r.notas else ""))[:2000]
+                # Queja → prender alerta para que el equipo la atienda
+                if calificacion in ("malo", "regular"):
+                    motivo = f"Queja: calificó {calificacion.upper()}"
+                    if comentario:
+                        motivo += f" — {comentario[:120]}"
+                    r.alerta = motivo[:200]
+                r.actualizado = datetime.utcnow()
+                await session.commit()
+                return True
+    return False
+
+
+async def clientes_para_agradecer(horas_min: int = 12, dias_max: int = 7) -> list[dict]:
+    """
+    Clientes que YA pagaron (estado 'proceso' o 'vendido') cuyo pedido se confirmó
+    hace al menos `horas_min` horas y no más de `dias_max` días.
+    Sirve para mandarles el 'gracias por confiar' + pedir calificación, una sola vez.
+    """
+    ahora = datetime.utcnow()
+    tope_reciente = ahora - timedelta(hours=horas_min)   # ya pasaron al menos 12h
+    tope_antiguo = ahora - timedelta(days=dias_max)       # pero no más de 7 días
+    async with async_session() as session:
+        result = await session.execute(
+            select(CrmRegistro).where(
+                CrmRegistro.estado.in_(["proceso", "vendido"]),
+                CrmRegistro.actualizado <= tope_reciente,
+                CrmRegistro.actualizado >= tope_antiguo,
+            )
+        )
+        return [
+            {"telefono": r.telefono, "nombre": r.nombre or "", "calificacion": getattr(r, "calificacion", "") or ""}
+            for r in result.scalars().all()
+        ]
 
 
 async def reactivar_cliente_no_contesto(telefono: str) -> bool:

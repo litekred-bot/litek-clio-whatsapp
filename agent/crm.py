@@ -94,6 +94,10 @@ HTML_PANEL = r"""<!DOCTYPE html>
   .card.alertado { border-left-color: #e30613; background: #fff6f6; }
   .card.expres-on { box-shadow: 0 0 0 2px #ff9800, 0 1px 4px rgba(0,0,0,.05); }
   .card .expres-badge { display: inline-block; background: #ff9800; color: #fff; font-size: 11px; font-weight: bold; border-radius: 10px; padding: 2px 9px; margin-left: 6px; }
+  .card .calif-badge { display: inline-block; font-size: 11px; font-weight: bold; border-radius: 10px; padding: 2px 9px; margin-left: 6px; }
+  .card .calif-bueno { background: #e8f5e9; color: #2e7d32; }
+  .card .calif-regular { background: #fff8e1; color: #f57f17; }
+  .card .calif-malo { background: #ffebee; color: #c62828; }
   .card .acciones .bexpres { background: #fff3e0; color: #e65100; border: 1px solid #ffb74d; border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
   .card .acciones .bexpres.on { background: #ff9800; color: #fff; border-color: #ff9800; }
   .card .alerta-banner { background: #ffe0e0; color: #b71c1c; border-radius: 8px; padding: 7px 10px; margin: 8px 0; font-size: 13px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -320,8 +324,10 @@ function pintar(regs){
     var opcEstado = Object.keys(ESTADOS).map(function(e){ return '<option value="'+e+'"'+(e===r.estado?' selected':'')+'>'+ESTADOS[e]+'</option>'; }).join("");
     var alertaHtml = r.alerta ? '<div class="alerta-banner"><span>'+esc(r.alerta)+'</span><button onclick="resolverAlerta('+r.id+')">✓ Resuelto</button></div>' : '';
     var badgeExpres = r.expres ? '<span class="expres-badge">⚡ EXPRÉS</span>' : '';
+    var CALIF = {bueno:'😀 Bueno', regular:'😐 Regular', malo:'😞 Malo'};
+    var badgeCalif = r.calificacion ? '<span class="calif-badge calif-'+r.calificacion+'">'+(CALIF[r.calificacion]||r.calificacion)+'</span>' : '';
     return '<div class="card '+r.estado+(r.alerta?' alertado':'')+(r.expres?' expres-on':'')+'">'+
-      '<div class="head"><span class="nombre">'+esc(r.nombre||"Sin nombre")+badgeExpres+'</span>'+
+      '<div class="head"><span class="nombre">'+esc(r.nombre||"Sin nombre")+badgeExpres+badgeCalif+'</span>'+
       '<span class="tipo">'+(TIPOS[r.tipo]||r.tipo)+'</span></div>'+
       alertaHtml+
       '<div class="desc">'+esc(r.descripcion||"")+'</div>'+
