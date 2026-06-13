@@ -2,6 +2,7 @@
 # Generado por AgentKit para LiTek
 
 import os
+import re
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -712,6 +713,55 @@ async def guardar_monto_crm(telefono: str, monto: float) -> bool:
                 await session.commit()
                 return True
     return False
+
+
+def _extraer_monto(texto: str) -> float:
+    """
+    Intenta sacar el importe $ del texto del pedido. Prioriza la línea de 'Importe',
+    si no, toma la primera cantidad con $ del texto. Devuelve 0 si no encuentra.
+    """
+    if not texto:
+        return 0.0
+    # 1) Preferir "Importe: $264" / "Importe $1,264.50"
+    m = re.search(r'[Ii]mporte[^\$\d]*\$?\s*([\d][\d,]*(?:\.\d+)?)', texto)
+    if not m:
+        # 2) Cualquier cantidad con $ (ej. "$264", "$1,264")
+        m = re.search(r'\$\s*([\d][\d,]*(?:\.\d+)?)', texto)
+    if not m:
+        return 0.0
+    try:
+        return float(m.group(1).replace(",", ""))
+    except ValueError:
+        return 0.0
+
+
+async def backfill_montos_crm() -> dict:
+    """
+    Rellena el monto de pedidos viejos (estado proceso/vendido con monto 0)
+    leyéndolo del texto de la descripción ('💰 Importe: $X' que guardaba Clio).
+    La fecha de venta de esos pedidos queda como su fecha de creación.
+    Devuelve cuántos actualizó y el total recuperado.
+    """
+    actualizados = 0
+    total = 0.0
+    async with async_session() as session:
+        result = await session.execute(
+            select(CrmRegistro).where(
+                CrmRegistro.estado.in_(["proceso", "vendido"]),
+                func.coalesce(CrmRegistro.monto, 0) <= 0,
+            )
+        )
+        for r in result.scalars().all():
+            monto = _extraer_monto(r.descripcion or "")
+            if monto > 0:
+                r.monto = monto
+                if not r.pagado_en:
+                    r.pagado_en = r.creado  # fecha de venta = cuando se creó la tarjeta
+                actualizados += 1
+                total += monto
+        if actualizados:
+            await session.commit()
+    return {"actualizados": actualizados, "total": total}
 
 
 async def total_vendido_crm(desde: datetime = None, hasta: datetime = None,

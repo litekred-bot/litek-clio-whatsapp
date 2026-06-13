@@ -47,7 +47,7 @@ from agent.memory import (
     tomar_control, devolver_clio, estado_control, esta_en_modo_humano,
     marcar_alerta_crm, listar_usuarios_crm, cambiar_password_crm,
     reactivar_cliente_no_contesto, marcar_no_contesto_automatico, marcar_expres_crm,
-    guardar_calificacion_crm, guardar_monto_crm, total_vendido_crm,
+    guardar_calificacion_crm, guardar_monto_crm, total_vendido_crm, backfill_montos_crm,
 )
 from zoneinfo import ZoneInfo as _ZI
 
@@ -447,6 +447,18 @@ async def crm_actualizar(registro_id: int, request: Request):
         monto=monto,
     )
     return {"ok": ok}
+
+
+@app.post("/crm/api/backfill-montos")
+async def crm_backfill_montos(request: Request):
+    """Recupera montos de pedidos viejos desde el texto (solo administrador)."""
+    u = _crm_usuario_de_request(request)
+    if not u:
+        raise HTTPException(status_code=401, detail="No autorizado")
+    if u["usuario"] not in CRM_VEN_TODO:
+        raise HTTPException(status_code=403, detail="Solo administrador")
+    res = await backfill_montos_crm()
+    return {"ok": True, **res}
 
 
 @app.get("/ruleta/ping")
