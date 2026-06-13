@@ -315,6 +315,14 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = "",
             rango_label = mes_desde if mes_desde == mes_hasta else (mes_desde + " a " + mes_hasta)
         ventas = await total_vendido_crm(desde=d_ini, hasta=d_fin, asesor="")
         ventas["rango"] = rango_label
+        # Total de HOY (siempre el día de hoy, sin importar el rango elegido)
+        hoy_camp = datetime.now(_TZ_CAMP)
+        inicio_hoy = datetime(hoy_camp.year, hoy_camp.month, hoy_camp.day, tzinfo=_TZ_CAMP)
+        hoy_ini = inicio_hoy.astimezone(timezone.utc).replace(tzinfo=None)
+        hoy_fin = (inicio_hoy + timedelta(days=1)).astimezone(timezone.utc).replace(tzinfo=None)
+        vh = await total_vendido_crm(desde=hoy_ini, hasta=hoy_fin, asesor="")
+        ventas["hoy"] = vh["total"]
+        ventas["hoy_num"] = vh["num"]
     # Carga por asesor (solo para quien ve todo): Anna 10, Brayan 15, Tere 3...
     carga = await carga_por_asesor() if ve_todo else None
     return {
