@@ -98,6 +98,11 @@ HTML_PANEL = r"""<!DOCTYPE html>
   .card .calif-bueno { background: #e8f5e9; color: #2e7d32; }
   .card .calif-regular { background: #fff8e1; color: #f57f17; }
   .card .calif-malo { background: #ffebee; color: #c62828; }
+  .resumen-calif { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .resumen-calif .rc { padding: 8px 14px; border-radius: 10px; font-size: 14px; font-weight: 600; }
+  .resumen-calif .rc-b { background: #e8f5e9; color: #2e7d32; }
+  .resumen-calif .rc-r { background: #fff8e1; color: #f57f17; }
+  .resumen-calif .rc-m { background: #ffebee; color: #c62828; }
   .card .acciones .bexpres { background: #fff3e0; color: #e65100; border: 1px solid #ffb74d; border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
   .card .acciones .bexpres.on { background: #ff9800; color: #fff; border-color: #ff9800; }
   .card .alerta-banner { background: #ffe0e0; color: #b71c1c; border-radius: 8px; padding: 7px 10px; margin: 8px 0; font-size: 13px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -171,6 +176,7 @@ HTML_PANEL = r"""<!DOCTYPE html>
     <div class="filtros">
       <button id="btnRevisar" onclick="toggleRevisar()" style="background:#ffe0e0;color:#b71c1c;border-color:#ffb3b3;">⚠️ Solo a revisar</button>
       <button id="btnExpres" onclick="toggleSoloExpres()" style="background:#fff3e0;color:#e65100;border-color:#ffb74d;">⚡ Solo exprés</button>
+      <button id="btnCalif" onclick="toggleSoloCalif()" style="background:#e8f5e9;color:#2e7d32;border-color:#a5d6a7;">⭐ Calificaciones</button>
     </div>
     <div id="lista"></div>
   </div>
@@ -252,12 +258,14 @@ async function cargar(){
 var ULTIMOS_REGISTROS = [];
 var SOLO_REVISAR = false;
 var SOLO_EXPRES = false;
+var SOLO_CALIF = false;
 function aplicarBusqueda(){
   var q = (document.getElementById("buscar").value || "").toLowerCase().trim();
   var qDig = q.replace(/\D/g, "");
   var regs = ULTIMOS_REGISTROS;
   if (SOLO_REVISAR){ regs = regs.filter(function(r){ return r.alerta; }); }
   if (SOLO_EXPRES){ regs = regs.filter(function(r){ return r.expres; }); }
+  if (SOLO_CALIF){ regs = regs.filter(function(r){ return r.calificacion; }); }
   if (q){
     regs = regs.filter(function(r){
       var nom = (r.nombre || "").toLowerCase();
@@ -289,6 +297,14 @@ function toggleSoloExpres(){
   aplicarBusqueda();
 }
 
+function toggleSoloCalif(){
+  SOLO_CALIF = !SOLO_CALIF;
+  var b = document.getElementById("btnCalif");
+  b.style.background = SOLO_CALIF ? "#2e7d32" : "#e8f5e9";
+  b.style.color = SOLO_CALIF ? "#fff" : "#2e7d32";
+  aplicarBusqueda();
+}
+
 async function toggleExpres(id, valor){
   await fetch("/crm/api/registro/"+id, {method:"POST", headers:{"Authorization":"Bearer "+TOKEN, "Content-Type":"application/json"}, body: JSON.stringify({expres: valor})});
   cargar();
@@ -316,7 +332,16 @@ function pintarStats(s){
 function pintar(regs){
   var c = document.getElementById("lista");
   if (!regs || !regs.length){ c.innerHTML = '<div class="vacio">No hay registros con este filtro 👍</div>'; return; }
-  c.innerHTML = regs.map(function(r){
+  var resumen = "";
+  if (SOLO_CALIF){
+    var nb=0,nr=0,nm=0;
+    regs.forEach(function(r){ if(r.calificacion==="bueno")nb++; else if(r.calificacion==="regular")nr++; else if(r.calificacion==="malo")nm++; });
+    resumen = '<div class="resumen-calif">'+
+      '<span class="rc rc-b">😀 Bueno: <b>'+nb+'</b></span>'+
+      '<span class="rc rc-r">😐 Regular: <b>'+nr+'</b></span>'+
+      '<span class="rc rc-m">😞 Malo: <b>'+nm+'</b></span></div>';
+  }
+  c.innerHTML = resumen + regs.map(function(r){
     var wa = r.telefono ? r.telefono.replace(/\D/g,"") : "";
     var num10 = wa.slice(-10);  // número local de 10 dígitos (como lo ven en su WhatsApp)
     var numFmt = num10.replace(/(\d{3})(\d{3})(\d{4})/, "$1 $2 $3") || wa;
