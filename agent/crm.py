@@ -81,6 +81,8 @@ HTML_PANEL = r"""<!DOCTYPE html>
   .stat { background: #fff; border-radius: 10px; padding: 12px 18px; box-shadow: 0 1px 4px rgba(0,0,0,.05); }
   .stat b { font-size: 22px; display: block; color: #e30613; }
   .stat span { font-size: 12px; color: #777; }
+  .stat.venta { background: #e8f5e9; }
+  .stat.venta b { color: #2e7d32; }
   /* Tarjetas */
   .card { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.05); border-left: 4px solid #ccc; }
   .card.nuevo { border-left-color: #2196F3; }
@@ -112,6 +114,7 @@ HTML_PANEL = r"""<!DOCTYPE html>
   .card .acciones { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
   .card .acciones select, .card .acciones input { padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
   .card .acciones input.nota { flex: 1; min-width: 140px; }
+  .card .acciones input.monto { width: 100px; font-weight: 600; color: #2e7d32; }
   .card a.wa, .card button.wa { background: #25D366; color: #fff; text-decoration: none; padding: 6px 12px; border-radius: 6px; font-size: 13px; border: none; cursor: pointer; }
   .card button.copia { background: #eef; color: #334; border: 1px solid #ccd; padding: 6px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; }
   .vacio { text-align: center; color: #999; padding: 40px; }
@@ -249,7 +252,7 @@ async function cargar(){
     document.getElementById("quien").textContent = "👤 " + (d.nombre || "") + (d.es_director ? "" : " · viendo solo lo tuyo");
     document.getElementById("btnEquipo").style.display = d.es_director ? "inline-block" : "none";
     pintarCarga(d.carga);
-    pintarStats(d.stats);
+    pintarStats(d.stats, d.ventas);
     ULTIMOS_REGISTROS = d.registros || [];
     aplicarBusqueda();
   }catch(e){ console.log(e); }
@@ -319,14 +322,25 @@ function pintarCarga(c){
   el.innerHTML = '<div class="titulo">Clientes por atender (pendientes):</div>' + chips;
 }
 
-function pintarStats(s){
+function fmtDinero(n){
+  n = Math.round((Number(n)||0));
+  return "$" + n.toLocaleString("es-MX");
+}
+
+function pintarStats(s, ventas){
   if(!s) return;
+  var ventaHtml = "";
+  if (ventas){
+    ventaHtml =
+      '<div class="stat venta"><b>'+fmtDinero(ventas.total)+'</b><span>💰 Vendido (pagado)</span></div>';
+  }
   document.getElementById("stats").innerHTML =
     '<div class="stat"><b>'+(s.nuevo||0)+'</b><span>Nuevos</span></div>'+
     '<div class="stat"><b>'+(s.asignado||0)+'</b><span>Asignados</span></div>'+
     '<div class="stat"><b>'+(s.proceso||0)+'</b><span>En proceso</span></div>'+
     '<div class="stat"><b>'+(s.vendido||0)+'</b><span>Vendidos</span></div>'+
-    '<div class="stat"><b>'+(s.no_contesto||0)+'</b><span>No contestó</span></div>';
+    '<div class="stat"><b>'+(s.no_contesto||0)+'</b><span>No contestó</span></div>'+
+    ventaHtml;
 }
 
 function pintar(regs){
@@ -361,6 +375,7 @@ function pintar(regs){
         '<select onchange="upd('+r.id+',\'estado\',this.value)">'+opcEstado+'</select>'+
         '<select onchange="upd('+r.id+',\'asesor\',this.value)">'+opcAsesor+'</select>'+
         '<button class="bexpres'+(r.expres?' on':'')+'" onclick="toggleExpres('+r.id+','+(r.expres?'false':'true')+')" title="Marcar/quitar exprés">⚡ Exprés</button>'+
+        '<input class="monto" type="number" min="0" step="1" placeholder="$ monto" value="'+(r.monto?Math.round(r.monto):"")+'" title="Monto $ del pedido (para el total vendido)" onblur="upd('+r.id+',\'monto\',this.value)">'+
         '<input class="nota" placeholder="Nota..." value="'+esc(r.notas||"")+'" onblur="upd('+r.id+',\'notas\',this.value)">'+
         (wa ? '<button class="copia" onclick="verChat(\''+wa+'\',\''+(r.nombre||"Cliente").replace(/[\\\\\x27"]/g,"")+'\')" title="Ver la conversación con Clio">👁️ Ver chat</button>' : '')+
         (num10 ? '<button class="copia" onclick="copiarNum(\''+num10+'\',this)" title="Copiar número para buscarlo en tu WhatsApp">📋 '+numFmt+'</button>'+
@@ -470,7 +485,7 @@ function copiarNum(num, btn){
 async function upd(id, campo, valor){
   var body = {}; body[campo] = valor;
   await fetch("/crm/api/registro/"+id, {method:"POST", headers:{"Authorization":"Bearer "+TOKEN, "Content-Type":"application/json"}, body: JSON.stringify(body)});
-  if (campo === "estado" || campo === "asesor") cargar();
+  if (campo === "estado" || campo === "asesor" || campo === "monto") cargar();
 }
 
 function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }

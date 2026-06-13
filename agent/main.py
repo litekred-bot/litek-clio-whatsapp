@@ -47,7 +47,7 @@ from agent.memory import (
     tomar_control, devolver_clio, estado_control, esta_en_modo_humano,
     marcar_alerta_crm, listar_usuarios_crm, cambiar_password_crm,
     reactivar_cliente_no_contesto, marcar_no_contesto_automatico, marcar_expres_crm,
-    guardar_calificacion_crm,
+    guardar_calificacion_crm, guardar_monto_crm,
 )
 from zoneinfo import ZoneInfo as _ZI
 
@@ -266,13 +266,25 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = ""):
     # Stats por estado (respetando el filtro de persona, sin filtro de estado)
     todos = await listar_crm(tipo=tipo, asesor=asesor_filtro, limite=1000)
     stats = {"nuevo": 0, "asignado": 0, "proceso": 0, "vendido": 0, "no_contesto": 0}
+    venta_proceso = venta_vendido = 0.0
     for r in todos:
         stats[r["estado"]] = stats.get(r["estado"], 0) + 1
+        m = float(r.get("monto", 0) or 0)
+        if r["estado"] == "proceso":
+            venta_proceso += m
+        elif r["estado"] == "vendido":
+            venta_vendido += m
+    ventas = {
+        "proceso": venta_proceso,
+        "vendido": venta_vendido,
+        "total": venta_proceso + venta_vendido,
+    }
     # Carga por asesor (solo para quien ve todo): Anna 10, Brayan 15, Tere 3...
     carga = await carga_por_asesor() if ve_todo else None
     return {
         "registros": registros,
         "stats": stats,
+        "ventas": ventas,
         "nombre": u["nombre"],
         "es_director": ve_todo,
         "carga": carga,
@@ -382,6 +394,7 @@ async def crm_actualizar(registro_id: int, request: Request):
         notas=data.get("notas"),
         alerta=data.get("alerta"),
         expres=data.get("expres"),
+        monto=data.get("monto"),
     )
     return {"ok": ok}
 
@@ -739,6 +752,18 @@ async def _procesar_mensaje(msg):
                 await marcar_expres_crm(msg.telefono, True)
             except Exception as e:
                 logger.error(f"Error marcando exprés CRM: {e}")
+
+        # Detectar [MONTO:numero] — total $ del pedido confirmado (para totalizar ventas)
+        match_monto = re.search(r'\[MONTO:\s*\$?([0-9][0-9.,]*)\]', respuesta)
+        if match_monto:
+            respuesta = re.sub(r'\[MONTO:[^\]]*\]', '', respuesta).strip()
+            try:
+                # Quitar separadores de miles (comas) antes de convertir
+                monto_val = float(match_monto.group(1).replace(",", ""))
+                await guardar_monto_crm(msg.telefono, monto_val)
+                logger.info(f"Monto de pedido de {msg.telefono}: ${monto_val}")
+            except Exception as e:
+                logger.error(f"Error guardando monto CRM: {e}")
 
         # Detectar [CALIFICACION:nivel|comentario] — el cliente calificó el servicio
         # nivel = bueno|regular|malo. El comentario es opcional (tras el "|").

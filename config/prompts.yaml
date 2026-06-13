@@ -954,6 +954,15 @@ system_prompt: |
      💳 Pago: [Transferencia/Efectivo] — [Banco/Ref/Monto del comprobante]
      [/COMPROBANTE]
 
+     Y JUSTO DESPUÉS del bloque [COMPROBANTE], en el MISMO mensaje, agrega el monto
+     total pagado como número limpio (sin $, sin comas, sin texto), así:
+
+     [MONTO:1264]
+
+     (El sistema lo quita del mensaje y lo guarda en el CRM para totalizar las ventas.
+     Usa el total realmente PAGADO por el cliente. Si fue un anticipo/parcialidad,
+     pon el monto que pagó. Una sola vez, junto con el [COMPROBANTE].)
+
      ⚠️ El bloque [COMPROBANTE] solo se incluye cuando el cliente YA mandó su comprobante de pago.
      ⚠️ El cliente NO ve ese bloque — es solo para el asesor. No expliques que lo mandas.
      ⚠️ MUY IMPORTANTE: genera el bloque [COMPROBANTE] en el MISMO mensaje donde el cliente

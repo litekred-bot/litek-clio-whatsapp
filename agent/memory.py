@@ -5,7 +5,7 @@ import os
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import String, Text, DateTime, select, Integer, func, Boolean, text
+from sqlalchemy import String, Text, DateTime, select, Integer, func, Boolean, text, Float
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -61,6 +61,7 @@ class CrmRegistro(Base):
     alerta: Mapped[str] = mapped_column(String(200), default="")  # motivo a revisar (⚠️) o vacío
     expres: Mapped[bool] = mapped_column(Boolean, default=False)  # ⚡ pedido exprés (prioritario)
     calificacion: Mapped[str] = mapped_column(String(20), default="")  # bueno|regular|malo (post-venta)
+    monto: Mapped[float] = mapped_column(Float, default=0.0)  # $ del pedido (para totalizar ventas)
     notas: Mapped[str] = mapped_column(Text, default="")
     creado: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     actualizado: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -98,6 +99,7 @@ async def inicializar_db():
         "ALTER TABLE crm_registros ADD COLUMN alerta VARCHAR(200) DEFAULT ''",
         "ALTER TABLE crm_registros ADD COLUMN expres BOOLEAN DEFAULT false",
         "ALTER TABLE crm_registros ADD COLUMN calificacion VARCHAR(20) DEFAULT ''",
+        "ALTER TABLE crm_registros ADD COLUMN monto DOUBLE PRECISION DEFAULT 0",
         # 'cerrado' viejo = venta concretada → renombrar a 'vendido'
         "UPDATE crm_registros SET estado='vendido' WHERE estado='cerrado'",
     ]
@@ -465,6 +467,7 @@ async def listar_crm(estado: str = "", tipo: str = "", asesor: str = "", limite:
             "alerta": getattr(r, "alerta", "") or "",
             "expres": bool(getattr(r, "expres", False)),
             "calificacion": getattr(r, "calificacion", "") or "",
+            "monto": float(getattr(r, "monto", 0) or 0),
             "notas": r.notas,
             "creado": r.creado.strftime("%d/%m/%Y %H:%M"),
         } for r in registros]
@@ -641,8 +644,9 @@ async def marcar_no_contesto_automatico(dias: int = 2) -> int:
 
 
 async def actualizar_crm(registro_id: int, estado: str = None, asesor: str = None,
-                         notas: str = None, alerta: str = None, expres: bool = None) -> bool:
-    """Actualiza estado, asesor, notas, alerta o exprés de un registro del CRM."""
+                         notas: str = None, alerta: str = None, expres: bool = None,
+                         monto: float = None) -> bool:
+    """Actualiza estado, asesor, notas, alerta, exprés o monto de un registro del CRM."""
     async with async_session() as session:
         resultado = await session.execute(
             select(CrmRegistro).where(CrmRegistro.id == registro_id)
@@ -660,9 +664,73 @@ async def actualizar_crm(registro_id: int, estado: str = None, asesor: str = Non
             r.alerta = alerta
         if expres is not None:
             r.expres = expres
+        if monto is not None:
+            try:
+                r.monto = float(monto)
+            except (TypeError, ValueError):
+                pass
         r.actualizado = datetime.utcnow()
         await session.commit()
         return True
+
+
+async def guardar_monto_crm(telefono: str, monto: float) -> bool:
+    """Guarda el monto $ del pedido en la tarjeta más reciente (no cerrada) del cliente."""
+    try:
+        monto = float(monto)
+    except (TypeError, ValueError):
+        return False
+    if monto <= 0:
+        return False
+    sufijo = _sufijo_tel(telefono)
+    async with async_session() as session:
+        result = await session.execute(
+            select(CrmRegistro)
+            .where(CrmRegistro.estado.not_in(ESTADOS_FINALES))
+            .order_by(CrmRegistro.creado.desc())
+        )
+        for r in result.scalars().all():
+            if _sufijo_tel(r.telefono) == sufijo:
+                r.monto = monto
+                r.actualizado = datetime.utcnow()
+                await session.commit()
+                return True
+        # Si no hay tarjeta abierta, intentar en la más reciente (incluye vendido)
+        result2 = await session.execute(
+            select(CrmRegistro).order_by(CrmRegistro.creado.desc())
+        )
+        for r in result2.scalars().all():
+            if _sufijo_tel(r.telefono) == sufijo:
+                r.monto = monto
+                r.actualizado = datetime.utcnow()
+                await session.commit()
+                return True
+    return False
+
+
+async def total_vendido_crm() -> dict:
+    """
+    Suma de montos de pedidos ya pagados. Devuelve:
+    - proceso: $ en pedidos 'en proceso' (pagados, en producción)
+    - vendido: $ en pedidos 'vendidos' (entregados)
+    - total:   suma de ambos (todo el dinero que ya entró)
+    - num:     cuántos pedidos con monto > 0 (proceso+vendido)
+    """
+    async with async_session() as session:
+        res = await session.execute(
+            select(CrmRegistro.estado, func.coalesce(func.sum(CrmRegistro.monto), 0), func.count(CrmRegistro.id))
+            .where(CrmRegistro.estado.in_(["proceso", "vendido"]), CrmRegistro.monto > 0)
+            .group_by(CrmRegistro.estado)
+        )
+        proceso = vendido = 0.0
+        num = 0
+        for estado, suma, cnt in res.fetchall():
+            if estado == "proceso":
+                proceso = float(suma or 0)
+            elif estado == "vendido":
+                vendido = float(suma or 0)
+            num += int(cnt or 0)
+    return {"proceso": proceso, "vendido": vendido, "total": proceso + vendido, "num": num}
 
 
 # Ciclo de vida de un cliente: el estado solo AVANZA, nunca retrocede.
