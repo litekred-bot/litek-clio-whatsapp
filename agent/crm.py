@@ -83,6 +83,10 @@ HTML_PANEL = r"""<!DOCTYPE html>
   .stat span { font-size: 12px; color: #777; }
   .stat.venta { background: #e8f5e9; }
   .stat.venta b { color: #2e7d32; }
+  .ventas-filtro { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; font-size: 13px; color: #555; }
+  .ventas-filtro span { font-weight: 600; }
+  .ventas-filtro input[type=month] { padding: 5px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
+  .ventas-filtro button { padding: 5px 12px; border: 1px solid #a5d6a7; background: #e8f5e9; color: #2e7d32; border-radius: 6px; font-size: 13px; cursor: pointer; }
   /* Tarjetas */
   .card { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.05); border-left: 4px solid #ccc; }
   .card.nuevo { border-left-color: #2196F3; }
@@ -161,6 +165,13 @@ HTML_PANEL = r"""<!DOCTYPE html>
     <div class="carga" id="carga"></div>
     <input id="buscar" class="buscador" placeholder="🔍 Buscar por nombre o número..." oninput="aplicarBusqueda()">
     <div class="stats" id="stats"></div>
+    <div class="ventas-filtro">
+      <span>💰 Ventas:</span>
+      <label>De <input type="month" id="vDesde" onchange="aplicarVentas()"></label>
+      <label>a <input type="month" id="vHasta" onchange="aplicarVentas()"></label>
+      <button id="btnVentasMes" onclick="ventasMesActual()">Este mes</button>
+      <button id="btnVentasTodo" onclick="ventasTodo()">Todo</button>
+    </div>
     <div class="filtros" id="filtros">
       <button data-f="estado" data-v="" class="activo">Todos</button>
       <button data-f="estado" data-v="nuevo">🔵 Nuevos</button>
@@ -240,12 +251,52 @@ function mostrarApp(){
       cargar();
     };
   });
+  initVentas();   // arranca en el mes actual
   cargar();
+}
+
+var V_DESDE = "", V_HASTA = "", V_TODO = false;
+
+function mesActualStr(){
+  var d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0");
+}
+function initVentas(){
+  var m = mesActualStr();
+  V_DESDE = m; V_HASTA = m; V_TODO = false;
+  var a = document.getElementById("vDesde"), b = document.getElementById("vHasta");
+  if (a) a.value = m;
+  if (b) b.value = m;
+}
+function aplicarVentas(){
+  V_TODO = false;
+  V_DESDE = document.getElementById("vDesde").value || "";
+  V_HASTA = document.getElementById("vHasta").value || "";
+  resaltarTodo(false);
+  cargar();
+}
+function ventasMesActual(){
+  initVentas();
+  resaltarTodo(false);
+  cargar();
+}
+function ventasTodo(){
+  V_TODO = true;
+  resaltarTodo(true);
+  cargar();
+}
+function resaltarTodo(on){
+  var b = document.getElementById("btnVentasTodo");
+  if (!b) return;
+  b.style.background = on ? "#2e7d32" : "";
+  b.style.color = on ? "#fff" : "";
 }
 
 async function cargar(){
   try{
     var url = "/crm/api/registros?estado=" + encodeURIComponent(fEstado) + "&tipo=" + encodeURIComponent(fTipo);
+    if (V_TODO){ url += "&desde=todo&hasta=todo"; }
+    else if (V_DESDE || V_HASTA){ url += "&desde=" + encodeURIComponent(V_DESDE||V_HASTA) + "&hasta=" + encodeURIComponent(V_HASTA||V_DESDE); }
     var r = await fetch(url, {headers:{"Authorization":"Bearer "+TOKEN}});
     if (r.status === 401){ salir(); return; }
     var d = await r.json();
@@ -327,12 +378,28 @@ function fmtDinero(n){
   return "$" + n.toLocaleString("es-MX");
 }
 
+var MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+function mesBonito(ym){
+  var p = (ym||"").split("-");
+  if (p.length < 2) return ym;
+  return (MESES[parseInt(p[1],10)-1]||p[1]) + " " + p[0];
+}
+function nombreRango(rango){
+  if (rango === "Todo") return "Todo";
+  if (rango.indexOf(" a ") !== -1){
+    var ab = rango.split(" a ");
+    return mesBonito(ab[0]) + " a " + mesBonito(ab[1]);
+  }
+  return mesBonito(rango);
+}
+
 function pintarStats(s, ventas){
   if(!s) return;
   var ventaHtml = "";
   if (ventas){
+    var etiqueta = "💰 Vendido" + (ventas.rango ? " · " + nombreRango(ventas.rango) : "");
     ventaHtml =
-      '<div class="stat venta"><b>'+fmtDinero(ventas.total)+'</b><span>💰 Vendido (pagado)</span></div>';
+      '<div class="stat venta"><b>'+fmtDinero(ventas.total)+'</b><span>'+etiqueta+'</span></div>';
   }
   document.getElementById("stats").innerHTML =
     '<div class="stat"><b>'+(s.nuevo||0)+'</b><span>Nuevos</span></div>'+

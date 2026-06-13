@@ -62,6 +62,7 @@ class CrmRegistro(Base):
     expres: Mapped[bool] = mapped_column(Boolean, default=False)  # ⚡ pedido exprés (prioritario)
     calificacion: Mapped[str] = mapped_column(String(20), default="")  # bueno|regular|malo (post-venta)
     monto: Mapped[float] = mapped_column(Float, default=0.0)  # $ del pedido (para totalizar ventas)
+    pagado_en: Mapped[datetime] = mapped_column(DateTime, nullable=True)  # fecha del pago (para ventas por mes)
     notas: Mapped[str] = mapped_column(Text, default="")
     creado: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     actualizado: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -100,6 +101,7 @@ async def inicializar_db():
         "ALTER TABLE crm_registros ADD COLUMN expres BOOLEAN DEFAULT false",
         "ALTER TABLE crm_registros ADD COLUMN calificacion VARCHAR(20) DEFAULT ''",
         "ALTER TABLE crm_registros ADD COLUMN monto DOUBLE PRECISION DEFAULT 0",
+        "ALTER TABLE crm_registros ADD COLUMN pagado_en TIMESTAMP",
         # 'cerrado' viejo = venta concretada → renombrar a 'vendido'
         "UPDATE crm_registros SET estado='vendido' WHERE estado='cerrado'",
     ]
@@ -692,6 +694,8 @@ async def guardar_monto_crm(telefono: str, monto: float) -> bool:
         for r in result.scalars().all():
             if _sufijo_tel(r.telefono) == sufijo:
                 r.monto = monto
+                if not r.pagado_en:
+                    r.pagado_en = datetime.utcnow()  # fecha de la venta
                 r.actualizado = datetime.utcnow()
                 await session.commit()
                 return True
@@ -702,24 +706,38 @@ async def guardar_monto_crm(telefono: str, monto: float) -> bool:
         for r in result2.scalars().all():
             if _sufijo_tel(r.telefono) == sufijo:
                 r.monto = monto
+                if not r.pagado_en:
+                    r.pagado_en = datetime.utcnow()
                 r.actualizado = datetime.utcnow()
                 await session.commit()
                 return True
     return False
 
 
-async def total_vendido_crm() -> dict:
+async def total_vendido_crm(desde: datetime = None, hasta: datetime = None,
+                            asesor: str = "") -> dict:
     """
-    Suma de montos de pedidos ya pagados. Devuelve:
-    - proceso: $ en pedidos 'en proceso' (pagados, en producción)
-    - vendido: $ en pedidos 'vendidos' (entregados)
-    - total:   suma de ambos (todo el dinero que ya entró)
-    - num:     cuántos pedidos con monto > 0 (proceso+vendido)
+    Suma de montos de pedidos ya pagados (estado 'proceso' o 'vendido'), opcionalmente
+    filtrado por rango de fechas y por asesor.
+    La FECHA DE VENTA es `pagado_en` (cuando se registró el pago); si no existe
+    (pedidos viejos / monto puesto a mano), usa `creado`.
+    Devuelve: proceso, vendido, total, num (cuántos pedidos con monto>0).
     """
+    # Fecha de venta = pagado_en si existe, si no creado
+    fecha_venta = func.coalesce(CrmRegistro.pagado_en, CrmRegistro.creado)
+    filtros = [CrmRegistro.estado.in_(["proceso", "vendido"]), CrmRegistro.monto > 0]
+    if asesor:
+        filtros.append(CrmRegistro.asesor == asesor)
+    if desde is not None:
+        filtros.append(fecha_venta >= desde)
+    if hasta is not None:
+        filtros.append(fecha_venta < hasta)
     async with async_session() as session:
         res = await session.execute(
-            select(CrmRegistro.estado, func.coalesce(func.sum(CrmRegistro.monto), 0), func.count(CrmRegistro.id))
-            .where(CrmRegistro.estado.in_(["proceso", "vendido"]), CrmRegistro.monto > 0)
+            select(CrmRegistro.estado,
+                   func.coalesce(func.sum(CrmRegistro.monto), 0),
+                   func.count(CrmRegistro.id))
+            .where(*filtros)
             .group_by(CrmRegistro.estado)
         )
         proceso = vendido = 0.0

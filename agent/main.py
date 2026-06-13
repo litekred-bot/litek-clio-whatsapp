@@ -4,7 +4,7 @@
 import os
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
 from collections import OrderedDict
 from fastapi import FastAPI, Request, HTTPException
@@ -47,7 +47,7 @@ from agent.memory import (
     tomar_control, devolver_clio, estado_control, esta_en_modo_humano,
     marcar_alerta_crm, listar_usuarios_crm, cambiar_password_crm,
     reactivar_cliente_no_contesto, marcar_no_contesto_automatico, marcar_expres_crm,
-    guardar_calificacion_crm, guardar_monto_crm,
+    guardar_calificacion_crm, guardar_monto_crm, total_vendido_crm,
 )
 from zoneinfo import ZoneInfo as _ZI
 
@@ -253,8 +253,36 @@ async def crm_login(request: Request):
     return {"ok": False}
 
 
+_TZ_CAMP = ZoneInfo("America/Merida")
+
+
+def _mes_inicio_utc(mes: str):
+    """'YYYY-MM' → primer día de ese mes 00:00 hora Campeche, como UTC naive. None si inválido."""
+    try:
+        y, m = [int(x) for x in mes.split("-")[:2]]
+        local = datetime(y, m, 1, tzinfo=_TZ_CAMP)
+        return local.astimezone(timezone.utc).replace(tzinfo=None)
+    except Exception:
+        return None
+
+
+def _mes_siguiente_utc(mes: str):
+    """Primer día del mes SIGUIENTE al dado (límite superior exclusivo), UTC naive."""
+    try:
+        y, m = [int(x) for x in mes.split("-")[:2]]
+        if m == 12:
+            y, m = y + 1, 1
+        else:
+            m += 1
+        local = datetime(y, m, 1, tzinfo=_TZ_CAMP)
+        return local.astimezone(timezone.utc).replace(tzinfo=None)
+    except Exception:
+        return None
+
+
 @app.get("/crm/api/registros")
-async def crm_registros(request: Request, estado: str = "", tipo: str = ""):
+async def crm_registros(request: Request, estado: str = "", tipo: str = "",
+                        desde: str = "", hasta: str = ""):
     """Lista registros del CRM (requiere token). Cada asesor ve solo lo suyo."""
     u = _crm_usuario_de_request(request)
     if not u:
@@ -266,19 +294,24 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = ""):
     # Stats por estado (respetando el filtro de persona, sin filtro de estado)
     todos = await listar_crm(tipo=tipo, asesor=asesor_filtro, limite=1000)
     stats = {"nuevo": 0, "asignado": 0, "proceso": 0, "vendido": 0, "no_contesto": 0}
-    venta_proceso = venta_vendido = 0.0
     for r in todos:
         stats[r["estado"]] = stats.get(r["estado"], 0) + 1
-        m = float(r.get("monto", 0) or 0)
-        if r["estado"] == "proceso":
-            venta_proceso += m
-        elif r["estado"] == "vendido":
-            venta_vendido += m
-    ventas = {
-        "proceso": venta_proceso,
-        "vendido": venta_vendido,
-        "total": venta_proceso + venta_vendido,
-    }
+    # Ventas por rango de meses. Default: mes actual (hora Campeche).
+    # 'desde'/'hasta' llegan como 'YYYY-MM'. 'todo' = sin límites de fecha.
+    es_todo = (desde == "todo" or hasta == "todo")
+    if es_todo:
+        d_ini = d_fin = None
+        rango_label = "Todo"
+    else:
+        hoy = datetime.now(_TZ_CAMP)
+        mes_actual = hoy.strftime("%Y-%m")
+        mes_desde = desde or mes_actual
+        mes_hasta = hasta or mes_desde
+        d_ini = _mes_inicio_utc(mes_desde)
+        d_fin = _mes_siguiente_utc(mes_hasta)
+        rango_label = mes_desde if mes_desde == mes_hasta else (mes_desde + " a " + mes_hasta)
+    ventas = await total_vendido_crm(desde=d_ini, hasta=d_fin, asesor=asesor_filtro or "")
+    ventas["rango"] = rango_label
     # Carga por asesor (solo para quien ve todo): Anna 10, Brayan 15, Tere 3...
     carga = await carga_por_asesor() if ve_todo else None
     return {
