@@ -323,6 +323,10 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = "",
         vh = await total_vendido_crm(desde=hoy_ini, hasta=hoy_fin, asesor="")
         ventas["hoy"] = vh["total"]
         ventas["hoy_num"] = vh["num"]
+        # Total ACUMULADO (todo lo vendido hasta hoy, sin límite de fecha)
+        vac = await total_vendido_crm(asesor="")
+        ventas["acumulado"] = vac["total"]
+        ventas["acumulado_num"] = vac["num"]
     # Carga por asesor (solo para quien ve todo): Anna 10, Brayan 15, Tere 3...
     carga = await carga_por_asesor() if ve_todo else None
     return {

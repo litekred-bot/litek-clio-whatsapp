@@ -85,6 +85,8 @@ HTML_PANEL = r"""<!DOCTYPE html>
   .stat.venta b { color: #2e7d32; }
   .stat.venta.hoy { background: #fff8e1; }
   .stat.venta.hoy b { color: #e65100; }
+  .stat.venta.total { background: #e3f2fd; }
+  .stat.venta.total b { color: #1565c0; }
   .ventas-filtro { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; font-size: 13px; color: #555; }
   .ventas-filtro span { font-weight: 600; }
   .ventas-filtro input[type=month] { padding: 5px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
@@ -408,8 +410,14 @@ function pintarStats(s, ventas){
       var nh = ventas.hoy_num || 0;
       hoyHtml = '<div class="stat venta hoy"><b>'+fmtDinero(ventas.hoy)+'</b><span>☀️ Vendido hoy'+(nh?" ("+nh+")":"")+'</span></div>';
     }
+    var acHtml = "";
+    if (ventas.acumulado !== undefined){
+      var na = ventas.acumulado_num || 0;
+      acHtml = '<div class="stat venta total"><b>'+fmtDinero(ventas.acumulado)+'</b><span>🏆 Total acumulado'+(na?" ("+na+")":"")+'</span></div>';
+    }
     ventaHtml = hoyHtml +
-      '<div class="stat venta"><b>'+fmtDinero(ventas.total)+'</b><span>'+etiqueta+'</span></div>';
+      '<div class="stat venta"><b>'+fmtDinero(ventas.total)+'</b><span>'+etiqueta+'</span></div>' +
+      acHtml;
   }
   document.getElementById("stats").innerHTML =
     '<div class="stat"><b>'+(s.nuevo||0)+'</b><span>Nuevos</span></div>'+
