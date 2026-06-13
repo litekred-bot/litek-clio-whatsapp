@@ -165,7 +165,7 @@ HTML_PANEL = r"""<!DOCTYPE html>
     <div class="carga" id="carga"></div>
     <input id="buscar" class="buscador" placeholder="🔍 Buscar por nombre o número..." oninput="aplicarBusqueda()">
     <div class="stats" id="stats"></div>
-    <div class="ventas-filtro">
+    <div class="ventas-filtro" id="ventasFiltro" style="display:none">
       <span>💰 Ventas:</span>
       <label>De <input type="month" id="vDesde" onchange="aplicarVentas()"></label>
       <label>a <input type="month" id="vHasta" onchange="aplicarVentas()"></label>
@@ -302,6 +302,8 @@ async function cargar(){
     var d = await r.json();
     document.getElementById("quien").textContent = "👤 " + (d.nombre || "") + (d.es_director ? "" : " · viendo solo lo tuyo");
     document.getElementById("btnEquipo").style.display = d.es_director ? "inline-block" : "none";
+    ES_DIRECTOR = !!d.es_director;
+    document.getElementById("ventasFiltro").style.display = ES_DIRECTOR ? "flex" : "none";
     pintarCarga(d.carga);
     pintarStats(d.stats, d.ventas);
     ULTIMOS_REGISTROS = d.registros || [];
@@ -310,6 +312,7 @@ async function cargar(){
 }
 
 var ULTIMOS_REGISTROS = [];
+var ES_DIRECTOR = false;
 var SOLO_REVISAR = false;
 var SOLO_EXPRES = false;
 var SOLO_CALIF = false;
@@ -442,7 +445,7 @@ function pintar(regs){
         '<select onchange="upd('+r.id+',\'estado\',this.value)">'+opcEstado+'</select>'+
         '<select onchange="upd('+r.id+',\'asesor\',this.value)">'+opcAsesor+'</select>'+
         '<button class="bexpres'+(r.expres?' on':'')+'" onclick="toggleExpres('+r.id+','+(r.expres?'false':'true')+')" title="Marcar/quitar exprés">⚡ Exprés</button>'+
-        '<input class="monto" type="number" min="0" step="1" placeholder="$ monto" value="'+(r.monto?Math.round(r.monto):"")+'" title="Monto $ del pedido (para el total vendido)" onblur="upd('+r.id+',\'monto\',this.value)">'+
+        (ES_DIRECTOR ? '<input class="monto" type="number" min="0" step="1" placeholder="$ monto" value="'+(r.monto?Math.round(r.monto):"")+'" title="Monto $ del pedido (para el total vendido)" onblur="upd('+r.id+',\'monto\',this.value)">' : '')+
         '<input class="nota" placeholder="Nota..." value="'+esc(r.notas||"")+'" onblur="upd('+r.id+',\'notas\',this.value)">'+
         (wa ? '<button class="copia" onclick="verChat(\''+wa+'\',\''+(r.nombre||"Cliente").replace(/[\\\\\x27"]/g,"")+'\')" title="Ver la conversación con Clio">👁️ Ver chat</button>' : '')+
         (num10 ? '<button class="copia" onclick="copiarNum(\''+num10+'\',this)" title="Copiar número para buscarlo en tu WhatsApp">📋 '+numFmt+'</button>'+

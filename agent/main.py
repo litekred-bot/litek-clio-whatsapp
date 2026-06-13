@@ -296,22 +296,25 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = "",
     stats = {"nuevo": 0, "asignado": 0, "proceso": 0, "vendido": 0, "no_contesto": 0}
     for r in todos:
         stats[r["estado"]] = stats.get(r["estado"], 0) + 1
-    # Ventas por rango de meses. Default: mes actual (hora Campeche).
-    # 'desde'/'hasta' llegan como 'YYYY-MM'. 'todo' = sin límites de fecha.
-    es_todo = (desde == "todo" or hasta == "todo")
-    if es_todo:
-        d_ini = d_fin = None
-        rango_label = "Todo"
-    else:
-        hoy = datetime.now(_TZ_CAMP)
-        mes_actual = hoy.strftime("%Y-%m")
-        mes_desde = desde or mes_actual
-        mes_hasta = hasta or mes_desde
-        d_ini = _mes_inicio_utc(mes_desde)
-        d_fin = _mes_siguiente_utc(mes_hasta)
-        rango_label = mes_desde if mes_desde == mes_hasta else (mes_desde + " a " + mes_hasta)
-    ventas = await total_vendido_crm(desde=d_ini, hasta=d_fin, asesor=asesor_filtro or "")
-    ventas["rango"] = rango_label
+    # Ventas por rango de meses — SOLO el administrador (Tere/Chino) ve el dinero.
+    # Los asesores NO reciben ningún total de ventas.
+    ventas = None
+    if ve_todo:
+        # 'desde'/'hasta' llegan como 'YYYY-MM'. 'todo' = sin límites de fecha.
+        es_todo = (desde == "todo" or hasta == "todo")
+        if es_todo:
+            d_ini = d_fin = None
+            rango_label = "Todo"
+        else:
+            hoy = datetime.now(_TZ_CAMP)
+            mes_actual = hoy.strftime("%Y-%m")
+            mes_desde = desde or mes_actual
+            mes_hasta = hasta or mes_desde
+            d_ini = _mes_inicio_utc(mes_desde)
+            d_fin = _mes_siguiente_utc(mes_hasta)
+            rango_label = mes_desde if mes_desde == mes_hasta else (mes_desde + " a " + mes_hasta)
+        ventas = await total_vendido_crm(desde=d_ini, hasta=d_fin, asesor="")
+        ventas["rango"] = rango_label
     # Carga por asesor (solo para quien ve todo): Anna 10, Brayan 15, Tere 3...
     carga = await carga_por_asesor() if ve_todo else None
     return {
@@ -420,6 +423,8 @@ async def crm_actualizar(registro_id: int, request: Request):
     if not u:
         raise HTTPException(status_code=401, detail="No autorizado")
     data = await request.json()
+    # El monto ($) solo lo puede tocar el administrador (Tere/Chino), no los asesores.
+    monto = data.get("monto") if u["usuario"] in CRM_VEN_TODO else None
     ok = await actualizar_crm(
         registro_id,
         estado=data.get("estado"),
@@ -427,7 +432,7 @@ async def crm_actualizar(registro_id: int, request: Request):
         notas=data.get("notas"),
         alerta=data.get("alerta"),
         expres=data.get("expres"),
-        monto=data.get("monto"),
+        monto=monto,
     )
     return {"ok": ok}
 
