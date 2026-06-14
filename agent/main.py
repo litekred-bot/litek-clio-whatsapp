@@ -84,7 +84,7 @@ from agent.transcription import transcribir_audio
 from agent.document_reader import leer_documento
 from agent.escalation import enviar_alerta_asesor, AREAS
 from agent.reporte_diario import generar_reporte_diario
-from agent.seguimiento import enviar_seguimientos, cargar_cache_desde_db
+from agent.seguimiento import enviar_seguimientos, cargar_cache_desde_db, enviar_seguimiento_ruleta, cargar_cache_ruleta
 from agent.agradecimiento import enviar_agradecimientos, cargar_cache_agradecidos
 from agent.crm import HTML_PANEL, crear_token, verificar_token
 
@@ -124,6 +124,7 @@ async def lifespan(app: FastAPI):
     logger.info("Base de datos inicializada")
     await cargar_cache_desde_db()  # Carga seguimientos recientes para no reenviar tras reinicio
     await cargar_cache_agradecidos()  # Carga a quién ya se agradeció (no reenviar tras reinicio)
+    await cargar_cache_ruleta()  # Carga a qué ganador ya se le recordó su premio (no reenviar)
     # Recuperar montos de pedidos viejos desde el texto (una sola vez por pedido,
     # porque solo toca los que aún no tienen fecha de pago).
     try:
@@ -165,6 +166,16 @@ async def lifespan(app: FastAPI):
         args=[proveedor.token],
         id="agradecimiento_postventa",
         name="Agradecer y pedir calificación a clientes que ya pagaron (+12h)",
+        replace_existing=True,
+    )
+    # Recordatorio de premio (Mensaje 2): a las ~2h al ganador que no contestó.
+    scheduler.add_job(
+        enviar_seguimiento_ruleta,
+        "interval",
+        minutes=30,
+        args=[proveedor.token],
+        id="seguimiento_ruleta",
+        name="Recordatorio de premio a ganadores que no contestan (+2h)",
         replace_existing=True,
     )
     # Reparto de ganadores de ruleta que llevan +2h sin avanzar (sin dueño).
@@ -380,6 +391,30 @@ def _wa_destino(telefono: str) -> str:
     return ("521" + d[-10:]) if len(d) >= 10 else d
 
 
+def _es_lona_gratis(premio: str) -> bool:
+    """La lona gratis es el ÚNICO premio que se entrega sin compra."""
+    pl = (premio or "").lower()
+    return ("lona" in pl and "gratis" in pl)
+
+
+def _mensaje_premio(nombre: str, premio: str, es_gol: bool) -> str:
+    """
+    Mensaje 1 — entrega del premio. La lona gratis se regala (sin compra);
+    cualquier otro premio se valida haciendo un pedido (cualquier producto).
+    """
+    gancho = "⚽ *¡GOOOL!* Metiste el gol y" if es_gol else "🎡 Giraste la ruleta y"
+    if _es_lona_gratis(premio):
+        return (
+            f"¡Felicidades {nombre}! {gancho} ganaste *{premio}* 🎉\n\n"
+            f"Es tuya sin compra 🎁 Pasa a recogerla a Av. Colosio No. 414, Col. Pensiones "
+            f"y muestra este chat. ¿Te late aprovechar y mandar a imprimir algo más?"
+        )
+    return (
+        f"¡Felicidades {nombre}! {gancho} ganaste *{premio}* 🎉\n\n"
+        f"Para hacerlo válido solo necesitas hacer un pedido con nosotros — cualquier producto cuenta."
+    )
+
+
 @app.post("/crm/api/enviar")
 async def crm_enviar(request: Request):
     """Envía un mensaje al cliente desde el número de Clio (requiere token)."""
@@ -510,16 +545,7 @@ async def ruleta_ping(nombre: str = "", telefono: str = "", premio: str = "", de
     except Exception as e:
         logger.error(f"Error registrando ruleta en CRM: {e}")
 
-    if es_gol:
-        msg_wa = (
-            f"¡Hola {nombre}! ⚽ *¡GOOOL!* 🎉 Ganaste en LiTek: *{premio}*\n\n"
-            f"¿Te gustaría aprovechar y ordenar algo? 😊"
-        )
-    else:
-        msg_wa = (
-            f"¡Hola {nombre}! 🎡 Ganaste en nuestra ruleta LiTek: *{premio}* 🎉\n\n"
-            f"¿Te gustaría aprovechar y ordenar algo? 😊"
-        )
+    msg_wa = _mensaje_premio(nombre, premio, es_gol)
     await guardar_mensaje(tel_wa, "assistant", msg_wa)
 
     # Mensaje al cliente ganador
@@ -623,10 +649,7 @@ async def ruleta_ganador(request: Request):
         return {"ok": False, "mensaje": "Este número ya participó"}
 
     # Guardar mensaje en historial para que Clio tenga contexto
-    msg_wa = (
-        f"¡Hola {nombre}! 🎡 Ganaste en nuestra ruleta LiTek: *{premio}* 🎉\n\n"
-        f"¿Te gustaría aprovechar y ordenar algo? 😊"
-    )
+    msg_wa = _mensaje_premio(nombre, premio, False)
     await guardar_mensaje(tel_wa, "assistant", msg_wa)
 
     # Enviar WhatsApp via Whapi

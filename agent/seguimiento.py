@@ -15,7 +15,10 @@ import logging
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from sqlalchemy import select, func
-from agent.memory import async_session, Mensaje, estado_crm_por_telefono
+from agent.memory import (
+    async_session, Mensaje, estado_crm_por_telefono,
+    ruletas_para_seguimiento, telefono_conversacion, obtener_historial, guardar_mensaje,
+)
 
 logger = logging.getLogger("agentkit")
 
@@ -153,6 +156,77 @@ def es_horario_permitido() -> bool:
     """Verifica que sea horario permitido para enviar seguimientos."""
     ahora = datetime.now(ZONA_CAMPECHE)
     return HORA_INICIO <= ahora.hour < HORA_FIN
+
+
+# ── Recordatorio de premio (Mensaje 2): ganador que no contesta en 2h ──
+MARCA_RULETA = "RULETA_SEG_AUTO"
+_cache_ruleta: dict[str, datetime] = {}
+
+
+async def cargar_cache_ruleta():
+    """Carga de la DB a quién ya se le mandó el recordatorio de premio (sobrevive reinicios)."""
+    limite = datetime.utcnow() - timedelta(hours=72)
+    async with async_session() as session:
+        result = await session.execute(
+            select(Mensaje.telefono, Mensaje.timestamp).where(
+                Mensaje.role == "assistant",
+                Mensaje.content.contains(MARCA_RULETA),
+                Mensaje.timestamp > limite,
+            )
+        )
+        for telefono, ts in result.fetchall():
+            _cache_ruleta.setdefault(telefono, ts)
+    logger.info(f"Ruleta-seg: cache cargado — {len(_cache_ruleta)} ganador(es) ya recordado(s)")
+
+
+async def enviar_seguimiento_ruleta(token: str):
+    """
+    Mensaje 2 — a las ~2h, recuerda al GANADOR que su premio tiene 48h, SOLO si
+    no ha contestado nada. Una sola vez. Horario 9am-9pm Campeche.
+    """
+    if not es_horario_permitido():
+        return
+    candidatos = await ruletas_para_seguimiento(horas_min=2, horas_max=48)
+    if not candidatos:
+        return
+    import httpx
+    enviados = 0
+    for cli in candidatos:
+        nombre = (cli["nombre"] or "").split(" ")[0]
+        conv_tel = await telefono_conversacion(cli["telefono"])
+        if conv_tel in _cache_ruleta and (datetime.utcnow() - _cache_ruleta[conv_tel] < timedelta(hours=72)):
+            continue
+        # Solo si NO ha contestado (ningún mensaje del cliente en el historial)
+        hist = await obtener_historial(conv_tel, limite=15)
+        if any(m["role"] == "user" for m in hist):
+            continue
+        msg = (
+            f"Oye {nombre}, tu premio tiene 48 horas para reclamarse. "
+            f"¿Qué necesitas imprimir ahorita — lona, vinil, etiquetas?"
+        )
+        try:
+            _cache_ruleta[conv_tel] = datetime.utcnow()
+            async with httpx.AsyncClient() as client:
+                r = await client.post(
+                    "https://gate.whapi.cloud/messages/text",
+                    json={"to": _destino(conv_tel), "body": msg},
+                    headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                )
+            if r.status_code == 200:
+                enviados += 1
+                await guardar_mensaje(conv_tel, "assistant", msg + f" {MARCA_RULETA}")
+            else:
+                _cache_ruleta.pop(conv_tel, None)
+        except Exception as e:
+            logger.error(f"Error recordatorio ruleta {conv_tel}: {e}")
+            _cache_ruleta.pop(conv_tel, None)
+    if enviados:
+        logger.info(f"Ruleta-seg: {enviados} recordatorio(s) de premio enviado(s)")
+
+
+def _destino(telefono: str) -> str:
+    d = "".join(c for c in (telefono or "") if c.isdigit())
+    return ("521" + d[-10:]) if len(d) >= 10 else d
 
 
 async def enviar_seguimientos(token: str):

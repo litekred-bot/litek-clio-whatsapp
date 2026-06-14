@@ -583,6 +583,28 @@ async def guardar_calificacion_crm(telefono: str, calificacion: str, comentario:
     return False
 
 
+async def ruletas_para_seguimiento(horas_min: int = 2, horas_max: int = 48) -> list[dict]:
+    """
+    Ganadores de ruleta/gol que ganaron hace entre `horas_min` y `horas_max` horas,
+    que NO han avanzado (siguen en 'nuevo' o 'asignado'). Sirve para mandarles el
+    recordatorio de las 2h (Mensaje 2) si no han contestado. El filtro de "no
+    contestó" se hace al enviar (revisando si hay mensajes del cliente).
+    """
+    ahora = datetime.utcnow()
+    tope_reciente = ahora - timedelta(hours=horas_min)
+    tope_antiguo = ahora - timedelta(hours=horas_max)
+    async with async_session() as session:
+        result = await session.execute(
+            select(CrmRegistro).where(
+                CrmRegistro.tipo == "ruleta",
+                CrmRegistro.estado.in_(["nuevo", "asignado"]),
+                CrmRegistro.creado <= tope_reciente,
+                CrmRegistro.creado >= tope_antiguo,
+            )
+        )
+        return [{"telefono": r.telefono, "nombre": r.nombre or ""} for r in result.scalars().all()]
+
+
 async def clientes_para_agradecer(horas_min: int = 12, dias_max: int = 7) -> list[dict]:
     """
     Clientes que YA pagaron (estado 'proceso' o 'vendido') cuyo pedido se confirmó
