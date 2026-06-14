@@ -749,6 +749,7 @@ async def backfill_montos_crm() -> dict:
             select(CrmRegistro).where(
                 CrmRegistro.estado.in_(["proceso", "vendido"]),
                 func.coalesce(CrmRegistro.monto, 0) <= 0,
+                CrmRegistro.pagado_en.is_(None),  # solo los que nunca se han fechado (una vez c/u)
             )
         )
         for r in result.scalars().all():

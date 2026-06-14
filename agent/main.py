@@ -124,6 +124,14 @@ async def lifespan(app: FastAPI):
     logger.info("Base de datos inicializada")
     await cargar_cache_desde_db()  # Carga seguimientos recientes para no reenviar tras reinicio
     await cargar_cache_agradecidos()  # Carga a quién ya se agradeció (no reenviar tras reinicio)
+    # Recuperar montos de pedidos viejos desde el texto (una sola vez por pedido,
+    # porque solo toca los que aún no tienen fecha de pago).
+    try:
+        bf = await backfill_montos_crm()
+        if bf["actualizados"]:
+            logger.info(f"Backfill montos: {bf['actualizados']} pedidos, ${bf['total']:.0f} recuperados")
+    except Exception as e:
+        logger.error(f"Error en backfill de montos: {e}")
     logger.info(f"Servidor AgentKit — LiTek corriendo en puerto {PORT}")
     logger.info(f"Proveedor de WhatsApp: {proveedor.__class__.__name__}")
 

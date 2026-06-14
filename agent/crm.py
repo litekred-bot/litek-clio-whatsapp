@@ -175,7 +175,6 @@ HTML_PANEL = r"""<!DOCTYPE html>
       <label>a <input type="month" id="vHasta" onchange="aplicarVentas()"></label>
       <button id="btnVentasMes" onclick="ventasMesActual()">Este mes</button>
       <button id="btnVentasTodo" onclick="ventasTodo()">Todo</button>
-      <button id="btnBackfill" onclick="recuperarMontos()" title="Recuperar montos de pedidos viejos desde el texto del pedido">↻ Recuperar montos viejos</button>
     </div>
     <div class="filtros" id="filtros">
       <button data-f="estado" data-v="" class="activo">Todos</button>
@@ -290,19 +289,6 @@ function ventasTodo(){
   resaltarTodo(true);
   cargar();
 }
-async function recuperarMontos(){
-  var b = document.getElementById("btnBackfill");
-  if (b){ b.disabled = true; b.textContent = "Recuperando..."; }
-  try{
-    var r = await fetch("/crm/api/backfill-montos", {method:"POST", headers:{"Authorization":"Bearer "+TOKEN}});
-    var d = await r.json();
-    if (d.ok){ alert("Listo ✅ Se recuperaron " + d.actualizados + " montos (" + fmtDinero(d.total) + ")."); }
-    else { alert("No se pudo: " + (d.detail||"")); }
-  }catch(e){ alert("Error: "+e); }
-  if (b){ b.disabled = false; b.textContent = "↻ Recuperar montos viejos"; }
-  cargar();
-}
-
 function resaltarTodo(on){
   var b = document.getElementById("btnVentasTodo");
   if (!b) return;
