@@ -59,6 +59,7 @@ class CrmRegistro(Base):
     descripcion: Mapped[str] = mapped_column(Text, default="")
     asesor: Mapped[str] = mapped_column(String(100), default="")     # a quién se asignó
     estado: Mapped[str] = mapped_column(String(20), default="nuevo", index=True)  # nuevo|asignado|proceso|cerrado
+    sucursal: Mapped[str] = mapped_column(String(30), default="Campeche", index=True)  # Campeche|Mérida|Carmen
     alerta: Mapped[str] = mapped_column(String(200), default="")  # motivo a revisar (⚠️) o vacío
     expres: Mapped[bool] = mapped_column(Boolean, default=False)  # ⚡ pedido exprés (prioritario)
     calificacion: Mapped[str] = mapped_column(String(20), default="")  # bueno|regular|malo (post-venta)
@@ -103,6 +104,7 @@ async def inicializar_db():
         "ALTER TABLE crm_registros ADD COLUMN calificacion VARCHAR(20) DEFAULT ''",
         "ALTER TABLE crm_registros ADD COLUMN monto DOUBLE PRECISION DEFAULT 0",
         "ALTER TABLE crm_registros ADD COLUMN pagado_en TIMESTAMP",
+        "ALTER TABLE crm_registros ADD COLUMN sucursal VARCHAR(30) DEFAULT 'Campeche'",
         # 'cerrado' viejo = venta concretada → renombrar a 'vendido'
         "UPDATE crm_registros SET estado='vendido' WHERE estado='cerrado'",
     ]
@@ -446,8 +448,8 @@ async def registrar_crm(tipo: str, nombre: str, telefono: str, descripcion: str,
         return reg.id
 
 
-async def listar_crm(estado: str = "", tipo: str = "", asesor: str = "", limite: int = 200) -> list[dict]:
-    """Lista registros del CRM, opcionalmente filtrados por estado, tipo y asesor."""
+async def listar_crm(estado: str = "", tipo: str = "", asesor: str = "", sucursal: str = "", limite: int = 200) -> list[dict]:
+    """Lista registros del CRM, opcionalmente filtrados por estado, tipo, asesor y sucursal."""
     async with async_session() as session:
         query = select(CrmRegistro)
         if estado:
@@ -456,6 +458,8 @@ async def listar_crm(estado: str = "", tipo: str = "", asesor: str = "", limite:
             query = query.where(CrmRegistro.tipo == tipo)
         if asesor:
             query = query.where(CrmRegistro.asesor == asesor)
+        if sucursal:
+            query = query.where(CrmRegistro.sucursal == sucursal)
         query = query.order_by(CrmRegistro.creado.desc()).limit(limite)
         result = await session.execute(query)
         registros = result.scalars().all()
@@ -467,6 +471,7 @@ async def listar_crm(estado: str = "", tipo: str = "", asesor: str = "", limite:
             "descripcion": r.descripcion,
             "asesor": r.asesor,
             "estado": r.estado,
+            "sucursal": getattr(r, "sucursal", "") or "Campeche",
             "alerta": getattr(r, "alerta", "") or "",
             "expres": bool(getattr(r, "expres", False)),
             "calificacion": getattr(r, "calificacion", "") or "",
@@ -648,8 +653,8 @@ async def marcar_no_contesto_automatico(dias: int = 2) -> int:
 
 async def actualizar_crm(registro_id: int, estado: str = None, asesor: str = None,
                          notas: str = None, alerta: str = None, expres: bool = None,
-                         monto: float = None) -> bool:
-    """Actualiza estado, asesor, notas, alerta, exprés o monto de un registro del CRM."""
+                         monto: float = None, sucursal: str = None) -> bool:
+    """Actualiza estado, asesor, notas, alerta, exprés, monto o sucursal de un registro del CRM."""
     async with async_session() as session:
         resultado = await session.execute(
             select(CrmRegistro).where(CrmRegistro.id == registro_id)
@@ -672,6 +677,8 @@ async def actualizar_crm(registro_id: int, estado: str = None, asesor: str = Non
                 r.monto = float(monto)
             except (TypeError, ValueError):
                 pass
+        if sucursal is not None and sucursal in ("Campeche", "Mérida", "Carmen"):
+            r.sucursal = sucursal
         r.actualizado = datetime.utcnow()
         await session.commit()
         return True
@@ -766,7 +773,7 @@ async def backfill_montos_crm() -> dict:
 
 
 async def total_vendido_crm(desde: datetime = None, hasta: datetime = None,
-                            asesor: str = "") -> dict:
+                            asesor: str = "", sucursal: str = "") -> dict:
     """
     Suma de montos de pedidos ya pagados (estado 'proceso' o 'vendido'), opcionalmente
     filtrado por rango de fechas y por asesor.
@@ -779,6 +786,8 @@ async def total_vendido_crm(desde: datetime = None, hasta: datetime = None,
     filtros = [CrmRegistro.estado.in_(["proceso", "vendido"]), CrmRegistro.monto > 0]
     if asesor:
         filtros.append(CrmRegistro.asesor == asesor)
+    if sucursal:
+        filtros.append(CrmRegistro.sucursal == sucursal)
     if desde is not None:
         filtros.append(fecha_venta >= desde)
     if hasta is not None:
@@ -834,19 +843,20 @@ async def siguiente_asesor_rueda(candidatos: tuple = ("Anna", "Brayan")) -> str:
         return min(candidatos, key=lambda a: conteos[a])
 
 
-async def carga_por_asesor(asesores: tuple = ("Anna", "Brayan", "Tere")) -> dict:
+async def carga_por_asesor(asesores: tuple = ("Anna", "Brayan", "Tere"), sucursal: str = "") -> dict:
     """
     Cuenta los clientes PENDIENTES (no cerrados) que tiene cada asesor por atender.
     Sirve para el resumen de carga del panel (ej. Anna 10, Brayan 15).
+    Opcionalmente filtra por sucursal.
     """
     out = {}
     async with async_session() as session:
         for a in asesores:
+            filtros = [CrmRegistro.asesor == a, CrmRegistro.estado.not_in(ESTADOS_FINALES)]
+            if sucursal:
+                filtros.append(CrmRegistro.sucursal == sucursal)
             res = await session.execute(
-                select(func.count(CrmRegistro.id)).where(
-                    CrmRegistro.asesor == a,
-                    CrmRegistro.estado.not_in(ESTADOS_FINALES),
-                )
+                select(func.count(CrmRegistro.id)).where(*filtros)
             )
             out[a] = res.scalar_one() or 0
     return out

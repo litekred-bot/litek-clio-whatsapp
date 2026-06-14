@@ -72,6 +72,11 @@ HTML_PANEL = r"""<!DOCTYPE html>
   .filtros { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
   .filtros button { background: #fff; border: 1px solid #ddd; padding: 8px 14px; border-radius: 20px; cursor: pointer; font-size: 14px; }
   .filtros button.activo { background: #e30613; color: #fff; border-color: #e30613; }
+  .sucursales { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: #fff; border: 1px solid #e7e1d7; border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.05); }
+  .sucursales .suc-label { font-weight: bold; color: #161616; font-size: 14px; margin-right: 4px; }
+  .sucursales button { background: #f4f1ea; border: 1px solid #ddd; padding: 7px 16px; border-radius: 20px; cursor: pointer; font-size: 14px; color: #444; }
+  .sucursales button.activo { background: #161616; color: #fff; border-color: #161616; }
+  .card .suc-badge { display: inline-block; font-size: 11px; font-weight: bold; border-radius: 10px; padding: 2px 9px; margin-left: 6px; background: #ECECEC; color: #444; }
   .carga { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0 6px; }
   .carga .a { background: #fff3e0; border: 1px solid #ffcc80; border-radius: 20px; padding: 8px 16px; font-size: 14px; }
   .carga .a b { color: #e65100; font-size: 17px; }
@@ -166,6 +171,13 @@ HTML_PANEL = r"""<!DOCTYPE html>
     <div><span class="user" id="quien"></span> &nbsp; <button id="btnEquipo" onclick="abrirEquipo()" style="display:none">👥 Equipo</button> &nbsp; <button onclick="salir()">Salir</button></div>
   </div>
   <div class="wrap">
+    <div class="sucursales" id="sucursales">
+      <span class="suc-label">🏢 Sucursal:</span>
+      <button data-suc="" class="activo">Todas</button>
+      <button data-suc="Campeche">Campeche</button>
+      <button data-suc="Mérida">Mérida</button>
+      <button data-suc="Carmen">Carmen</button>
+    </div>
     <div class="carga" id="carga"></div>
     <input id="buscar" class="buscador" placeholder="🔍 Buscar por nombre o número..." oninput="aplicarBusqueda()">
     <div class="stats" id="stats"></div>
@@ -255,11 +267,20 @@ function mostrarApp(){
       cargar();
     };
   });
+  document.querySelectorAll("#sucursales button").forEach(function(b){
+    b.onclick = function(){
+      document.querySelectorAll("#sucursales button").forEach(function(x){ x.classList.remove("activo"); });
+      b.classList.add("activo");
+      SUCURSAL = b.dataset.suc;
+      cargar();
+    };
+  });
   initVentas();   // arranca en el mes actual
   cargar();
 }
 
 var V_DESDE = "", V_HASTA = "", V_TODO = false;
+var SUCURSAL = "";
 
 function mesActualStr(){
   var d = new Date();
@@ -298,7 +319,7 @@ function resaltarTodo(on){
 
 async function cargar(){
   try{
-    var url = "/crm/api/registros?estado=" + encodeURIComponent(fEstado) + "&tipo=" + encodeURIComponent(fTipo);
+    var url = "/crm/api/registros?estado=" + encodeURIComponent(fEstado) + "&tipo=" + encodeURIComponent(fTipo) + "&sucursal=" + encodeURIComponent(SUCURSAL);
     if (V_TODO){ url += "&desde=todo&hasta=todo"; }
     else if (V_DESDE || V_HASTA){ url += "&desde=" + encodeURIComponent(V_DESDE||V_HASTA) + "&hasta=" + encodeURIComponent(V_HASTA||V_DESDE); }
     var r = await fetch(url, {headers:{"Authorization":"Bearer "+TOKEN}});
@@ -450,8 +471,10 @@ function pintar(regs){
     var badgeExpres = r.expres ? '<span class="expres-badge">⚡ EXPRÉS</span>' : '';
     var CALIF = {bueno:'😀 Bueno', regular:'😐 Regular', malo:'😞 Malo'};
     var badgeCalif = r.calificacion ? '<span class="calif-badge calif-'+r.calificacion+'">'+(CALIF[r.calificacion]||r.calificacion)+'</span>' : '';
+    var badgeSuc = '<span class="suc-badge">🏢 '+(r.sucursal||"Campeche")+'</span>';
+    var opcSuc = ["Campeche","Mérida","Carmen"].map(function(su){ return '<option value="'+su+'"'+((r.sucursal||"Campeche")===su?' selected':'')+'>'+su+'</option>'; }).join("");
     return '<div class="card '+r.estado+(r.alerta?' alertado':'')+(r.expres?' expres-on':'')+'">'+
-      '<div class="head"><span class="nombre">'+esc(r.nombre||"Sin nombre")+badgeExpres+badgeCalif+'</span>'+
+      '<div class="head"><span class="nombre">'+esc(r.nombre||"Sin nombre")+badgeExpres+badgeCalif+badgeSuc+'</span>'+
       '<span class="tipo">'+(TIPOS[r.tipo]||r.tipo)+'</span></div>'+
       alertaHtml+
       '<div class="desc">'+esc(r.descripcion||"")+'</div>'+
@@ -459,6 +482,7 @@ function pintar(regs){
       '<div class="acciones">'+
         '<select onchange="upd('+r.id+',\'estado\',this.value)">'+opcEstado+'</select>'+
         '<select onchange="upd('+r.id+',\'asesor\',this.value)">'+opcAsesor+'</select>'+
+        '<select onchange="upd('+r.id+',\'sucursal\',this.value)" title="Sucursal">'+opcSuc+'</select>'+
         '<button class="bexpres'+(r.expres?' on':'')+'" onclick="toggleExpres('+r.id+','+(r.expres?'false':'true')+')" title="Marcar/quitar exprés">⚡ Exprés</button>'+
         (ES_DIRECTOR ? '<input class="monto" type="number" min="0" step="1" placeholder="$ monto" value="'+(r.monto?Math.round(r.monto):"")+'" title="Monto $ del pedido (para el total vendido)" onblur="upd('+r.id+',\'monto\',this.value)">' : '')+
         '<input class="nota" placeholder="Nota..." value="'+esc(r.notas||"")+'" onblur="upd('+r.id+',\'notas\',this.value)">'+
@@ -570,7 +594,7 @@ function copiarNum(num, btn){
 async function upd(id, campo, valor){
   var body = {}; body[campo] = valor;
   await fetch("/crm/api/registro/"+id, {method:"POST", headers:{"Authorization":"Bearer "+TOKEN, "Content-Type":"application/json"}, body: JSON.stringify(body)});
-  if (campo === "estado" || campo === "asesor" || campo === "monto") cargar();
+  if (campo === "estado" || campo === "asesor" || campo === "monto" || campo === "sucursal") cargar();
 }
 
 function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }

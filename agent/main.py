@@ -290,7 +290,7 @@ def _mes_siguiente_utc(mes: str):
 
 @app.get("/crm/api/registros")
 async def crm_registros(request: Request, estado: str = "", tipo: str = "",
-                        desde: str = "", hasta: str = ""):
+                        desde: str = "", hasta: str = "", sucursal: str = ""):
     """Lista registros del CRM (requiere token). Cada asesor ve solo lo suyo."""
     u = _crm_usuario_de_request(request)
     if not u:
@@ -298,9 +298,9 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = "",
     # Filtro por persona: director/admin ven todo, cada asesor solo lo asignado a él
     asesor_filtro = _asesor_filtro_de(u["usuario"])
     ve_todo = u["usuario"] in CRM_VEN_TODO
-    registros = await listar_crm(estado=estado, tipo=tipo, asesor=asesor_filtro)
-    # Stats por estado (respetando el filtro de persona, sin filtro de estado)
-    todos = await listar_crm(tipo=tipo, asesor=asesor_filtro, limite=1000)
+    registros = await listar_crm(estado=estado, tipo=tipo, asesor=asesor_filtro, sucursal=sucursal)
+    # Stats por estado (respetando el filtro de persona y sucursal, sin filtro de estado)
+    todos = await listar_crm(tipo=tipo, asesor=asesor_filtro, sucursal=sucursal, limite=1000)
     stats = {"nuevo": 0, "asignado": 0, "proceso": 0, "vendido": 0, "no_contesto": 0}
     for r in todos:
         stats[r["estado"]] = stats.get(r["estado"], 0) + 1
@@ -321,22 +321,22 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = "",
             d_ini = _mes_inicio_utc(mes_desde)
             d_fin = _mes_siguiente_utc(mes_hasta)
             rango_label = mes_desde if mes_desde == mes_hasta else (mes_desde + " a " + mes_hasta)
-        ventas = await total_vendido_crm(desde=d_ini, hasta=d_fin, asesor="")
+        ventas = await total_vendido_crm(desde=d_ini, hasta=d_fin, asesor="", sucursal=sucursal)
         ventas["rango"] = rango_label
         # Total de HOY (siempre el día de hoy, sin importar el rango elegido)
         hoy_camp = datetime.now(_TZ_CAMP)
         inicio_hoy = datetime(hoy_camp.year, hoy_camp.month, hoy_camp.day, tzinfo=_TZ_CAMP)
         hoy_ini = inicio_hoy.astimezone(timezone.utc).replace(tzinfo=None)
         hoy_fin = (inicio_hoy + timedelta(days=1)).astimezone(timezone.utc).replace(tzinfo=None)
-        vh = await total_vendido_crm(desde=hoy_ini, hasta=hoy_fin, asesor="")
+        vh = await total_vendido_crm(desde=hoy_ini, hasta=hoy_fin, asesor="", sucursal=sucursal)
         ventas["hoy"] = vh["total"]
         ventas["hoy_num"] = vh["num"]
         # Total ACUMULADO (todo lo vendido hasta hoy, sin límite de fecha)
-        vac = await total_vendido_crm(asesor="")
+        vac = await total_vendido_crm(asesor="", sucursal=sucursal)
         ventas["acumulado"] = vac["total"]
         ventas["acumulado_num"] = vac["num"]
     # Carga por asesor (solo para quien ve todo): Anna 10, Brayan 15, Tere 3...
-    carga = await carga_por_asesor() if ve_todo else None
+    carga = await carga_por_asesor(sucursal=sucursal) if ve_todo else None
     return {
         "registros": registros,
         "stats": stats,
@@ -453,6 +453,7 @@ async def crm_actualizar(registro_id: int, request: Request):
         alerta=data.get("alerta"),
         expres=data.get("expres"),
         monto=monto,
+        sucursal=data.get("sucursal"),
     )
     return {"ok": ok}
 
