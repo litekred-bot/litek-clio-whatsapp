@@ -48,7 +48,7 @@ from agent.memory import (
     marcar_alerta_crm, listar_usuarios_crm, cambiar_password_crm,
     reactivar_cliente_no_contesto, marcar_no_contesto_automatico, marcar_expres_crm,
     guardar_calificacion_crm, guardar_monto_crm, total_vendido_crm, backfill_montos_crm,
-    guardar_sucursal_crm, sucursal_crm_por_telefono, marcar_factura_crm,
+    guardar_sucursal_crm, sucursal_crm_por_telefono, marcar_factura_crm, forzar_asesor_crm,
 )
 from zoneinfo import ZoneInfo as _ZI
 
@@ -1232,6 +1232,9 @@ async def _procesar_mensaje(msg):
                     estado_minimo="asignado",
                     asesor=_asesor_area,
                 )
+                # En Carmen, el DISEÑO/letreros lo lleva Jadiel (especialista). Forzamos.
+                if es_carmen and area_escalar == "letreros":
+                    await forzar_asesor_crm(msg.telefono.replace("@s.whatsapp.net", ""), "Jadiel")
             except Exception as e:
                 logger.error(f"Error registrando escalación en CRM: {e}")
 

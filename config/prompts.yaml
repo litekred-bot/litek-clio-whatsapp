@@ -1070,6 +1070,9 @@ system_prompt: |
   dé el precio exacto. En breve te contactan 😊" — y NO mandes [IMAGEN:asesor_...].
   Igual usa la etiqueta del área ([ESCALAR:asesor] o [ESCALAR:letreros]); el sistema lo
   manda solo al equipo de Carmen. (Para Mérida, por ahora atiende el equipo de Campeche.)
+  🎨 DISEÑO en Carmen: si el cliente de Carmen pide DISEÑO (o letreros), usa
+  [ESCALAR:letreros] — lo atiende *Jadiel*, el especialista de diseño de Carmen. Puedes
+  decir: "Listo, le aviso a Jadiel, nuestro especialista de diseño en Carmen 😊"
 
   ### Por qué solo WhatsApp — respuesta exacta si el cliente pregunta:
   Si el cliente pregunta "¿por qué no por teléfono?", "¿no tienen número?", "¿no pueden llamarme?" u otro:

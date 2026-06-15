@@ -783,6 +783,26 @@ async def actualizar_crm(registro_id: int, estado: str = None, asesor: str = Non
         return True
 
 
+async def forzar_asesor_crm(telefono: str, asesor: str) -> bool:
+    """Asigna SÍ o SÍ un asesor a la tarjeta abierta del cliente (ej. diseño Carmen → Jadiel)."""
+    sufijo = _sufijo_tel(telefono)
+    async with async_session() as session:
+        result = await session.execute(
+            select(CrmRegistro)
+            .where(CrmRegistro.estado.not_in(ESTADOS_FINALES))
+            .order_by(CrmRegistro.creado.desc())
+        )
+        for r in result.scalars().all():
+            if _sufijo_tel(r.telefono) == sufijo:
+                r.asesor = asesor
+                if r.estado == "nuevo":
+                    r.estado = "asignado"
+                r.actualizado = datetime.utcnow()
+                await session.commit()
+                return True
+    return False
+
+
 async def marcar_factura_crm(telefono: str) -> bool:
     """Prende '🧾 requiere factura' en la tarjeta abierta del cliente (el cliente pidió factura)."""
     sufijo = _sufijo_tel(telefono)
