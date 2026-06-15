@@ -262,6 +262,11 @@ CRM_USUARIO_A_ASESOR = {"anna": "Anna", "brayan": "Brayan", "alan": "Alan", "jad
 # Administradores de UNA sola sucursal: ven todo lo de SU sucursal (clientes + dinero),
 # pero nada de las demás. Ej: Leo ve solo Carmen.
 CRM_ADMIN_SUCURSAL = {"leo": "Carmen"}
+# Asesores que pertenecen a cada sucursal (para la carga "Clientes por atender").
+ASESORES_POR_SUCURSAL = {
+    "Campeche": ("Anna", "Brayan", "Tere"),
+    "Carmen": ("Alan", "Jadiel"),
+}
 
 
 def _es_admin(usuario: str) -> bool:
@@ -372,8 +377,13 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = "",
         vac = await total_vendido_crm(asesor="", sucursal=sucursal)
         ventas["acumulado"] = vac["total"]
         ventas["acumulado_num"] = vac["num"]
-    # Carga por asesor (solo para quien ve todo): Anna 10, Brayan 15, Tere 3...
-    carga = await carga_por_asesor(sucursal=sucursal) if ve_todo else None
+    # Carga por asesor (solo para quien ve todo). Si hay sucursal elegida, solo
+    # muestra los asesores de ESA sucursal (Carmen → Alan/Jadiel; Campeche → Anna/Brayan/Tere).
+    carga = None
+    if ve_todo:
+        aseq = ASESORES_POR_SUCURSAL.get(sucursal)
+        carga = await carga_por_asesor(asesores=aseq, sucursal=sucursal) if aseq \
+            else await carga_por_asesor(sucursal=sucursal)
     return {
         "registros": registros,
         "stats": stats,
