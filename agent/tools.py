@@ -14,13 +14,10 @@ logger = logging.getLogger("agentkit")
 # ─────────────────────────────────────────────────────────────────────────────
 # Lonas promocionales — precio fijo por medida EXACTA
 # ─────────────────────────────────────────────────────────────────────────────
+# La ÚNICA lona con precio fijo es la promocional 75×50 cm → $39.
+# Todas las demás medidas se calculan por m² (tabla de volumen oficial).
 _LONAS_PROMO: dict[tuple[int, int], float] = {
-    (75, 50):   39,
-    (100, 75):  99,
-    (150, 100): 198,
-    (200, 100): 264,
-    (200, 150): 396,
-    (150, 150): 297,
+    (75, 50): 39,
 }
 
 
@@ -70,14 +67,20 @@ def calcular_precio(
             # Precio promo × cantidad (cada pieza al precio fijo)
             precio = float(precio_promo) * cantidad
         else:
+            # Tabla OFICIAL — precio/m² baja al aumentar el área total del pedido.
             tabla = [
-                (2.00,        252.0),
-                (4.00,        150.0),
-                (6.00,        144.0),
-                (9.00,        130.0),
-                (12.00,       125.0),
-                (15.00,       115.0),
-                (float("inf"), 99.0),
+                (0.49,         99.0),
+                (0.98,         185.0),
+                (2.00,         166.0),
+                (4.00,         150.0),
+                (6.00,         144.0),
+                (9.00,         130.0),
+                (12.00,        125.0),
+                (15.00,        115.0),
+                (100.00,       95.0),
+                (200.00,       80.0),
+                (400.00,       75.0),
+                (float("inf"), 65.0),
             ]
             area_total = area_pieza * cantidad
             precio = max(99.0, area_total * _tasa(area_total, tabla))
