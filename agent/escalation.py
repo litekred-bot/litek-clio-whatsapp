@@ -30,6 +30,7 @@ async def enviar_alerta_asesor(
     resumen: str,
     whapi_token: str,
     nombre_cliente: str = "",
+    grupo: str = "",
 ) -> bool:
     """
     Envía un mensaje de alerta al grupo del equipo LiTek.
@@ -83,7 +84,7 @@ async def enviar_alerta_asesor(
         async with httpx.AsyncClient(timeout=15.0) as client:
             r = await client.post(
                 "https://gate.whapi.cloud/messages/text",
-                json={"to": GRUPO_ALERTAS, "body": mensaje},
+                json={"to": grupo or GRUPO_ALERTAS, "body": mensaje},
                 headers=headers,
             )
             if r.status_code == 200:

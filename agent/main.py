@@ -1200,20 +1200,29 @@ async def _procesar_mensaje(msg):
             else:
                 resumen_completo = "\n".join(resumen_lineas) if resumen_lineas else "(sin historial)"
 
+            # ¿De qué sucursal es el cliente? Carmen se atiende con su propio equipo.
+            suc_cliente = await sucursal_crm_por_telefono(msg.telefono)
+            es_carmen = (suc_cliente == "Carmen")
+
+            # La alerta va al grupo de SU sucursal (ASESOR_WHATSAPP local ya es el correcto).
             await enviar_alerta_asesor(
                 area=area_escalar,
                 telefono_cliente=msg.telefono,
                 resumen=resumen_completo,
                 whapi_token=proveedor.token,
                 nombre_cliente=msg.nombre_perfil,
+                grupo=ASESOR_WHATSAPP,
             )
-            logger.info(f"Escalación enviada a área: {area_escalar}")
+            logger.info(f"Escalación enviada a área: {area_escalar} (sucursal: {suc_cliente})")
 
-            # Registrar la escalación en el CRM, asignada al asesor correspondiente
+            # Registrar la escalación en el CRM, asignada al asesor correspondiente.
+            # En Carmen NO se reasigna: el dueño por turnos (Alan/Jadiel) se queda.
             _asesor_area = {
                 "asesor": "Anna", "director": "Chino",
                 "letreros": "Brayan", "administracion": "Tere",
             }.get(area_escalar, "")
+            if es_carmen:
+                _asesor_area = ""
             try:
                 await registrar_o_actualizar_crm(
                     telefono=msg.telefono.replace("@s.whatsapp.net", ""),
@@ -1226,9 +1235,9 @@ async def _procesar_mensaje(msg):
             except Exception as e:
                 logger.error(f"Error registrando escalación en CRM: {e}")
 
-            # Enviar foto del asesor al cliente según el área
-            # Solo si Clio no la envió ya via [IMAGEN:] para evitar duplicado
-            if hasattr(proveedor, 'enviar_imagen') and not imagen_nombre:
+            # Foto del asesor al cliente según el área. En Carmen NO mandamos foto
+            # (los asesores de Campeche no aplican). Solo si Clio no la envió ya.
+            if hasattr(proveedor, 'enviar_imagen') and not imagen_nombre and not es_carmen:
                 foto_asesor = {
                     "asesor":         "asesor_ana",
                     "director":       "asesor_ana",
