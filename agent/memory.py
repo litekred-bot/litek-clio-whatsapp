@@ -471,7 +471,10 @@ async def listar_crm(estado: str = "", tipo: str = "", asesor: str = "", sucursa
             query = query.where(CrmRegistro.asesor == asesor)
         if sucursal:
             query = query.where(CrmRegistro.sucursal == sucursal)
-        query = query.order_by(CrmRegistro.creado.desc()).limit(limite)
+        # Ordenar por ÚLTIMA ACTIVIDAD (no por creación): así un cliente que ya
+        # tenía tarjeta (ej. ganó la ruleta hace días) y vuelve a escribir HOY sube
+        # hasta arriba, en vez de quedarse hundido con su fecha vieja de creación.
+        query = query.order_by(CrmRegistro.actualizado.desc()).limit(limite)
         result = await session.execute(query)
         registros = result.scalars().all()
         return [{
@@ -491,6 +494,7 @@ async def listar_crm(estado: str = "", tipo: str = "", asesor: str = "", sucursa
             "monto": float(getattr(r, "monto", 0) or 0),
             "notas": r.notas,
             "creado": r.creado.strftime("%d/%m/%Y %H:%M"),
+            "actualizado": (r.actualizado or r.creado).strftime("%d/%m/%Y %H:%M"),
         } for r in registros]
 
 

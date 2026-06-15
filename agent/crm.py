@@ -508,7 +508,7 @@ function pintar(regs){
       '<span class="tipo">'+(TIPOS[r.tipo]||r.tipo)+'</span></div>'+
       alertaHtml+
       '<div class="desc">'+esc(r.descripcion||"")+'</div>'+
-      '<div class="meta">📅 '+r.creado+'</div>'+
+      '<div class="meta">📅 '+(r.actualizado||r.creado)+'</div>'+
       '<div class="acciones">'+
         '<select onchange="upd('+r.id+',\'estado\',this.value)">'+opcEstado+'</select>'+
         '<select onchange="upd('+r.id+',\'asesor\',this.value)">'+opcAsesor+'</select>'+
