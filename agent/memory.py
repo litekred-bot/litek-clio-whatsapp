@@ -384,6 +384,10 @@ async def _crear_usuarios_crm_iniciales():
         "anna":   ("anna2026",  "Anna (Asesora)"),
         "brayan": ("brayan2026", "Brayan (Letreros)"),
         "tere":   ("tere2026",  "Tere (Administración)"),
+        # Sucursal Carmen
+        "leo":    ("carmen-leo-86",    "Leo (Admin Carmen)"),
+        "alan":   ("carmen-alan-71",   "Alan (Asesor Carmen)"),
+        "jadiel": ("carmen-jadiel-39", "Jadiel (Asesor Carmen)"),
     }
     async with async_session() as session:
         for usuario, (pwd, nombre) in iniciales.items():
@@ -535,6 +539,48 @@ async def telefono_conversacion(telefono: str) -> str:
             if _sufijo_tel(tel) == sufijo:
                 return tel
     return telefono
+
+
+async def _asesor_carmen_turno(session) -> str:
+    """Reparto por TURNOS en Carmen: el de menor carga entre Alan y Jadiel (empate → Alan)."""
+    counts = {}
+    for a in ("Alan", "Jadiel"):
+        res = await session.execute(
+            select(func.count(CrmRegistro.id)).where(
+                CrmRegistro.asesor == a,
+                CrmRegistro.sucursal == "Carmen",
+                CrmRegistro.estado.not_in(ESTADOS_FINALES),
+            )
+        )
+        counts[a] = res.scalar_one() or 0
+    return "Alan" if counts["Alan"] <= counts["Jadiel"] else "Jadiel"
+
+
+async def guardar_sucursal_crm(telefono: str, sucursal: str) -> bool:
+    """
+    Marca la sucursal en la tarjeta abierta del cliente. Si es Carmen, asigna
+    por TURNOS (Alan/Jadiel) sin importar el producto (si aún no tiene dueño de Carmen).
+    """
+    if sucursal not in ("Campeche", "Mérida", "Carmen"):
+        return False
+    sufijo = _sufijo_tel(telefono)
+    async with async_session() as session:
+        result = await session.execute(
+            select(CrmRegistro)
+            .where(CrmRegistro.estado.not_in(ESTADOS_FINALES))
+            .order_by(CrmRegistro.creado.desc())
+        )
+        for r in result.scalars().all():
+            if _sufijo_tel(r.telefono) == sufijo:
+                r.sucursal = sucursal
+                if sucursal == "Carmen" and r.asesor not in ("Alan", "Jadiel"):
+                    r.asesor = await _asesor_carmen_turno(session)
+                    if r.estado == "nuevo":
+                        r.estado = "asignado"
+                r.actualizado = datetime.utcnow()
+                await session.commit()
+                return True
+    return False
 
 
 async def estado_crm_por_telefono(telefono: str) -> str:
@@ -865,7 +911,7 @@ async def siguiente_asesor_rueda(candidatos: tuple = ("Anna", "Brayan")) -> str:
         return min(candidatos, key=lambda a: conteos[a])
 
 
-async def carga_por_asesor(asesores: tuple = ("Anna", "Brayan", "Tere"), sucursal: str = "") -> dict:
+async def carga_por_asesor(asesores: tuple = ("Anna", "Brayan", "Tere", "Alan", "Jadiel"), sucursal: str = "") -> dict:
     """
     Cuenta los clientes PENDIENTES (no cerrados) que tiene cada asesor por atender.
     Sirve para el resumen de carga del panel (ej. Anna 10, Brayan 15).
@@ -950,8 +996,11 @@ async def registrar_o_actualizar_crm(
         # Nombre: completa si estaba vacío o genérico
         if nombre and existente.nombre.strip().lower() in ("", "cliente", "cliente nuevo"):
             existente.nombre = nombre
-        # Asesor: solo el explícito reasigna; asesor_si_nuevo respeta al dueño actual
-        if asesor:
+        # Asesor: solo el explícito reasigna; asesor_si_nuevo respeta al dueño actual.
+        # EXCEPCIÓN Carmen: el dueño es por TURNOS (Alan/Jadiel) y NO se reasigna por producto.
+        carmen_fijo = (getattr(existente, "sucursal", "") == "Carmen"
+                       and existente.asesor in ("Alan", "Jadiel"))
+        if asesor and not carmen_fijo:
             existente.asesor = asesor
         elif asesor_si_nuevo and not existente.asesor:
             existente.asesor = asesor_si_nuevo

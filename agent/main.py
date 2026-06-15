@@ -48,6 +48,7 @@ from agent.memory import (
     marcar_alerta_crm, listar_usuarios_crm, cambiar_password_crm,
     reactivar_cliente_no_contesto, marcar_no_contesto_automatico, marcar_expres_crm,
     guardar_calificacion_crm, guardar_monto_crm, total_vendido_crm, backfill_montos_crm,
+    guardar_sucursal_crm,
 )
 from zoneinfo import ZoneInfo as _ZI
 
@@ -244,12 +245,20 @@ def _crm_usuario_de_request(request: Request) -> dict | None:
 # Quién ve qué: director (Chino) y administradora (Tere) ven TODO;
 # cada asesor (Anna, Brayan) ve SOLO lo asignado a él.
 CRM_VEN_TODO = {"chino", "tere"}
-CRM_USUARIO_A_ASESOR = {"anna": "Anna", "brayan": "Brayan"}
+CRM_USUARIO_A_ASESOR = {"anna": "Anna", "brayan": "Brayan", "alan": "Alan", "jadiel": "Jadiel"}
+# Administradores de UNA sola sucursal: ven todo lo de SU sucursal (clientes + dinero),
+# pero nada de las demás. Ej: Leo ve solo Carmen.
+CRM_ADMIN_SUCURSAL = {"leo": "Carmen"}
+
+
+def _es_admin(usuario: str) -> bool:
+    """¿El usuario ve dinero/ventas? (director global o admin de sucursal)."""
+    return usuario in CRM_VEN_TODO or usuario in CRM_ADMIN_SUCURSAL
 
 
 def _asesor_filtro_de(usuario: str) -> str:
-    """Asesor por el que se filtra. '' = ve todo (director/admin)."""
-    if usuario in CRM_VEN_TODO:
+    """Asesor por el que se filtra. '' = ve todo (director / admin de sucursal)."""
+    if usuario in CRM_VEN_TODO or usuario in CRM_ADMIN_SUCURSAL:
         return ""
     return CRM_USUARIO_A_ASESOR.get(usuario, usuario.capitalize())
 
@@ -308,7 +317,11 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = "",
         raise HTTPException(status_code=401, detail="No autorizado")
     # Filtro por persona: director/admin ven todo, cada asesor solo lo asignado a él
     asesor_filtro = _asesor_filtro_de(u["usuario"])
-    ve_todo = u["usuario"] in CRM_VEN_TODO
+    # Admin de UNA sucursal (ej. Leo→Carmen): se le FUERZA su sucursal y ve dinero.
+    suc_forzada = CRM_ADMIN_SUCURSAL.get(u["usuario"], "")
+    if suc_forzada:
+        sucursal = suc_forzada
+    ve_todo = _es_admin(u["usuario"])
     registros = await listar_crm(estado=estado, tipo=tipo, asesor=asesor_filtro, sucursal=sucursal)
     # Stats por estado (respetando el filtro de persona y sucursal, sin filtro de estado)
     todos = await listar_crm(tipo=tipo, asesor=asesor_filtro, sucursal=sucursal, limite=1000)
@@ -354,6 +367,7 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = "",
         "ventas": ventas,
         "nombre": u["nombre"],
         "es_director": ve_todo,
+        "solo_sucursal": suc_forzada,
         "carga": carga,
     }
 
@@ -478,8 +492,8 @@ async def crm_actualizar(registro_id: int, request: Request):
     if not u:
         raise HTTPException(status_code=401, detail="No autorizado")
     data = await request.json()
-    # El monto ($) solo lo puede tocar el administrador (Tere/Chino), no los asesores.
-    monto = data.get("monto") if u["usuario"] in CRM_VEN_TODO else None
+    # El monto ($) solo lo toca un administrador (Chino/Tere o admin de sucursal), no los asesores.
+    monto = data.get("monto") if _es_admin(u["usuario"]) else None
     ok = await actualizar_crm(
         registro_id,
         estado=data.get("estado"),
@@ -846,6 +860,19 @@ async def _procesar_mensaje(msg):
                 await marcar_expres_crm(msg.telefono, True)
             except Exception as e:
                 logger.error(f"Error marcando exprés CRM: {e}")
+
+        # Detectar [SUCURSAL:Campeche|Mérida|Carmen] — la sucursal del cliente.
+        # En Carmen, además asigna por TURNOS (Alan/Jadiel).
+        match_suc = re.search(r'\[SUCURSAL:\s*([^\]]+)\]', respuesta, re.IGNORECASE)
+        if match_suc:
+            respuesta = re.sub(r'\[SUCURSAL:[^\]]*\]', '', respuesta, flags=re.IGNORECASE).strip()
+            suc = match_suc.group(1).strip().capitalize()
+            suc = {"Merida": "Mérida", "Mérida": "Mérida", "Campeche": "Campeche", "Carmen": "Carmen"}.get(suc, suc)
+            try:
+                await guardar_sucursal_crm(msg.telefono, suc)
+                logger.info(f"Sucursal de {msg.telefono}: {suc}")
+            except Exception as e:
+                logger.error(f"Error guardando sucursal CRM: {e}")
 
         # Detectar [MONTO:numero] — total $ del pedido confirmado (para totalizar ventas)
         match_monto = re.search(r'\[MONTO:\s*\$?([0-9][0-9.,]*)\]', respuesta)

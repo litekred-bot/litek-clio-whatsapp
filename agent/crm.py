@@ -234,7 +234,7 @@ HTML_PANEL = r"""<!DOCTYPE html>
 <script>
 var TOKEN = localStorage.getItem("crm_token") || "";
 var fEstado = "", fTipo = "";
-var ASESORES = ["", "Anna", "Brayan", "Tere", "Chino"];
+var ASESORES = ["", "Anna", "Brayan", "Tere", "Chino", "Alan", "Jadiel"];
 var ESTADOS = {nuevo:"🔵 Nuevo", asignado:"🟠 Asignado", proceso:"🟣 En proceso", vendido:"✅ Vendido", no_contesto:"⚫ No contestó"};
 var TIPOS = {escalacion:"Escalación", pedido:"Pedido", cliente:"Cliente", ruleta:"Ruleta"};
 
@@ -326,9 +326,15 @@ async function cargar(){
     if (r.status === 401){ salir(); return; }
     var d = await r.json();
     document.getElementById("quien").textContent = "👤 " + (d.nombre || "") + (d.es_director ? "" : " · viendo solo lo tuyo");
-    document.getElementById("btnEquipo").style.display = d.es_director ? "inline-block" : "none";
+    document.getElementById("btnEquipo").style.display = (d.es_director && !d.solo_sucursal) ? "inline-block" : "none";
     ES_DIRECTOR = !!d.es_director;
     document.getElementById("ventasFiltro").style.display = ES_DIRECTOR ? "flex" : "none";
+    // Admin de UNA sola sucursal (ej. Leo→Carmen): se le fija y se oculta el selector.
+    if (d.solo_sucursal){
+      SUCURSAL = d.solo_sucursal;
+      var sucBar = document.getElementById("sucursales");
+      if (sucBar) sucBar.style.display = "none";
+    }
     pintarCarga(d.carga);
     pintarStats(d.stats, d.ventas);
     ULTIMOS_REGISTROS = d.registros || [];
