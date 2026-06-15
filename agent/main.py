@@ -1254,6 +1254,23 @@ async def _procesar_mensaje(msg):
         _diag_webhook["ultimo_error"] = _tb.format_exc()[-1200:]
 
 
+@app.get("/crm/recuperar-acceso")
+async def crm_recuperar_acceso(usuario: str = "chino", clave: str = ""):
+    """Rescate de contraseña con clave secreta (cuando alguien queda fuera del CRM)."""
+    if clave != "litek-rescate-2026":
+        raise HTTPException(status_code=404, detail="No encontrado")
+    if usuario not in ("chino", "tere", "leo", "anna", "brayan", "alan", "jadiel"):
+        return {"ok": False, "error": "usuario no válido"}
+    nueva = {
+        "chino": "litek2026", "tere": "tere2026", "leo": "carmen-leo-86",
+        "anna": "anna2026", "brayan": "brayan2026",
+        "alan": "carmen-alan-71", "jadiel": "carmen-jadiel-39",
+    }[usuario]
+    ok = await cambiar_password_crm(usuario, nueva)
+    return {"ok": ok, "usuario": usuario, "nueva_password": nueva,
+            "nota": "Inicia sesión y cámbiala en la pestaña Equipo."}
+
+
 @app.get("/diag/grupos")
 async def diag_grupos():
     """Lista los grupos de WhatsApp con su ID (para configurar alertas por sucursal)."""
