@@ -1211,6 +1211,31 @@ async def _procesar_mensaje(msg):
         _diag_webhook["ultimo_error"] = _tb.format_exc()[-1200:]
 
 
+@app.get("/diag/grupos")
+async def diag_grupos():
+    """Lista los grupos de WhatsApp con su ID (para configurar alertas por sucursal)."""
+    import httpx
+    token = getattr(proveedor, "token", None)
+    if not token:
+        return {"error": "No hay token de Whapi configurado"}
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.get(
+                "https://gate.whapi.cloud/groups",
+                params={"count": 200},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+        data = r.json()
+        grupos = [
+            {"nombre": g.get("name", "(sin nombre)"), "id": g.get("id", "")}
+            for g in data.get("groups", [])
+        ]
+        grupos.sort(key=lambda x: x["nombre"].lower())
+        return {"total": len(grupos), "grupos": grupos}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @app.get("/diag/webhook")
 async def diag_webhook():
     """Diagnóstico: cuántos webhooks ha recibido y cuándo el último."""
