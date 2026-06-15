@@ -1271,6 +1271,13 @@ async def crm_recuperar_acceso(usuario: str = "chino", clave: str = ""):
             "nota": "Inicia sesión y cámbiala en la pestaña Equipo."}
 
 
+@app.get("/diag/brain")
+async def diag_brain():
+    """Muestra el último error del cerebro (Claude API / tool_use) para diagnóstico."""
+    import agent.brain as _brain
+    return {"ultimo_error_brain": getattr(_brain, "ULTIMO_ERROR_BRAIN", None)}
+
+
 @app.get("/diag/grupos")
 async def diag_grupos():
     """Lista los grupos de WhatsApp con su ID (para configurar alertas por sucursal)."""

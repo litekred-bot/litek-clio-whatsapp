@@ -17,6 +17,9 @@ logger = logging.getLogger("agentkit")
 
 client = AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
+# Último error del cerebro (para diagnóstico vía /diag/brain)
+ULTIMO_ERROR_BRAIN = None
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Definición de herramientas para Claude (tool_use)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -259,8 +262,11 @@ async def generar_respuesta(
 
         # Si llegamos aquí se agotaron las iteraciones
         logger.error("Se agotaron las iteraciones del loop tool_use")
+        globals()["ULTIMO_ERROR_BRAIN"] = "MAX_ITER agotado (loop tool_use)"
         return obtener_mensaje_error()
 
     except Exception as e:
+        import traceback as _tb
         logger.error(f"Error Claude API: {e}")
+        globals()["ULTIMO_ERROR_BRAIN"] = f"{type(e).__name__}: {e}\n" + _tb.format_exc()[-1500:]
         return obtener_mensaje_error()
