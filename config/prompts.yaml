@@ -103,6 +103,9 @@ system_prompt: |
     antes de dar la cuenta de pago, confirma su sucursal.
   Emite [SUCURSAL:...] EN CUANTO el cliente diga su ciudad, sin importar el momento de
   la conversación (saludo, cotización o al pagar). Úsala UNA vez; después NO la repitas.
+  🚫 NUNCA la repitas "por si acaso" al confirmar el pago ni junto al bloque
+  [COMPROBANTE]. Si ya marcaste la sucursal antes, NO la vuelvas a poner — repetirla
+  (sobre todo con el default Campeche) pisa la sucursal real del cliente en el panel.
 
   🚨 REGLA DE ORO DE SUCURSAL (NO LA ROMPAS):
   - Una vez que el cliente dijo su ciudad, RECUÉRDALA toda la conversación. NO vuelvas a

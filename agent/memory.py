@@ -3,6 +3,7 @@
 
 import os
 import re
+import logging
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -18,6 +19,8 @@ if DATABASE_URL.startswith("postgresql://"):
 
 engine = create_async_engine(DATABASE_URL, echo=False)
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+logger = logging.getLogger("agentkit")
 
 
 class Base(DeclarativeBase):
@@ -566,6 +569,12 @@ async def guardar_sucursal_crm(telefono: str, sucursal: str) -> bool:
     """
     Marca la sucursal en la tarjeta abierta del cliente. Si es Carmen, asigna
     por TURNOS (Alan/Jadiel) sin importar el producto (si aún no tiene dueño de Carmen).
+
+    🔒 Una sucursal EXPLÍCITA ya fijada (Carmen o Mérida) NO se sobrescribe por una
+    etiqueta automática distinta. Clio a veces re-emite [SUCURSAL:Campeche] (el default)
+    en un paso posterior —p. ej. al confirmar el pago— y eso pisaba la sucursal real,
+    dejando la tarjeta como "Campeche" aunque el cliente fuera de Carmen. El cambio
+    manual desde el panel (actualizar_crm) sí manda y NO pasa por aquí.
     """
     if sucursal not in ("Campeche", "Mérida", "Carmen"):
         return False
@@ -578,6 +587,15 @@ async def guardar_sucursal_crm(telefono: str, sucursal: str) -> bool:
         )
         for r in result.scalars().all():
             if _sufijo_tel(r.telefono) == sufijo:
+                actual = getattr(r, "sucursal", "") or ""
+                # Si ya está fijada en Carmen/Mérida (elección explícita del cliente),
+                # ignorar una etiqueta automática que intente cambiarla a otra cosa.
+                if actual in ("Carmen", "Mérida") and sucursal != actual:
+                    logger.info(
+                        f"Sucursal de {telefono} se mantiene en {actual}; "
+                        f"se ignoró [SUCURSAL:{sucursal}]"
+                    )
+                    return False
                 r.sucursal = sucursal
                 if sucursal == "Carmen" and r.asesor not in ("Alan", "Jadiel"):
                     r.asesor = await _asesor_carmen_turno(session)
