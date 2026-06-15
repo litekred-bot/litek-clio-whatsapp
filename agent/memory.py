@@ -767,6 +767,13 @@ async def actualizar_crm(registro_id: int, estado: str = None, asesor: str = Non
                 pass
         if sucursal is not None and sucursal in ("Campeche", "Mérida", "Carmen"):
             r.sucursal = sucursal
+            # Si lo pasan a Carmen y no traía dueño de Carmen, reasignar por turnos
+            # (sale de Anna/Brayan y entra al equipo de Carmen). Salvo que en el mismo
+            # cambio ya hayan elegido un asesor a mano.
+            if sucursal == "Carmen" and asesor is None and r.asesor not in ("Alan", "Jadiel"):
+                r.asesor = await _asesor_carmen_turno(session)
+                if r.estado == "nuevo":
+                    r.estado = "asignado"
         if factura is not None:
             r.factura = bool(factura)
         if facturado is not None:
