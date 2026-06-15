@@ -48,7 +48,7 @@ from agent.memory import (
     marcar_alerta_crm, listar_usuarios_crm, cambiar_password_crm,
     reactivar_cliente_no_contesto, marcar_no_contesto_automatico, marcar_expres_crm,
     guardar_calificacion_crm, guardar_monto_crm, total_vendido_crm, backfill_montos_crm,
-    guardar_sucursal_crm, sucursal_crm_por_telefono,
+    guardar_sucursal_crm, sucursal_crm_por_telefono, marcar_factura_crm,
 )
 from zoneinfo import ZoneInfo as _ZI
 
@@ -526,6 +526,8 @@ async def crm_actualizar(registro_id: int, request: Request):
         expres=data.get("expres"),
         monto=monto,
         sucursal=data.get("sucursal"),
+        factura=data.get("factura"),
+        facturado=data.get("facturado"),
     )
     return {"ok": ok}
 
@@ -1092,6 +1094,11 @@ async def _procesar_mensaje(msg):
                 # Alerta automática si el pedido entró FUERA de horario
                 if not es_horario_atencion():
                     await marcar_alerta_crm(numero_limpio, "⚠️ Pidió fuera de horario")
+                # ¿El pedido es CON factura? → marcar 🧾 para que el equipo de la
+                # sucursal la haga (el resumen trae "Factura: Sí/No").
+                rl = (resumen_pedido or "").lower()
+                if re.search(r'factura:\s*s[ií]\b', rl) or "con factura" in rl:
+                    await marcar_factura_crm(numero_limpio)
             except Exception as e:
                 logger.error(f"Error registrando pedido en CRM: {e}")
             msg_asesor = (

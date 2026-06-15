@@ -77,6 +77,11 @@ HTML_PANEL = r"""<!DOCTYPE html>
   .sucursales button { background: #f4f1ea; border: 1px solid #ddd; padding: 7px 16px; border-radius: 20px; cursor: pointer; font-size: 14px; color: #444; }
   .sucursales button.activo { background: #161616; color: #fff; border-color: #161616; }
   .card .suc-badge { display: inline-block; font-size: 11px; font-weight: bold; border-radius: 10px; padding: 2px 9px; margin-left: 6px; background: #ECECEC; color: #444; }
+  .card .fact-badge { display: inline-block; font-size: 11px; font-weight: bold; border-radius: 10px; padding: 2px 9px; margin-left: 6px; }
+  .card .fact-pend { background: #fff3e0; color: #e65100; }
+  .card .fact-ok { background: #e8f5e9; color: #2e7d32; }
+  .card .acciones .bfact { background: #fff3e0; color: #e65100; border: 1px solid #ffb74d; border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
+  .card .acciones .bfact.on { background: #2e7d32; color: #fff; border-color: #2e7d32; }
   .carga { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0 6px; }
   .carga .a { background: #fff3e0; border: 1px solid #ffcc80; border-radius: 20px; padding: 8px 16px; font-size: 14px; }
   .carga .a b { color: #e65100; font-size: 17px; }
@@ -207,6 +212,7 @@ HTML_PANEL = r"""<!DOCTYPE html>
       <button id="btnRevisar" onclick="toggleRevisar()" style="background:#ffe0e0;color:#b71c1c;border-color:#ffb3b3;">⚠️ Solo a revisar</button>
       <button id="btnExpres" onclick="toggleSoloExpres()" style="background:#fff3e0;color:#e65100;border-color:#ffb74d;">⚡ Solo exprés</button>
       <button id="btnCalif" onclick="toggleSoloCalif()" style="background:#e8f5e9;color:#2e7d32;border-color:#a5d6a7;">⭐ Calificaciones</button>
+      <button id="btnFactura" onclick="toggleSoloFactura()" style="background:#fff3e0;color:#e65100;border-color:#ffb74d;">🧾 Por facturar</button>
     </div>
     <div id="lista"></div>
   </div>
@@ -347,6 +353,7 @@ var ES_DIRECTOR = false;
 var SOLO_REVISAR = false;
 var SOLO_EXPRES = false;
 var SOLO_CALIF = false;
+var SOLO_FACTURA = false;
 function aplicarBusqueda(){
   var q = (document.getElementById("buscar").value || "").toLowerCase().trim();
   var qDig = q.replace(/\D/g, "");
@@ -354,6 +361,7 @@ function aplicarBusqueda(){
   if (SOLO_REVISAR){ regs = regs.filter(function(r){ return r.alerta; }); }
   if (SOLO_EXPRES){ regs = regs.filter(function(r){ return r.expres; }); }
   if (SOLO_CALIF){ regs = regs.filter(function(r){ return r.calificacion; }); }
+  if (SOLO_FACTURA){ regs = regs.filter(function(r){ return r.factura && !r.facturado; }); }
   if (q){
     regs = regs.filter(function(r){
       var nom = (r.nombre || "").toLowerCase();
@@ -385,6 +393,14 @@ function toggleSoloExpres(){
   aplicarBusqueda();
 }
 
+function toggleSoloFactura(){
+  SOLO_FACTURA = !SOLO_FACTURA;
+  var b = document.getElementById("btnFactura");
+  b.style.background = SOLO_FACTURA ? "#e65100" : "#fff3e0";
+  b.style.color = SOLO_FACTURA ? "#fff" : "#e65100";
+  aplicarBusqueda();
+}
+
 function toggleSoloCalif(){
   SOLO_CALIF = !SOLO_CALIF;
   var b = document.getElementById("btnCalif");
@@ -395,6 +411,11 @@ function toggleSoloCalif(){
 
 async function toggleExpres(id, valor){
   await fetch("/crm/api/registro/"+id, {method:"POST", headers:{"Authorization":"Bearer "+TOKEN, "Content-Type":"application/json"}, body: JSON.stringify({expres: valor})});
+  cargar();
+}
+
+async function toggleFacturado(id, valor){
+  await fetch("/crm/api/registro/"+id, {method:"POST", headers:{"Authorization":"Bearer "+TOKEN, "Content-Type":"application/json"}, body: JSON.stringify({facturado: valor})});
   cargar();
 }
 
@@ -478,9 +499,12 @@ function pintar(regs){
     var CALIF = {bueno:'😀 Bueno', regular:'😐 Regular', malo:'😞 Malo'};
     var badgeCalif = r.calificacion ? '<span class="calif-badge calif-'+r.calificacion+'">'+(CALIF[r.calificacion]||r.calificacion)+'</span>' : '';
     var badgeSuc = '<span class="suc-badge">🏢 '+(r.sucursal||"Campeche")+'</span>';
+    var badgeFact = r.factura ? (r.facturado
+        ? '<span class="fact-badge fact-ok">✅ Facturado</span>'
+        : '<span class="fact-badge fact-pend">🧾 Por facturar</span>') : '';
     var opcSuc = ["Campeche","Mérida","Carmen"].map(function(su){ return '<option value="'+su+'"'+((r.sucursal||"Campeche")===su?' selected':'')+'>'+su+'</option>'; }).join("");
     return '<div class="card '+r.estado+(r.alerta?' alertado':'')+(r.expres?' expres-on':'')+'">'+
-      '<div class="head"><span class="nombre">'+esc(r.nombre||"Sin nombre")+badgeExpres+badgeCalif+badgeSuc+'</span>'+
+      '<div class="head"><span class="nombre">'+esc(r.nombre||"Sin nombre")+badgeExpres+badgeCalif+badgeSuc+badgeFact+'</span>'+
       '<span class="tipo">'+(TIPOS[r.tipo]||r.tipo)+'</span></div>'+
       alertaHtml+
       '<div class="desc">'+esc(r.descripcion||"")+'</div>'+
@@ -490,6 +514,7 @@ function pintar(regs){
         '<select onchange="upd('+r.id+',\'asesor\',this.value)">'+opcAsesor+'</select>'+
         '<select onchange="upd('+r.id+',\'sucursal\',this.value)" title="Sucursal">'+opcSuc+'</select>'+
         '<button class="bexpres'+(r.expres?' on':'')+'" onclick="toggleExpres('+r.id+','+(r.expres?'false':'true')+')" title="Marcar/quitar exprés">⚡ Exprés</button>'+
+        (r.factura ? '<button class="bfact'+(r.facturado?' on':'')+'" onclick="toggleFacturado('+r.id+','+(r.facturado?'false':'true')+')" title="Marcar/quitar facturado">'+(r.facturado?'✅ Facturado':'🧾 Marcar facturado')+'</button>' : '')+
         (ES_DIRECTOR ? '<input class="monto" type="number" min="0" step="1" placeholder="$ monto" value="'+(r.monto?Math.round(r.monto):"")+'" title="Monto $ del pedido (para el total vendido)" onblur="upd('+r.id+',\'monto\',this.value)">' : '')+
         '<input class="nota" placeholder="Nota..." value="'+esc(r.notas||"")+'" onblur="upd('+r.id+',\'notas\',this.value)">'+
         (wa ? '<button class="copia" onclick="verChat(\''+wa+'\',\''+(r.nombre||"Cliente").replace(/[\\\\\x27"]/g,"")+'\')" title="Ver la conversación con Clio">👁️ Ver chat</button>' : '')+

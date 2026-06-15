@@ -63,6 +63,8 @@ class CrmRegistro(Base):
     alerta: Mapped[str] = mapped_column(String(200), default="")  # motivo a revisar (⚠️) o vacío
     expres: Mapped[bool] = mapped_column(Boolean, default=False)  # ⚡ pedido exprés (prioritario)
     calificacion: Mapped[str] = mapped_column(String(20), default="")  # bueno|regular|malo (post-venta)
+    factura: Mapped[bool] = mapped_column(Boolean, default=False)     # 🧾 el cliente pidió factura
+    facturado: Mapped[bool] = mapped_column(Boolean, default=False)   # ✅ ya se hizo la factura
     monto: Mapped[float] = mapped_column(Float, default=0.0)  # $ del pedido (para totalizar ventas)
     pagado_en: Mapped[datetime] = mapped_column(DateTime, nullable=True)  # fecha del pago (para ventas por mes)
     notas: Mapped[str] = mapped_column(Text, default="")
@@ -105,6 +107,8 @@ async def inicializar_db():
         "ALTER TABLE crm_registros ADD COLUMN monto DOUBLE PRECISION DEFAULT 0",
         "ALTER TABLE crm_registros ADD COLUMN pagado_en TIMESTAMP",
         "ALTER TABLE crm_registros ADD COLUMN sucursal VARCHAR(30) DEFAULT 'Campeche'",
+        "ALTER TABLE crm_registros ADD COLUMN factura BOOLEAN DEFAULT false",
+        "ALTER TABLE crm_registros ADD COLUMN facturado BOOLEAN DEFAULT false",
         # 'cerrado' viejo = venta concretada → renombrar a 'vendido'
         "UPDATE crm_registros SET estado='vendido' WHERE estado='cerrado'",
     ]
@@ -479,6 +483,8 @@ async def listar_crm(estado: str = "", tipo: str = "", asesor: str = "", sucursa
             "alerta": getattr(r, "alerta", "") or "",
             "expres": bool(getattr(r, "expres", False)),
             "calificacion": getattr(r, "calificacion", "") or "",
+            "factura": bool(getattr(r, "factura", False)),
+            "facturado": bool(getattr(r, "facturado", False)),
             "monto": float(getattr(r, "monto", 0) or 0),
             "notas": r.notas,
             "creado": r.creado.strftime("%d/%m/%Y %H:%M"),
@@ -734,8 +740,9 @@ async def marcar_no_contesto_automatico(dias: int = 2) -> int:
 
 async def actualizar_crm(registro_id: int, estado: str = None, asesor: str = None,
                          notas: str = None, alerta: str = None, expres: bool = None,
-                         monto: float = None, sucursal: str = None) -> bool:
-    """Actualiza estado, asesor, notas, alerta, exprés, monto o sucursal de un registro del CRM."""
+                         monto: float = None, sucursal: str = None,
+                         factura: bool = None, facturado: bool = None) -> bool:
+    """Actualiza estado, asesor, notas, alerta, exprés, monto, sucursal o factura de un registro."""
     async with async_session() as session:
         resultado = await session.execute(
             select(CrmRegistro).where(CrmRegistro.id == registro_id)
@@ -760,9 +767,31 @@ async def actualizar_crm(registro_id: int, estado: str = None, asesor: str = Non
                 pass
         if sucursal is not None and sucursal in ("Campeche", "Mérida", "Carmen"):
             r.sucursal = sucursal
+        if factura is not None:
+            r.factura = bool(factura)
+        if facturado is not None:
+            r.facturado = bool(facturado)
         r.actualizado = datetime.utcnow()
         await session.commit()
         return True
+
+
+async def marcar_factura_crm(telefono: str) -> bool:
+    """Prende '🧾 requiere factura' en la tarjeta abierta del cliente (el cliente pidió factura)."""
+    sufijo = _sufijo_tel(telefono)
+    async with async_session() as session:
+        result = await session.execute(
+            select(CrmRegistro)
+            .where(CrmRegistro.estado.not_in(ESTADOS_FINALES))
+            .order_by(CrmRegistro.creado.desc())
+        )
+        for r in result.scalars().all():
+            if _sufijo_tel(r.telefono) == sufijo:
+                r.factura = True
+                r.actualizado = datetime.utcnow()
+                await session.commit()
+                return True
+    return False
 
 
 async def guardar_monto_crm(telefono: str, monto: float) -> bool:
