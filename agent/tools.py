@@ -14,10 +14,16 @@ logger = logging.getLogger("agentkit")
 # ─────────────────────────────────────────────────────────────────────────────
 # Lonas promocionales — precio fijo por medida EXACTA
 # ─────────────────────────────────────────────────────────────────────────────
-# La ÚNICA lona con precio fijo es la promocional 75×50 cm → $39.
-# Todas las demás medidas se calculan por m² (tabla de volumen oficial).
+# Lonas PROMOCIONALES — precio fijo por medida (oferta). Acepta medidas giradas.
+# Si el cliente pide varias, se compara la promo×cantidad contra el precio por
+# volumen y se le da el MÁS BAJO (lo que más le conviene).
 _LONAS_PROMO: dict[tuple[int, int], float] = {
-    (75, 50): 39,
+    (75, 50):   39,
+    (100, 75):  99,
+    (150, 100): 198,
+    (200, 100): 264,
+    (200, 150): 396,
+    (150, 150): 297,
 }
 
 
@@ -55,35 +61,43 @@ def calcular_precio(
     alto_m     = alto_cm / 100
     area_pieza = base_m * alto_m
     precio     = 0.0
+    es_promocion = False   # True si se aplicó un precio promocional de lona
 
     # ── LONA ─────────────────────────────────────────────────────────────────
     if producto == "lona":
-        # Verificar precio promocional (acepta medidas giradas: 75×50 = 50×75)
+        # Tabla OFICIAL por m² — el precio/m² baja al aumentar el área total.
+        tabla = [
+            (0.49,         99.0),
+            (0.98,         185.0),
+            (2.00,         166.0),
+            (4.00,         150.0),
+            (6.00,         144.0),
+            (9.00,         130.0),
+            (12.00,        125.0),
+            (15.00,        115.0),
+            (100.00,       95.0),
+            (200.00,       80.0),
+            (400.00,       75.0),
+            (float("inf"), 65.0),
+        ]
+        area_total = area_pieza * cantidad
+        precio_vol = max(99.0, area_total * _tasa(area_total, tabla))
+
+        # ¿La medida tiene promoción? (acepta giradas: 75×50 = 50×75)
         clave     = (int(base_cm), int(alto_cm))
         clave_inv = (int(alto_cm), int(base_cm))
-        precio_promo = _LONAS_PROMO.get(clave) or _LONAS_PROMO.get(clave_inv)
+        promo_unit = _LONAS_PROMO.get(clave) or _LONAS_PROMO.get(clave_inv)
 
-        if precio_promo is not None:
-            # Precio promo × cantidad (cada pieza al precio fijo)
-            precio = float(precio_promo) * cantidad
+        if promo_unit is not None:
+            precio_promo = float(promo_unit) * cantidad
+            # Le damos lo que MÁS le conviene: el más barato entre promo y volumen.
+            if precio_promo <= precio_vol:
+                precio = precio_promo
+                es_promocion = True
+            else:
+                precio = precio_vol   # en volumen le sale más barato
         else:
-            # Tabla OFICIAL — precio/m² baja al aumentar el área total del pedido.
-            tabla = [
-                (0.49,         99.0),
-                (0.98,         185.0),
-                (2.00,         166.0),
-                (4.00,         150.0),
-                (6.00,         144.0),
-                (9.00,         130.0),
-                (12.00,        125.0),
-                (15.00,        115.0),
-                (100.00,       95.0),
-                (200.00,       80.0),
-                (400.00,       75.0),
-                (float("inf"), 65.0),
-            ]
-            area_total = area_pieza * cantidad
-            precio = max(99.0, area_total * _tasa(area_total, tabla))
+            precio = precio_vol
 
     # ── VINIL IMPRESO ────────────────────────────────────────────────────────
     elif producto == "vinil_impreso":
@@ -245,10 +259,11 @@ def calcular_precio(
         precio *= 1.35
 
     return {
-        "precio":    round(precio, 2),
-        "producto":  producto,
-        "base_cm":   base_cm,
-        "alto_cm":   alto_cm,
-        "cantidad":  cantidad,
-        "expres":    expres,
+        "precio":     round(precio, 2),
+        "producto":   producto,
+        "base_cm":    base_cm,
+        "alto_cm":    alto_cm,
+        "cantidad":   cantidad,
+        "expres":     expres,
+        "promocion":  es_promocion,   # True → dile al cliente que es precio de promoción
     }
