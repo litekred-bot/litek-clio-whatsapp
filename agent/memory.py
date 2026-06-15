@@ -596,6 +596,19 @@ async def estado_crm_por_telefono(telefono: str) -> str:
     return ""
 
 
+async def sucursal_crm_por_telefono(telefono: str) -> str:
+    """Devuelve la sucursal de la tarjeta más reciente del cliente (default 'Campeche')."""
+    sufijo = _sufijo_tel(telefono)
+    async with async_session() as session:
+        result = await session.execute(
+            select(CrmRegistro).order_by(CrmRegistro.creado.desc())
+        )
+        for r in result.scalars().all():
+            if _sufijo_tel(r.telefono) == sufijo:
+                return getattr(r, "sucursal", "") or "Campeche"
+    return "Campeche"
+
+
 async def guardar_calificacion_crm(telefono: str, calificacion: str, comentario: str = "") -> bool:
     """
     Guarda la calificación post-venta (bueno|regular|malo) en la tarjeta del cliente.

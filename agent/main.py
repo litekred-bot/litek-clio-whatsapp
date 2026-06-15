@@ -48,7 +48,7 @@ from agent.memory import (
     marcar_alerta_crm, listar_usuarios_crm, cambiar_password_crm,
     reactivar_cliente_no_contesto, marcar_no_contesto_automatico, marcar_expres_crm,
     guardar_calificacion_crm, guardar_monto_crm, total_vendido_crm, backfill_montos_crm,
-    guardar_sucursal_crm,
+    guardar_sucursal_crm, sucursal_crm_por_telefono,
 )
 from zoneinfo import ZoneInfo as _ZI
 
@@ -92,7 +92,20 @@ from agent.crm import HTML_PANEL, crear_token, verificar_token
 # Número del dueño para recibir copia de cotizaciones de productos que no son lonas
 ADMIN_WHATSAPP = os.getenv("ADMIN_WHATSAPP", "529812710000")
 # Grupo de alertas de Clio (equipo LiTek) — recibe pedidos confirmados, comprobantes y archivos
-ASESOR_WHATSAPP = os.getenv("ASESOR_WHATSAPP", "120363425558631008@g.us")
+ASESOR_WHATSAPP = os.getenv("ASESOR_WHATSAPP", "120363425558631008@g.us")  # Campeche/principal
+# Grupo de alertas de la sucursal CARMEN (Alan, Jadiel, Leo)
+ASESOR_WHATSAPP_CARMEN = os.getenv("ASESOR_WHATSAPP_CARMEN", "120363408250148529@g.us")
+# Mapa sucursal → grupo de alertas
+GRUPO_ALERTA_SUCURSAL = {"Carmen": ASESOR_WHATSAPP_CARMEN}
+
+
+async def _grupo_alerta_de(telefono: str) -> str:
+    """Grupo de WhatsApp al que van las alertas, según la sucursal del cliente."""
+    try:
+        suc = await sucursal_crm_por_telefono(telefono)
+    except Exception:
+        suc = "Campeche"
+    return GRUPO_ALERTA_SUCURSAL.get(suc, ASESOR_WHATSAPP)
 
 load_dotenv()
 
@@ -714,6 +727,10 @@ async def _reenviar_media(destino: str, tipo: str, media_url: str, media_id: str
 async def _procesar_mensaje(msg):
     """Procesa un mensaje en segundo plano (responder rápido evita reintentos de Whapi)."""
     try:
+        # Grupo de alertas según la sucursal del cliente (Carmen → su grupo; resto → Campeche).
+        # Esta variable LOCAL sustituye al grupo global para todas las alertas de este cliente.
+        ASESOR_WHATSAPP = await _grupo_alerta_de(msg.telefono)
+
         # Guardar media y tipo ORIGINALES antes de modificarlos (para reenviar comprobantes)
         media_original = msg.media_url
         tipo_original = msg.tipo
