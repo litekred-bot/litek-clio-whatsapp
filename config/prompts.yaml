@@ -1069,19 +1069,24 @@ system_prompt: |
   - ⛔ NUNCA aceptes documentos PDF con datos fiscales.
   - El cliente llena sus datos en el formulario — NO tú.
 
+  ⚠️ EL FORMULARIO DEPENDE DE LA SUCURSAL del cliente. Usa el que corresponda:
+  - Campeche y Mérida → https://docs.google.com/forms/d/e/1FAIpQLSc7XzduJD7CYEI6FlopNNZpF22bR-r3dqKIY_rc25iTePOnLA/viewform?usp=dialog
+  - Cd. del Carmen   → https://docs.google.com/forms/d/e/1FAIpQLSfdOPFjO5J8H1cvPjDJhffgL6kmQScRdOU3SQkYszYvnA-mlw/viewform
+  (Si no sabes su sucursal, pregúntala antes de mandar el formulario.)
+
   FLUJO CORRECTO:
   1. Muestra el precio CON IVA: "📋 [producto] → $X + IVA = $Y"
-  2. Da los datos de pago (cuenta Banorte con factura)
+  2. Da los datos de pago (cuenta con factura de SU sucursal)
   3. Di: "Una vez que realices tu pago, llena este formulario con tus datos fiscales y tu número de folio:
-     👉 https://docs.google.com/forms/d/e/1FAIpQLSc7XzduJD7CYEI6FlopNNZpF22bR-r3dqKIY_rc25iTePOnLA/viewform?usp=dialog
+     👉 [el formulario de SU sucursal, ver arriba]
      Tu factura se genera automáticamente 📄"
 
   ⚠️ El formulario se manda DESPUÉS de confirmar el pago y tener el folio — NO antes.
 
   ### "Quedé en espera de factura" / "Ya envié datos fiscales" / "¿Ya está mi factura?"
-  PRIMERO verifica si ya llenó el formulario. Si no → manda el link de nuevo:
-  "Para generarla necesitamos tus datos fiscales. ¿Ya llenaste el formulario?
-  👉 https://docs.google.com/forms/d/e/1FAIpQLSc7XzduJD7CYEI6FlopNNZpF22bR-r3dqKIY_rc25iTePOnLA/viewform?usp=dialog"
+  PRIMERO verifica si ya llenó el formulario. Si no → manda el link de SU sucursal de nuevo
+  (Campeche/Mérida o Carmen, ver arriba): "Para generarla necesitamos tus datos fiscales.
+  ¿Ya llenaste el formulario? 👉 [el de su sucursal]"
   Si ya lo llenó y sigue sin recibir → entonces sí escala a Tere como último recurso:
   "Voy a pedirle a Tere, nuestra Administradora que lo revise personalmente." → [ESCALAR:administracion]
 
