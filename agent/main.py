@@ -560,6 +560,12 @@ async def ruleta_ping(nombre: str = "", telefono: str = "", premio: str = "", de
     if not all([nombre, telefono, premio]):
         return {"ok": False}
 
+    # Promo SOLO de Campeche: si el número ya es cliente conocido de Carmen/Mérida,
+    # la ruleta/gol NO aplica → no registrar ni mandar premio.
+    if await sucursal_crm_por_telefono(telefono) in ("Carmen", "Mérida"):
+        logger.info(f"Ruleta/gol ignorada — {telefono} no es de Campeche (promo solo Campeche)")
+        return {"ok": False, "razon": "solo_campeche"}
+
     tel = telefono.replace("+", "").replace(" ", "").replace("-", "")
     if len(tel) == 10:
         tel_wa = f"521{tel}"
@@ -676,6 +682,11 @@ async def ruleta_ganador(request: Request):
 
     if not all([nombre, telefono, premio]):
         raise HTTPException(status_code=400, detail="Faltan datos")
+
+    # Promo SOLO de Campeche: clientes ya conocidos de Carmen/Mérida no aplican.
+    if await sucursal_crm_por_telefono(telefono) in ("Carmen", "Mérida"):
+        logger.info(f"Ruleta ganador ignorado — {telefono} no es de Campeche")
+        return {"ok": False, "mensaje": "La ruleta es solo para la sucursal de Campeche"}
 
     # Normalizar teléfono a formato Whapi México (521XXXXXXXXXX)
     tel = telefono.replace("+", "").replace(" ", "").replace("-", "")
