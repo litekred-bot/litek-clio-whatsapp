@@ -25,25 +25,36 @@
   .stat.venta{background:#e8f5e9}.stat.venta b{color:#2e7d32}
   .stat.venta.hoy{background:#fff8e1}.stat.venta.hoy b{color:#e65100}
   .stat.venta.total{background:#e3f2fd}.stat.venta.total b{color:#1565c0}
-  .filtros{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+  .filtros{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
   .filtros button{background:#fff;border:1px solid #ddd;padding:8px 14px;border-radius:20px;cursor:pointer;font-size:14px}
   .filtros button.activo{background:#e30613;color:#fff;border-color:#e30613}
+  .esp button{border-radius:20px;padding:8px 14px;font-size:14px;cursor:pointer;border:1px solid}
+  .esp .rev{background:#ffe0e0;color:#b71c1c;border-color:#ffb3b3}
+  .esp .exp{background:#fff3e0;color:#e65100;border-color:#ffb74d}
+  .esp .cal{background:#e8f5e9;color:#2e7d32;border-color:#a5d6a7}
+  .esp .fac{background:#fff3e0;color:#e65100;border-color:#ffb74d}
+  .esp .dis{background:#ede7f6;color:#5e35b1;border-color:#b39ddb}
+  .esp button.on{filter:brightness(.82);font-weight:bold}
   .card{background:#fff;border-radius:10px;padding:14px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.05);border-left:4px solid #ccc}
   .card.nuevo{border-left-color:#2196F3}.card.asignado{border-left-color:#FF9800}
   .card.proceso{border-left-color:#9C27B0}.card.vendido{border-left-color:#4CAF50;opacity:.85}
   .card.no_contesto{border-left-color:#555;opacity:.7}
+  .card.alertado{border-left-color:#e30613;background:#fff6f6}
   .card .head{display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:8px}
   .card .nombre{font-weight:bold;font-size:16px}
   .card .tipo{font-size:11px;padding:2px 8px;border-radius:10px;background:#eee;color:#555;text-transform:uppercase}
   .badge{display:inline-block;font-size:11px;font-weight:bold;border-radius:10px;padding:2px 9px;margin-left:6px}
-  .b-exp{background:#ff9800;color:#fff}.b-suc{background:#ECECEC;color:#444}
+  .b-exp{background:#ff9800;color:#fff}.b-suc{background:#ECECEC;color:#444}.b-dis{background:#ede7f6;color:#5e35b1}
   .b-bueno{background:#e8f5e9;color:#2e7d32}.b-regular{background:#fff8e1;color:#f57f17}.b-malo{background:#ffebee;color:#c62828}
   .b-fact-pend{background:#fff3e0;color:#e65100}.b-fact-ok{background:#e8f5e9;color:#2e7d32}
+  .alerta{background:#ffe0e0;color:#b71c1c;border-radius:8px;padding:7px 10px;margin:8px 0;font-size:13px;font-weight:bold}
   .desc{color:#444;font-size:14px;margin:8px 0}
   .meta{font-size:12px;color:#999}
   .acciones{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center}
   .acciones select,.acciones input{padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px}
   .acciones .nota{flex:1;min-width:120px}
+  .bexp{background:#fff3e0;color:#e65100;border:1px solid #ffb74d;border-radius:6px;padding:6px 10px;font-size:13px;cursor:pointer}
+  .bdis{background:#ede7f6;color:#5e35b1;border:1px solid #b39ddb;border-radius:6px;padding:6px 10px;font-size:13px;cursor:pointer}
   .wa{background:#25D366;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:13px;cursor:pointer}
   .copia{background:#eef;color:#334;border:1px solid #ccd;padding:6px 12px;border-radius:6px;font-size:13px;cursor:pointer}
 </style></head><body>
@@ -67,36 +78,57 @@
     <button data-e="vendido">✅ Vendidos</button>
     <button data-e="no_contesto">⚫ No contestó</button>
   </div>
+  <div class="filtros" id="ftipo">
+    <button data-t="" class="activo">Todos los tipos</button>
+    <button data-t="escalacion">Escalaciones</button>
+    <button data-t="pedido">Pedidos</button>
+    <button data-t="cliente">Clientes nuevos</button>
+    <button data-t="ruleta">Ruleta</button>
+  </div>
+  <div class="filtros esp" id="fesp">
+    <button class="rev" data-x="rev">⚠️ Solo a revisar</button>
+    <button class="exp" data-x="exp">⚡ Solo exprés</button>
+    <button class="cal" data-x="cal">⭐ Calificaciones</button>
+    <button class="fac" data-x="fac">🧾 Por facturar</button>
+    <button class="dis" data-x="dis">🎨 Solo diseño</button>
+  </div>
   <div id="lista"></div>
 </div>
 <script>
 var DATOS = [
-  {nombre:"María González", tel:"9990001122", tipo:"pedido", estado:"proceso", sucursal:"Campeche", desc:"Lona 200×100 cm — pago confirmado", monto:332, factura:true, facturado:false, calif:"", expres:false, fecha:"16/06/2026"},
-  {nombre:"Restaurante El Faro", tipo:"escalacion", estado:"asignado", sucursal:"Carmen", desc:"Letrero 3D iluminado — diseño", monto:0, factura:false, facturado:false, calif:"", expres:true, fecha:"16/06/2026", asesor:"Jadiel"},
-  {nombre:"Juan Pérez", tipo:"cliente", estado:"nuevo", sucursal:"Campeche", desc:"Cliente nuevo: precio de vinil", monto:0, factura:false, facturado:false, calif:"", expres:false, fecha:"16/06/2026"},
-  {nombre:"Ana López", tipo:"pedido", estado:"vendido", sucursal:"Campeche", desc:"100 tarjetas + 2 lonas — entregado", monto:880, factura:true, facturado:true, calif:"bueno", expres:false, fecha:"15/06/2026"},
-  {nombre:"Carlos Ramírez", tipo:"ruleta", estado:"asignado", sucursal:"Carmen", desc:"🎁 Ganó en el gol: lona a $39", monto:0, factura:false, facturado:false, calif:"", expres:false, fecha:"15/06/2026", asesor:"Alan"},
-  {nombre:"Sofía Martín", tipo:"pedido", estado:"vendido", sucursal:"Mérida", desc:"Vinil sobre coroplast — entregado", monto:1240, factura:false, facturado:false, calif:"regular", expres:false, fecha:"14/06/2026"},
-  {nombre:"Pedro Sánchez", tipo:"cliente", estado:"no_contesto", sucursal:"Campeche", desc:"Cotizó playeras, no respondió", monto:0, factura:false, facturado:false, calif:"", expres:false, fecha:"12/06/2026"},
-  {nombre:"Laura Díaz", tipo:"pedido", estado:"proceso", sucursal:"Carmen", desc:"Lona 150×100 con factura", monto:264, factura:true, facturado:true, calif:"", expres:true, fecha:"16/06/2026", asesor:"Jadiel"},
+  {nombre:"María González", tel:"9990001122", tipo:"pedido", estado:"proceso", sucursal:"Campeche", desc:"Lona 200×100 cm — pago confirmado", monto:332, factura:true, facturado:false, calif:"", expres:false, diseno:false, alerta:"", fecha:"16/06/2026"},
+  {nombre:"Restaurante El Faro", tel:"9381234567", tipo:"escalacion", estado:"asignado", sucursal:"Carmen", desc:"Letrero 3D iluminado — diseño", monto:0, factura:false, facturado:false, calif:"", expres:true, diseno:true, alerta:"", fecha:"16/06/2026", asesor:"Jadiel"},
+  {nombre:"Juan Pérez", tel:"9818887766", tipo:"cliente", estado:"nuevo", sucursal:"Campeche", desc:"Cliente nuevo: precio de vinil", monto:0, factura:false, facturado:false, calif:"", expres:false, diseno:false, alerta:"", fecha:"16/06/2026"},
+  {nombre:"Ana López", tel:"9811112233", tipo:"pedido", estado:"vendido", sucursal:"Campeche", desc:"100 tarjetas + 2 lonas — entregado", monto:880, factura:true, facturado:true, calif:"bueno", expres:false, diseno:false, alerta:"", fecha:"15/06/2026"},
+  {nombre:"Carlos Ramírez", tel:"9389998877", tipo:"ruleta", estado:"asignado", sucursal:"Carmen", desc:"🎁 Ganó en el gol: lona a $39", monto:0, factura:false, facturado:false, calif:"", expres:false, diseno:false, alerta:"", fecha:"15/06/2026", asesor:"Alan"},
+  {nombre:"Sofía Martín", tel:"9991234567", tipo:"pedido", estado:"vendido", sucursal:"Mérida", desc:"Vinil sobre coroplast — entregado", monto:1240, factura:false, facturado:false, calif:"regular", expres:false, diseno:false, alerta:"Queja: calificó REGULAR — tardó", fecha:"14/06/2026"},
+  {nombre:"Pedro Sánchez", tel:"9817776655", tipo:"cliente", estado:"no_contesto", sucursal:"Campeche", desc:"Cotizó playeras, no respondió", monto:0, factura:false, facturado:false, calif:"", expres:false, diseno:false, alerta:"", fecha:"12/06/2026"},
+  {nombre:"Laura Díaz", tel:"9385554433", tipo:"pedido", estado:"proceso", sucursal:"Carmen", desc:"Lona 150×100 con factura — diseño", monto:264, factura:true, facturado:true, calif:"", expres:true, diseno:true, alerta:"", fecha:"16/06/2026", asesor:"Jadiel"},
+  {nombre:"Gráfica Sol", tel:"9812223344", tipo:"escalacion", estado:"asignado", sucursal:"Campeche", desc:"Letrero acrílico — diseño y medidas", monto:0, factura:false, facturado:false, calif:"", expres:false, diseno:true, alerta:"", fecha:"15/06/2026", asesor:"Brayan"},
 ];
 var ASES = ["","Anna","Brayan","Tere","Alan","Jadiel"];
 var ESTADOS={nuevo:"🔵 Nuevo",asignado:"🟠 Asignado",proceso:"🟣 En proceso",vendido:"✅ Vendido",no_contesto:"⚫ No contestó"};
 var TIPOS={cliente:"Cliente",pedido:"Pedido",escalacion:"Escalación",ruleta:"Ruleta"};
-var fSuc="", fEstado="";
+var fSuc="", fEstado="", fTipo="", esp={rev:false,exp:false,cal:false,fac:false,dis:false};
 function asesorDe(r){ if(r.asesor)return r.asesor; if(r.sucursal==="Carmen")return "Alan"; return r.tipo==="escalacion"?"Brayan":"Anna"; }
-document.querySelectorAll("#suc button").forEach(function(b){b.onclick=function(){document.querySelectorAll("#suc button").forEach(x=>x.classList.remove("activo"));b.classList.add("activo");fSuc=b.dataset.s;render();};});
-document.querySelectorAll("#festado button").forEach(function(b){b.onclick=function(){document.querySelectorAll("#festado button").forEach(x=>x.classList.remove("activo"));b.classList.add("activo");fEstado=b.dataset.e;render();};});
+function wireGrupo(sel,attr,setFn){document.querySelectorAll(sel+" button").forEach(function(b){b.onclick=function(){document.querySelectorAll(sel+" button").forEach(x=>x.classList.remove("activo"));b.classList.add("activo");setFn(b.dataset[attr]);render();};});}
+wireGrupo("#suc","s",v=>fSuc=v); wireGrupo("#festado","e",v=>fEstado=v); wireGrupo("#ftipo","t",v=>fTipo=v);
+document.querySelectorAll("#fesp button").forEach(function(b){b.onclick=function(){var k=b.dataset.x;esp[k]=!esp[k];b.classList.toggle("on",esp[k]);render();};});
 function fmt(n){return "$"+Math.round(n).toLocaleString("es-MX");}
 function render(){
   var q=(document.getElementById("buscar").value||"").toLowerCase();
   var regs=DATOS.filter(function(r){
     if(fSuc && r.sucursal!==fSuc)return false;
     if(fEstado && r.estado!==fEstado)return false;
+    if(fTipo && r.tipo!==fTipo)return false;
+    if(esp.rev && !r.alerta)return false;
+    if(esp.exp && !r.expres)return false;
+    if(esp.cal && !r.calif)return false;
+    if(esp.fac && !(r.factura&&!r.facturado))return false;
+    if(esp.dis && !r.diseno)return false;
     if(q && r.nombre.toLowerCase().indexOf(q)===-1)return false;
     return true;
   });
-  // stats (sobre el filtro de sucursal, no de estado)
   var base=DATOS.filter(r=>!fSuc||r.sucursal===fSuc);
   var st={nuevo:0,asignado:0,proceso:0,vendido:0,no_contesto:0}, hoy=0, mes=0, total=0;
   base.forEach(function(r){st[r.estado]++; if(r.estado==="proceso"||r.estado==="vendido"){total+=r.monto; mes+=r.monto; if(r.fecha==="16/06/2026")hoy+=r.monto;}});
@@ -109,12 +141,9 @@ function render(){
     '<div class="stat venta hoy"><b>'+fmt(hoy)+'</b><span>☀️ Vendido hoy</span></div>'+
     '<div class="stat venta"><b>'+fmt(mes)+'</b><span>💰 Vendido · Jun 2026</span></div>'+
     '<div class="stat venta total"><b>'+fmt(total)+'</b><span>🏆 Total acumulado</span></div>';
-  // carga
-  var c={Anna:0,Brayan:0,Tere:0,Alan:0,Jadiel:0};
-  base.forEach(r=>{ if(r.estado!=="vendido"&&r.estado!=="no_contesto") c[asesorDe(r)]=(c[asesorDe(r)]||0)+1; });
+  var c={}; base.forEach(r=>{ if(r.estado!=="vendido"&&r.estado!=="no_contesto"){var a=asesorDe(r);c[a]=(c[a]||0)+1;} });
   var aseShow = fSuc==="Carmen"?["Alan","Jadiel"]:(fSuc==="Campeche"?["Anna","Brayan","Tere"]:["Anna","Brayan","Tere","Alan","Jadiel"]);
   document.getElementById("carga").innerHTML='<div class="titulo">Clientes por atender (pendientes):</div>'+aseShow.map(a=>'<span class="a">'+a+' <b>'+(c[a]||0)+'</b></span>').join("");
-  // tarjetas
   var CAL={bueno:'😀 Bueno',regular:'😐 Regular',malo:'😞 Malo'};
   document.getElementById("lista").innerHTML = regs.length? regs.map(function(r){
     var num=r.tel?r.tel.replace(/(\d{3})(\d{3})(\d{4})/,"$1 $2 $3"):"—";
@@ -122,13 +151,17 @@ function render(){
     var badges=(r.expres?'<span class="badge b-exp">⚡ EXPRÉS</span>':'')+
       (r.calif?'<span class="badge b-'+r.calif+'">'+CAL[r.calif]+'</span>':'')+
       '<span class="badge b-suc">🏢 '+r.sucursal+'</span>'+
+      (r.diseno?'<span class="badge b-dis">🎨 Diseño</span>':'')+
       (r.factura?(r.facturado?'<span class="badge b-fact-ok">✅ Facturado</span>':'<span class="badge b-fact-pend">🧾 Por facturar</span>'):'');
-    return '<div class="card '+r.estado+'"><div class="head"><span class="nombre">'+r.nombre+badges+'</span>'+
-      '<span class="tipo">'+(TIPOS[r.tipo]||r.tipo)+'</span></div>'+
+    var alertaHtml=r.alerta?'<div class="alerta">⚠️ '+r.alerta+'</div>':'';
+    return '<div class="card '+r.estado+(r.alerta?' alertado':'')+'"><div class="head"><span class="nombre">'+r.nombre+badges+'</span>'+
+      '<span class="tipo">'+(TIPOS[r.tipo]||r.tipo)+'</span></div>'+alertaHtml+
       '<div class="desc">'+r.desc+'</div><div class="meta">📅 '+r.fecha+'</div>'+
       '<div class="acciones">'+
         '<select>'+Object.keys(ESTADOS).map(e=>'<option'+(e===r.estado?' selected':'')+'>'+ESTADOS[e]+'</option>').join("")+'</select>'+
         '<select>'+ASES.map(a=>'<option'+(a===ase?' selected':'')+'>'+(a||'— Asignar —')+'</option>').join("")+'</select>'+
+        '<button class="bexp">⚡ Exprés</button>'+
+        '<button class="bdis">🎨 Diseño</button>'+
         '<input class="nota" placeholder="Nota...">'+
         '<button class="copia">📋 '+num+'</button>'+
         '<button class="wa">💬 Mandar</button>'+
