@@ -292,6 +292,16 @@ async def crm_panel():
     return HTMLResponse(HTML_PANEL)
 
 
+@app.get("/demo")
+async def crm_demo():
+    """Espejo del CRM con datos de EJEMPLO (sin info real) — para mostrar/compartir."""
+    try:
+        with open("web/crm_demo.html", "r", encoding="utf-8") as f:
+            return HTMLResponse(f.read())
+    except Exception:
+        return HTMLResponse("<h1>Demo no disponible</h1>", status_code=404)
+
+
 @app.post("/crm/login")
 async def crm_login(request: Request):
     """Autenticación del CRM. Retorna token de sesión."""
