@@ -49,6 +49,7 @@ from agent.memory import (
     reactivar_cliente_no_contesto, marcar_no_contesto_automatico, marcar_expres_crm,
     guardar_calificacion_crm, guardar_monto_crm, total_vendido_crm, backfill_montos_crm,
     guardar_sucursal_crm, sucursal_crm_por_telefono, marcar_factura_crm, forzar_asesor_crm,
+    canalizar_diseno_brayan, marcar_diseno_crm,
 )
 from zoneinfo import ZoneInfo as _ZI
 
@@ -528,6 +529,7 @@ async def crm_actualizar(registro_id: int, request: Request):
         sucursal=data.get("sucursal"),
         factura=data.get("factura"),
         facturado=data.get("facturado"),
+        diseno=data.get("diseno"),
     )
     return {"ok": ok}
 
@@ -890,8 +892,18 @@ async def _procesar_mensaje(msg):
             except Exception as e:
                 logger.error(f"Error marcando exprés CRM: {e}")
 
+        # Detectar [DISENO] — el pedido incluye que NOSOTROS hagamos/modifiquemos el
+        # diseño (no trae arte listo). Marca 🎨 en la tarjeta para que el equipo lo
+        # identifique; al confirmarse el pago, si es de Carmen, pasa a Brayan (ver pago).
+        if "[DISENO]" in respuesta:
+            respuesta = respuesta.replace("[DISENO]", "").strip()
+            try:
+                await marcar_diseno_crm(msg.telefono, True)
+            except Exception as e:
+                logger.error(f"Error marcando diseño CRM: {e}")
+
         # Detectar [SUCURSAL:Campeche|Mérida|Carmen] — la sucursal del cliente.
-        # En Carmen, además asigna por TURNOS (Alan/Jadiel).
+        # En Carmen, además asigna a Jadiel (dueño por defecto del equipo Carmen).
         match_suc = re.search(r'\[SUCURSAL:\s*([^\]]+)\]', respuesta, re.IGNORECASE)
         if match_suc:
             respuesta = re.sub(r'\[SUCURSAL:[^\]]*\]', '', respuesta, flags=re.IGNORECASE).strip()
@@ -1101,6 +1113,15 @@ async def _procesar_mensaje(msg):
                     await marcar_factura_crm(numero_limpio)
             except Exception as e:
                 logger.error(f"Error registrando pedido en CRM: {e}")
+
+            # Carmen: pedido PAGADO marcado con diseño (🎨) → pasa a Brayan (diseño).
+            # La tarjeta se mueve al módulo de Campeche; Brayan la regresa a Carmen al
+            # terminar. canalizar_diseno_brayan solo actúa si la tarjeta es diseño + Carmen.
+            try:
+                if await canalizar_diseno_brayan(numero_limpio):
+                    logger.info(f"Pedido pagado con diseño (Carmen) → Brayan: {numero_limpio}")
+            except Exception as e:
+                logger.error(f"Error canalizando diseño a Brayan: {e}")
             msg_asesor = (
                 f"✅ *PEDIDO CONFIRMADO — CLIO*\n\n"
                 f"👤 *Cliente:* {nombre_cli}\n"

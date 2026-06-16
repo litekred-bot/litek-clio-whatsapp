@@ -65,6 +65,7 @@ class CrmRegistro(Base):
     sucursal: Mapped[str] = mapped_column(String(30), default="Campeche", index=True)  # Campeche|Mérida|Carmen
     alerta: Mapped[str] = mapped_column(String(200), default="")  # motivo a revisar (⚠️) o vacío
     expres: Mapped[bool] = mapped_column(Boolean, default=False)  # ⚡ pedido exprés (prioritario)
+    diseno: Mapped[bool] = mapped_column(Boolean, default=False)  # 🎨 lleva diseño nuestro
     calificacion: Mapped[str] = mapped_column(String(20), default="")  # bueno|regular|malo (post-venta)
     factura: Mapped[bool] = mapped_column(Boolean, default=False)     # 🧾 el cliente pidió factura
     facturado: Mapped[bool] = mapped_column(Boolean, default=False)   # ✅ ya se hizo la factura
@@ -112,6 +113,7 @@ async def inicializar_db():
         "ALTER TABLE crm_registros ADD COLUMN sucursal VARCHAR(30) DEFAULT 'Campeche'",
         "ALTER TABLE crm_registros ADD COLUMN factura BOOLEAN DEFAULT false",
         "ALTER TABLE crm_registros ADD COLUMN facturado BOOLEAN DEFAULT false",
+        "ALTER TABLE crm_registros ADD COLUMN diseno BOOLEAN DEFAULT false",
         # 'cerrado' viejo = venta concretada → renombrar a 'vendido'
         "UPDATE crm_registros SET estado='vendido' WHERE estado='cerrado'",
     ]
@@ -488,6 +490,7 @@ async def listar_crm(estado: str = "", tipo: str = "", asesor: str = "", sucursa
             "sucursal": getattr(r, "sucursal", "") or "Campeche",
             "alerta": getattr(r, "alerta", "") or "",
             "expres": bool(getattr(r, "expres", False)),
+            "diseno": bool(getattr(r, "diseno", False)),
             "calificacion": getattr(r, "calificacion", "") or "",
             "factura": bool(getattr(r, "factura", False)),
             "facturado": bool(getattr(r, "facturado", False)),
@@ -534,6 +537,25 @@ async def marcar_expres_crm(telefono: str, valor: bool = True) -> bool:
     return False
 
 
+async def marcar_diseno_crm(telefono: str, valor: bool = True) -> bool:
+    """Prende/apaga el 🎨 diseño en la tarjeta del cliente (la más reciente no cerrada).
+    Clio lo prende con [DISENO] para que el equipo identifique los pedidos con diseño nuestro."""
+    sufijo = _sufijo_tel(telefono)
+    async with async_session() as session:
+        result = await session.execute(
+            select(CrmRegistro)
+            .where(CrmRegistro.estado.not_in(ESTADOS_FINALES))
+            .order_by(CrmRegistro.creado.desc())
+        )
+        for r in result.scalars().all():
+            if _sufijo_tel(r.telefono) == sufijo:
+                r.diseno = valor
+                r.actualizado = datetime.utcnow()
+                await session.commit()
+                return True
+    return False
+
+
 async def telefono_conversacion(telefono: str) -> str:
     """
     Devuelve el identificador EXACTO con el que se guarda la conversación de este
@@ -554,25 +576,19 @@ async def telefono_conversacion(telefono: str) -> str:
     return telefono
 
 
-async def _asesor_carmen_turno(session) -> str:
-    """Reparto por TURNOS en Carmen: el de menor carga entre Alan y Jadiel (empate → Alan)."""
-    counts = {}
-    for a in ("Alan", "Jadiel"):
-        res = await session.execute(
-            select(func.count(CrmRegistro.id)).where(
-                CrmRegistro.asesor == a,
-                CrmRegistro.sucursal == "Carmen",
-                CrmRegistro.estado.not_in(ESTADOS_FINALES),
-            )
-        )
-        counts[a] = res.scalar_one() or 0
-    return "Alan" if counts["Alan"] <= counts["Jadiel"] else "Jadiel"
+async def _asesor_carmen_default(session=None) -> str:
+    """Dueño por defecto en Carmen: SIEMPRE Jadiel.
+    Jadiel cotiza y cierra la venta (aunque después se pague, se queda con él).
+    Alan (producción) y Brayan (diseño) reciben las tarjetas DESPUÉS: Brayan por la
+    regla automática de pago+diseño (canalizar_diseno_brayan), y Alan a mano cuando
+    Brayan/el equipo la pasan a producción."""
+    return "Jadiel"
 
 
 async def guardar_sucursal_crm(telefono: str, sucursal: str) -> bool:
     """
-    Marca la sucursal en la tarjeta abierta del cliente. Si es Carmen, asigna
-    por TURNOS (Alan/Jadiel) sin importar el producto (si aún no tiene dueño de Carmen).
+    Marca la sucursal en la tarjeta abierta del cliente. Si es Carmen, la asigna
+    a Jadiel (dueño por defecto de Carmen) si aún no tiene dueño de ese equipo.
 
     🔒 Una sucursal EXPLÍCITA ya fijada (Carmen o Mérida) NO se sobrescribe por una
     etiqueta automática distinta. Clio a veces re-emite [SUCURSAL:Campeche] (el default)
@@ -602,9 +618,37 @@ async def guardar_sucursal_crm(telefono: str, sucursal: str) -> bool:
                     return False
                 r.sucursal = sucursal
                 if sucursal == "Carmen" and r.asesor not in ("Alan", "Jadiel"):
-                    r.asesor = await _asesor_carmen_turno(session)
+                    r.asesor = await _asesor_carmen_default(session)
                     if r.estado == "nuevo":
                         r.estado = "asignado"
+                r.actualizado = datetime.utcnow()
+                await session.commit()
+                return True
+    return False
+
+
+async def canalizar_diseno_brayan(telefono: str) -> bool:
+    """
+    Pedido PAGADO con diseño (🎨) en Carmen → lo lleva Brayan (especialista de diseño).
+    La tarjeta se mueve al módulo de Campeche (donde Brayan trabaja). Brayan, al
+    terminar el diseño, la regresa a Carmen a mano (cambia sucursal + asesor en el panel).
+
+    Solo actúa si la tarjeta está marcada como diseño Y es de Carmen; si no, no hace nada.
+    Se llama al confirmarse el pago.
+    """
+    sufijo = _sufijo_tel(telefono)
+    async with async_session() as session:
+        result = await session.execute(
+            select(CrmRegistro)
+            .where(CrmRegistro.estado.not_in(ESTADOS_FINALES))
+            .order_by(CrmRegistro.creado.desc())
+        )
+        for r in result.scalars().all():
+            if _sufijo_tel(r.telefono) == sufijo:
+                if not getattr(r, "diseno", False) or getattr(r, "sucursal", "") != "Carmen":
+                    return False
+                r.asesor = "Brayan"
+                r.sucursal = "Campeche"
                 r.actualizado = datetime.utcnow()
                 await session.commit()
                 return True
@@ -763,8 +807,9 @@ async def marcar_no_contesto_automatico(dias: int = 2) -> int:
 async def actualizar_crm(registro_id: int, estado: str = None, asesor: str = None,
                          notas: str = None, alerta: str = None, expres: bool = None,
                          monto: float = None, sucursal: str = None,
-                         factura: bool = None, facturado: bool = None) -> bool:
-    """Actualiza estado, asesor, notas, alerta, exprés, monto, sucursal o factura de un registro."""
+                         factura: bool = None, facturado: bool = None,
+                         diseno: bool = None) -> bool:
+    """Actualiza estado, asesor, notas, alerta, exprés, diseño, monto, sucursal o factura de un registro."""
     async with async_session() as session:
         resultado = await session.execute(
             select(CrmRegistro).where(CrmRegistro.id == registro_id)
@@ -782,6 +827,8 @@ async def actualizar_crm(registro_id: int, estado: str = None, asesor: str = Non
             r.alerta = alerta
         if expres is not None:
             r.expres = expres
+        if diseno is not None:
+            r.diseno = diseno
         if monto is not None:
             try:
                 r.monto = float(monto)
@@ -793,7 +840,7 @@ async def actualizar_crm(registro_id: int, estado: str = None, asesor: str = Non
             # (sale de Anna/Brayan y entra al equipo de Carmen). Salvo que en el mismo
             # cambio ya hayan elegido un asesor a mano.
             if sucursal == "Carmen" and asesor is None and r.asesor not in ("Alan", "Jadiel"):
-                r.asesor = await _asesor_carmen_turno(session)
+                r.asesor = await _asesor_carmen_default(session)
                 if r.estado == "nuevo":
                     r.estado = "asignado"
         if factura is not None:
@@ -1088,7 +1135,8 @@ async def registrar_o_actualizar_crm(
         if nombre and existente.nombre.strip().lower() in ("", "cliente", "cliente nuevo"):
             existente.nombre = nombre
         # Asesor: solo el explícito reasigna; asesor_si_nuevo respeta al dueño actual.
-        # EXCEPCIÓN Carmen: el dueño es por TURNOS (Alan/Jadiel) y NO se reasigna por producto.
+        # EXCEPCIÓN Carmen: el dueño del equipo Carmen (Jadiel default, o Alan en producción)
+        # NO se reasigna por producto.
         carmen_fijo = (getattr(existente, "sucursal", "") == "Carmen"
                        and existente.asesor in ("Alan", "Jadiel"))
         if asesor and not carmen_fijo:
