@@ -6,15 +6,15 @@ add_action('wp_footer', function() {
   if(location.pathname.indexOf("ruleta")===-1 && location.hash.indexOf("popup")===-1) return;
 
   var premios=[
-    {n:"Servicio express",d:"Servicio exprés sin costo extra. Aplica con cualquier compra."},
-    {n:"Lona gratis 75x75",d:"Una lona 75x75 cm gratis con tu próxima compra."},
+    {n:"Servicio express",d:"Servicio expr\u00e9s sin costo extra. Aplica con cualquier compra."},
+    {n:"Lona gratis 75x75",d:"Una lona 75x75 cm gratis con tu pr\u00f3xima compra."},
     {n:"Mitad de costo",d:"Segunda lona a mitad de precio. Aplica con compra."},
     {n:"20 stickers gratis",d:"20 stickers gratis con cualquier compra."},
     {n:"1 lona gratis 75x50",d:"Una lona 75x50 cm GRATIS. Sin compra necesaria."},
     {n:"Descuento lona",d:"Descuento precio red en lona o vinil. Aplica con compra."},
     {n:"Descuento volumen",d:"Descuento por volumen en lona o vinil. Aplica con compra."},
-    {n:"24 tarjetas",d:"24 tarjetas de presentación gratis con cualquier compra."},
-    {n:"Diseno gratis",d:"Diseño gratis con tu pedido. Aplica con compra."}
+    {n:"24 tarjetas",d:"24 tarjetas de presentaci\u00f3n gratis con cualquier compra."},
+    {n:"Diseno gratis",d:"Dise\u00f1o gratis con tu pedido. Aplica con compra."}
   ];
   var nombre="",telefono="",startAngle=0,arc=Math.PI*2/premios.length,ctx,girando=false;
   var COLORES=["#e30613","#0d3b80","#00897b","#c2185b","#f57c00","#3949ab","#43a047","#8e24aa","#d35400"];
@@ -48,31 +48,31 @@ add_action('wp_footer', function() {
       +'</style>'
       +'<div id="lk-card">'
       + '<span id="lk-x">&times;</span>'
-      + '<div id="lk-hd"><h2>🎡 ¡GANA UN PREMIO!</h2><p>🎁 Gira y llévate tu descuento · LiTek</p></div>'
+      + '<div id="lk-hd"><h2>\ud83c\udfa1 \u00a1GANA UN PREMIO!</h2><p>\ud83c\udf81 Gira y ll\u00e9vate tu descuento \u00b7 LiTek</p></div>'
       + '<div id="lk-form">'
-      +   '<p style="color:#555;font-size:15px;margin:2px 0 6px;">Déjanos tus datos y gira la ruleta 👇</p>'
+      +   '<p style="color:#555;font-size:15px;margin:2px 0 6px;">D\u00e9janos tus datos y gira la ruleta \ud83d\udc47</p>'
       +   '<input id="lk-nom" placeholder="Tu nombre" autocomplete="name">'
-      +   '<input id="lk-tel" type="tel" inputmode="numeric" placeholder="Tu WhatsApp (10 dígitos)" autocomplete="tel">'
-      +   '<button id="lk-bd" class="lk-btn">Obtén tu descuento 🎁</button>'
-      +   '<div class="lk-nota">1 giro por persona · 📍 Aplica solo en sucursal <b>Campeche</b></div>'
+      +   '<input id="lk-tel" type="tel" inputmode="numeric" placeholder="Tu WhatsApp (10 d\u00edgitos)" autocomplete="tel">'
+      +   '<button id="lk-bd" class="lk-btn">Obt\u00e9n tu descuento \ud83c\udf81</button>'
+      +   '<div class="lk-nota">1 giro por persona \u00b7 \ud83d\udccd Aplica solo en sucursal <b>Campeche</b></div>'
       + '</div>'
-      + '<div id="lk-rul" style="display:none;"><h2 style="color:#e30613;margin:2px 0 10px;font-size:20px;">¡Gira la ruleta!</h2>'
+      + '<div id="lk-rul" style="display:none;"><h2 style="color:#e30613;margin:2px 0 10px;font-size:20px;">\u00a1Gira la ruleta!</h2>'
       +   '<canvas id="lk-cv" width="360" height="360"></canvas>'
-      +   '<button id="lk-bg" class="lk-btn">GIRAR 🎯</button></div>'
+      +   '<button id="lk-bg" class="lk-btn">GIRAR \ud83c\udfaf</button></div>'
       + '<div id="lk-res" style="display:none;">'
-      +   '<h2 id="lk-feli" style="color:#e30613;margin:2px 0;">🎉 ¡Felicidades!</h2>'
+      +   '<h2 id="lk-feli" style="color:#e30613;margin:2px 0;">\ud83c\udf89 \u00a1Felicidades!</h2>'
       +   '<p style="color:#555;margin:4px;">Ganaste:</p>'
       +   '<p id="lk-pn" style="font-size:24px;color:#e30613;font-weight:900;margin:6px;"></p>'
       +   '<p id="lk-pd" style="color:#555;font-size:15px;margin:8px;"></p>'
       +   '<div class="lk-cup">'
-      +     '<p style="margin:3px;font-size:13px;color:#888;">CUPÓN</p>'
+      +     '<p style="margin:3px;font-size:13px;color:#888;">CUP\u00d3N</p>'
       +     '<p style="margin:3px;font-size:18px;font-weight:bold;color:#222;" id="lk-folio"></p>'
-      +     '<p style="margin:3px;font-size:13px;color:#888;">Válido hasta: <b id="lk-vence"></b></p>'
-      +     '<p style="margin:7px 3px 0;font-size:12px;color:#e30613;font-weight:700;">📍 Aplica solo en sucursal Campeche</p>'
+      +     '<p style="margin:3px;font-size:13px;color:#888;">V\u00e1lido hasta: <b id="lk-vence"></b></p>'
+      +     '<p style="margin:7px 3px 0;font-size:12px;color:#e30613;font-weight:700;">\ud83d\udccd Aplica solo en sucursal Campeche</p>'
       +   '</div>'
-      +   '<p style="color:#555;font-size:14px;">📲 Te enviamos los detalles por WhatsApp. Presenta este cupón en tienda o por WhatsApp para canjearlo.</p></div>'
-      + '<div id="lk-ya" style="display:none;"><h2 style="color:#e30613;">😊 Ya participaste</h2>'
-      +   '<p style="color:#555;">Este número ya jugó. ¡Solo se puede una vez!</p></div>'
+      +   '<p style="color:#555;font-size:14px;">\ud83d\udcf2 Te enviamos los detalles por WhatsApp. Presenta este cup\u00f3n en tienda o por WhatsApp para canjearlo.</p></div>'
+      + '<div id="lk-ya" style="display:none;"><h2 style="color:#e30613;">\ud83d\ude0a Ya participaste</h2>'
+      +   '<p style="color:#555;">Este n\u00famero ya jug\u00f3. \u00a1Solo se puede una vez!</p></div>'
       +'</div>';
     document.body.appendChild(ov);
     document.getElementById("lk-bd").addEventListener("click",enviarDatos);
@@ -107,7 +107,7 @@ add_action('wp_footer', function() {
     var pr=premios[idx], folio=genFolio(), vence=fechaVence();
     document.getElementById("lk-rul").style.display="none";
     document.getElementById("lk-res").style.display="block";
-    document.getElementById("lk-feli").textContent="🎉 ¡Felicidades, "+nombre+"!";
+    document.getElementById("lk-feli").textContent="\ud83c\udf89 \u00a1Felicidades, "+nombre+"!";
     document.getElementById("lk-pn").textContent=pr.n;
     document.getElementById("lk-pd").textContent=pr.d;
     document.getElementById("lk-folio").textContent=folio;
@@ -119,14 +119,14 @@ add_action('wp_footer', function() {
   async function enviarDatos(){
     nombre=document.getElementById("lk-nom").value.trim();
     telefono=document.getElementById("lk-tel").value.trim().replace(/\D/g,"");
-    if(!nombre||telefono.length<10){alert("Pon tu nombre y WhatsApp de 10 dígitos");return;}
+    if(!nombre||telefono.length<10){alert("Pon tu nombre y WhatsApp de 10 d\u00edgitos");return;}
     try{var r=await fetch(API+"/ruleta/verificar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({telefono:telefono})});
       var d=await r.json();
       if(d.ya_jugo){
         document.getElementById("lk-form").style.display="none";
         document.getElementById("lk-ya").style.display="block";
         var dias=d.dias_faltantes||1;
-        document.querySelector("#lk-ya p").textContent="Ya jugaste hace poco. Podrás volver a participar en "+dias+" día"+(dias>1?"s":"")+". ¡Te esperamos!";
+        document.querySelector("#lk-ya p").textContent="Ya jugaste hace poco. Podr\u00e1s volver a participar en "+dias+" d\u00eda"+(dias>1?"s":"")+". \u00a1Te esperamos!";
         return;
       }
     }catch(e){}
