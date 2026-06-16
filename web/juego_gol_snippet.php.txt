@@ -85,7 +85,7 @@ add_action('wp_footer', function () {
       +       '<input id="lg-nombre" placeholder="Tu nombre" autocomplete="name">'
       +       '<input id="lg-tel" placeholder="Tu WhatsApp (10 d\u00edgitos)" inputmode="numeric" autocomplete="tel">'
       +       '<button id="lg-btn">\u26bd \u00a1PATEAR!</button>'
-      +       '<div id="lg-nota">1 tiro por persona \u00b7 \u00a1descubre tu premio!</div>'
+      +       '<div id="lg-nota">1 tiro por persona \u00b7 \u00a1descubre tu premio!<br>\ud83d\udccd Aplica solo en sucursal <b>Campeche</b></div>'
       +     '</div>'
       +   '</div>'
       +   '<div id="lg-result"></div>'
@@ -168,7 +168,7 @@ add_action('wp_footer', function () {
             + '<p style="color:#777;font-size:13px;">Ya tienes tu premio guardado.' + (dias ? ' Podr\u00e1s volver a jugar en ' + dias + ' d\u00edas.' : '') + '</p>'
           : '<div class="gol">\u00a1GOOOOL! \ud83c\udf89\u26bd</div><div class="pr">Ganaste: ' + esc(premio.nombre) + '</div>')
         + '<div class="cup"><div style="font-weight:800;">\ud83c\udf81 ' + esc(premio.desc) + '</div>'
-        + '<div class="folio">Folio: <b>' + folio + '</b><br>V\u00e1lido hasta: ' + vence + '</div></div>'
+        + '<div class="folio">Folio: <b>' + folio + '</b><br>V\u00e1lido hasta: ' + vence + '<br>📍 Aplica solo en sucursal Campeche</div></div>'
         + '<a href="https://wa.me/' + WA_CLIO + '?text=' + encodeURIComponent("\u00a1Hola! Gan\u00e9 en el juego de gol: " + premio.nombre + " (Folio " + folio + ")") + '" target="_blank">\ud83d\udcac Reclamar con Clio por WhatsApp</a>'
         + '<div style="margin-top:10px;color:#999;font-size:11px;cursor:pointer;" onclick="document.getElementById(\'litek-gol\').remove();window.__litekGolCargado=false;">Cerrar</div>';
     }
