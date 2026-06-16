@@ -54,17 +54,21 @@ from agent.memory import (
 from zoneinfo import ZoneInfo as _ZI
 
 
-def es_horario_atencion() -> bool:
-    """True si estamos dentro del horario de LiTek (Campeche).
-    L-V 9-19h, Sáb 9-16h, Dom cerrado."""
+def es_horario_atencion(sucursal: str = "") -> bool:
+    """True si estamos dentro del horario de atención de la sucursal del cliente.
+    Campeche/Mérida: L-V 9-19h, Sáb 9-16h. Carmen: L-V 9-18h, Sáb 9-14h. Dom cerrado."""
     ahora = datetime.now(_ZI("America/Merida"))
     dia = ahora.weekday()  # 0=Lun ... 6=Dom
     h = ahora.hour
-    if dia == 6:            # Domingo
+    if dia == 6:            # Domingo (cerrado en todas)
         return False
-    if dia == 5:            # Sábado hasta las 4pm
+    if sucursal == "Carmen":
+        if dia == 5:        # Sábado hasta las 2pm
+            return 9 <= h < 14
+        return 9 <= h < 18  # Lunes a Viernes hasta las 6pm
+    if dia == 5:            # Sábado hasta las 4pm (Campeche/Mérida)
         return 9 <= h < 16
-    return 9 <= h < 19      # Lunes a Viernes hasta las 7pm
+    return 9 <= h < 19      # Lunes a Viernes hasta las 7pm (Campeche/Mérida)
 
 # ── Reparto POR PRODUCTO (no por turnos) ──────────────────────────────────────
 # El primer producto que identifica el cliente define su asesor; luego no cambia.
@@ -1103,8 +1107,9 @@ async def _procesar_mensaje(msg):
                     estado_minimo="proceso",
                     asesor_si_nuevo="Anna",
                 )
-                # Alerta automática si el pedido entró FUERA de horario
-                if not es_horario_atencion():
+                # Alerta automática si el pedido entró FUERA de horario (según su sucursal)
+                suc_cli = await sucursal_crm_por_telefono(numero_limpio)
+                if not es_horario_atencion(suc_cli):
                     await marcar_alerta_crm(numero_limpio, "⚠️ Pidió fuera de horario")
                 # ¿El pedido es CON factura? → marcar 🧾 para que el equipo de la
                 # sucursal la haga (el resumen trae "Factura: Sí/No").
