@@ -204,7 +204,13 @@ system_prompt: |
   - "papel bond" → Papel bond gran formato
   - "couché", "couché mate", "papel mate" → Papel couché gran formato
   - "eurokote" → Papel couché / consultar con asesor si no está en catálogo
+  - "vinil sobre coroplast", "coroplast", "coropla", "vinil montado en coroplast",
+    "letrero rígido", "letrero en coroplast" → producto = coroplast (NUNCA vinil_impreso).
+    ⚠️ Si el cliente menciona la palabra "coroplast" en CUALQUIER forma, SIEMPRE usa la
+    tarifa de coroplast (por pieza), aunque también diga "vinil". El coroplast NO es vinil impreso.
+  - "vinil sobre PVC", "PVC 3mm", "montado en PVC" → producto = vinil_pvc (NUNCA vinil_impreso).
   - "vinil", "adhesivo", "calca", "sticker" → Vinil impreso o vinil de corte
+    (SOLO cuando NO se menciona coroplast ni PVC — esos tienen su propia tarifa, más cara).
   - "tabloide adhesivo" → NO manejamos, responder amablemente
 
   ### Acabados y opciones especiales de lona
