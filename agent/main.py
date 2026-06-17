@@ -46,7 +46,8 @@ from agent.memory import (
     carga_por_asesor, consolidar_duplicados_crm, obtener_conversacion_crm,
     tomar_control, devolver_clio, estado_control, esta_en_modo_humano,
     marcar_alerta_crm, listar_usuarios_crm, cambiar_password_crm,
-    reactivar_cliente_no_contesto, marcar_no_contesto_automatico, marcar_expres_crm,
+    reactivar_cliente_no_contesto, marcar_no_contesto_automatico,
+    marcar_no_concretado_automatico, marcar_expres_crm,
     guardar_calificacion_crm, guardar_monto_crm, total_vendido_crm, backfill_montos_crm,
     guardar_sucursal_crm, sucursal_crm_por_telefono, marcar_factura_crm, forzar_asesor_crm,
     canalizar_diseno_brayan, marcar_diseno_crm,
@@ -214,6 +215,15 @@ async def lifespan(app: FastAPI):
         hours=3,
         id="marcar_no_contesto",
         name="Mover a 'No contestó' leads sin actividad en 2 días",
+        replace_existing=True,
+    )
+    # Marcar 'No concretado' los leads cotizados que callaron +10h (cada 30 min).
+    scheduler.add_job(
+        marcar_no_concretado_automatico,
+        "interval",
+        minutes=30,
+        id="marcar_no_concretado",
+        name="Mover a 'No concretado' leads cotizados sin respuesta en 10h",
         replace_existing=True,
     )
     scheduler.start()
@@ -875,6 +885,7 @@ async def _procesar_mensaje(msg):
                     tipo="cliente",
                     estado_minimo="asignado",  # cotizó → ya tiene dueño → pasa a Asignados
                     asesor_si_nuevo=asesor_prod,  # dueño fijo según el producto
+                    cotizo=True,  # sella la hora de cotización → 'no concretado' si calla 10h
                 )
             except Exception as e:
                 logger.error(f"Error asignando lead cotizado en CRM: {e}")
