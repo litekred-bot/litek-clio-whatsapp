@@ -72,6 +72,7 @@ class CrmRegistro(Base):
     monto: Mapped[float] = mapped_column(Float, default=0.0)  # $ del pedido (para totalizar ventas)
     pagado_en: Mapped[datetime] = mapped_column(DateTime, nullable=True)  # fecha del pago (para ventas por mes)
     cotizado_en: Mapped[datetime] = mapped_column(DateTime, nullable=True)  # cuándo se le dio precio (para 'no concretado' a las 10h)
+    cuenta_en: Mapped[datetime] = mapped_column(DateTime, nullable=True)  # cuándo se le dio la cuenta de pago (para 'esperando pago' a las 2h)
     notas: Mapped[str] = mapped_column(Text, default="")
     creado: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     actualizado: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -116,6 +117,7 @@ async def inicializar_db():
         "ALTER TABLE crm_registros ADD COLUMN facturado BOOLEAN DEFAULT false",
         "ALTER TABLE crm_registros ADD COLUMN diseno BOOLEAN DEFAULT false",
         "ALTER TABLE crm_registros ADD COLUMN cotizado_en TIMESTAMP",
+        "ALTER TABLE crm_registros ADD COLUMN cuenta_en TIMESTAMP",
         # 'cerrado' viejo = venta concretada → renombrar a 'vendido'
         "UPDATE crm_registros SET estado='vendido' WHERE estado='cerrado'",
     ]
@@ -770,21 +772,53 @@ async def reactivar_cliente_no_contesto(telefono: str) -> bool:
     async with async_session() as session:
         result = await session.execute(
             select(CrmRegistro)
-            .where(CrmRegistro.estado.in_(["no_contesto", "no_concretado"]))
+            .where(CrmRegistro.estado.in_(["no_contesto", "no_concretado", "esperando_pago"]))
             .order_by(CrmRegistro.creado.desc())
         )
         for r in result.scalars().all():
             if _sufijo_tel(r.telefono) == sufijo:
                 previo = r.estado
                 r.estado = "asignado" if r.asesor else "nuevo"
-                aviso = ("🔄 Regresó tras no concretar. " if previo == "no_concretado"
-                         else "🔄 Regresó tras no contestar. ")
-                r.descripcion = aviso + (r.descripcion or "")
-                r.cotizado_en = None  # reinicia el reloj de 10h; solo una nueva cotización lo re-arma
+                avisos = {
+                    "no_concretado": "🔄 Regresó tras no concretar. ",
+                    "esperando_pago": "🔄 Regresó tras pedir la cuenta. ",
+                }
+                r.descripcion = avisos.get(previo, "🔄 Regresó tras no contestar. ") + (r.descripcion or "")
+                # Reinicia los relojes; solo una nueva cotización/cuenta los re-arma
+                r.cotizado_en = None
+                r.cuenta_en = None
                 r.actualizado = datetime.utcnow()
                 await session.commit()
                 return True
     return False
+
+
+async def marcar_esperando_pago_automatico(horas: int = 2) -> int:
+    """
+    Mueve a 'esperando_pago' los leads a los que Clio YA dio la cuenta de pago
+    (cuenta_en marcado) pero llevan +N horas sin responder ni pagar. Son los leads
+    más calientes (estaban por pagar) → el asesor les da seguimiento manual.
+    Si el cliente vuelve a escribir o paga, se reactiva/avanza. NO toca 'proceso'
+    (ya pagaron) ni estados finales. Retorna cuántos movió.
+    """
+    limite = datetime.utcnow() - timedelta(hours=horas)
+    movidos = 0
+    async with async_session() as session:
+        result = await session.execute(
+            select(CrmRegistro).where(
+                CrmRegistro.estado.in_(["nuevo", "asignado"]),
+                CrmRegistro.cuenta_en.is_not(None),
+                CrmRegistro.cuenta_en <= limite,
+                CrmRegistro.actualizado <= limite,
+            )
+        )
+        for r in result.scalars().all():
+            r.estado = "esperando_pago"
+            r.actualizado = datetime.utcnow()
+            movidos += 1
+        if movidos:
+            await session.commit()
+    return movidos
 
 
 async def marcar_no_concretado_automatico(horas: int = 10) -> int:
@@ -1053,7 +1087,7 @@ async def total_vendido_crm(desde: datetime = None, hasta: datetime = None,
 # Ciclo de vida de un cliente: el estado solo AVANZA, nunca retrocede.
 _ORDEN_ESTADO = {"nuevo": 0, "asignado": 1, "proceso": 2, "vendido": 3}
 # Estados FINALES (fuera del embudo activo): venta cerrada o lead perdido.
-ESTADOS_FINALES = ("vendido", "no_contesto", "no_concretado", "cerrado")
+ESTADOS_FINALES = ("vendido", "no_contesto", "no_concretado", "esperando_pago", "cerrado")
 # Importancia del tipo: se muestra la etiqueta del evento más avanzado alcanzado.
 _ORDEN_TIPO = {"cliente": 0, "ruleta": 1, "escalacion": 2, "pedido": 3}
 
@@ -1110,6 +1144,7 @@ async def registrar_o_actualizar_crm(
     asesor: str = "",
     asesor_si_nuevo: str = "",
     cotizo: bool = False,
+    dio_cuenta: bool = False,
 ) -> int:
     """
     Una tarjeta por cliente que AVANZA de estado (nuevo→asignado→proceso→cerrado).
@@ -1150,6 +1185,7 @@ async def registrar_o_actualizar_crm(
                 asesor=asesor or asesor_si_nuevo or "",
                 estado=estado_minimo,
                 cotizado_en=datetime.utcnow() if cotizo else None,
+                cuenta_en=datetime.utcnow() if dio_cuenta else None,
             )
             session.add(reg)
             await session.commit()
@@ -1181,6 +1217,9 @@ async def registrar_o_actualizar_crm(
         # Sello de cotización: marca cuándo se le dio precio (para 'no concretado' a 10h)
         if cotizo:
             existente.cotizado_en = datetime.utcnow()
+        # Sello de cuenta: marca cuándo se le dio la cuenta de pago (para 'esperando pago' a 2h)
+        if dio_cuenta:
+            existente.cuenta_en = datetime.utcnow()
         existente.actualizado = datetime.utcnow()
         await session.commit()
         return existente.id

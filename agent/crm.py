@@ -109,6 +109,7 @@ HTML_PANEL = r"""<!DOCTYPE html>
   .card.vendido { border-left-color: #4CAF50; opacity: .75; }
   .card.no_contesto { border-left-color: #555; opacity: .65; }
   .card.no_concretado { border-left-color: #d4a017; opacity: .8; }
+  .card.esperando_pago { border-left-color: #00897b; background: #e0f2f1; }
   .card .head { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 8px; }
   .card .nombre { font-weight: bold; font-size: 16px; }
   .card .tipo { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #eee; color: #555; text-transform: uppercase; }
@@ -203,6 +204,7 @@ HTML_PANEL = r"""<!DOCTYPE html>
       <button data-f="estado" data-v="asignado">🟠 Asignados</button>
       <button data-f="estado" data-v="proceso">🟣 En proceso</button>
       <button data-f="estado" data-v="vendido">✅ Vendidos</button>
+      <button data-f="estado" data-v="esperando_pago">💳 Esperando pago</button>
       <button data-f="estado" data-v="no_contesto">⚫ No contestó</button>
       <button data-f="estado" data-v="no_concretado">🟡 No concretados</button>
     </div>
@@ -247,7 +249,7 @@ HTML_PANEL = r"""<!DOCTYPE html>
 var TOKEN = localStorage.getItem("crm_token") || "";
 var fEstado = "", fTipo = "";
 var ASESORES = ["", "Anna", "Brayan", "Tere", "Chino", "Alan", "Jadiel"];
-var ESTADOS = {nuevo:"🔵 Nuevo", asignado:"🟠 Asignado", proceso:"🟣 En proceso", vendido:"✅ Vendido", no_contesto:"⚫ No contestó", no_concretado:"🟡 No concretado"};
+var ESTADOS = {nuevo:"🔵 Nuevo", asignado:"🟠 Asignado", proceso:"🟣 En proceso", vendido:"✅ Vendido", esperando_pago:"💳 Esperando pago", no_contesto:"⚫ No contestó", no_concretado:"🟡 No concretado"};
 var TIPOS = {escalacion:"Escalación", pedido:"Pedido", cliente:"Cliente", ruleta:"Ruleta"};
 
 if (TOKEN) mostrarApp();
@@ -493,6 +495,7 @@ function pintarStats(s, ventas){
     '<div class="stat"><b>'+(s.asignado||0)+'</b><span>Asignados</span></div>'+
     '<div class="stat"><b>'+(s.proceso||0)+'</b><span>En proceso</span></div>'+
     '<div class="stat"><b>'+(s.vendido||0)+'</b><span>Vendidos</span></div>'+
+    '<div class="stat"><b>'+(s.esperando_pago||0)+'</b><span>💳 Esperando pago</span></div>'+
     '<div class="stat"><b>'+(s.no_contesto||0)+'</b><span>No contestó</span></div>'+
     '<div class="stat"><b>'+(s.no_concretado||0)+'</b><span>No concretados</span></div>'+
     ventaHtml;

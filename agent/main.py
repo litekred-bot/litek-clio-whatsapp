@@ -47,7 +47,7 @@ from agent.memory import (
     tomar_control, devolver_clio, estado_control, esta_en_modo_humano,
     marcar_alerta_crm, listar_usuarios_crm, cambiar_password_crm,
     reactivar_cliente_no_contesto, marcar_no_contesto_automatico,
-    marcar_no_concretado_automatico, marcar_expres_crm,
+    marcar_no_concretado_automatico, marcar_esperando_pago_automatico, marcar_expres_crm,
     guardar_calificacion_crm, guardar_monto_crm, total_vendido_crm, backfill_montos_crm,
     guardar_sucursal_crm, sucursal_crm_por_telefono, marcar_factura_crm, forzar_asesor_crm,
     canalizar_diseno_brayan, marcar_diseno_crm,
@@ -224,6 +224,15 @@ async def lifespan(app: FastAPI):
         minutes=30,
         id="marcar_no_concretado",
         name="Mover a 'No concretado' leads cotizados sin respuesta en 10h",
+        replace_existing=True,
+    )
+    # Marcar 'Esperando pago' los leads que recibieron la cuenta y callaron +2h (cada 15 min).
+    scheduler.add_job(
+        marcar_esperando_pago_automatico,
+        "interval",
+        minutes=15,
+        id="marcar_esperando_pago",
+        name="Mover a 'Esperando pago' leads con cuenta dada sin pagar en 2h",
         replace_existing=True,
     )
     scheduler.start()
@@ -889,6 +898,23 @@ async def _procesar_mensaje(msg):
                 )
             except Exception as e:
                 logger.error(f"Error asignando lead cotizado en CRM: {e}")
+
+        # Si Clio mandó la CUENTA de pago en este turno → sella la hora.
+        # Si el cliente calla +2h sin pagar, pasará a 'Esperando pago' (lead caliente).
+        # Se detecta por los marcadores que SIEMPRE acompañan los datos bancarios.
+        dio_cuenta = bool(re.search(r'CLABE|Cuenta:\s*\d|Tarjeta:\s*\d', respuesta, re.IGNORECASE))
+        if dio_cuenta:
+            try:
+                await registrar_o_actualizar_crm(
+                    telefono=tel_limpio,
+                    nombre=msg.nombre_perfil or "Cliente",
+                    descripcion="💳 Se le dio la cuenta de pago.",
+                    tipo="cliente",
+                    estado_minimo="asignado",
+                    dio_cuenta=True,  # sella la hora → 'esperando pago' si calla 2h
+                )
+            except Exception as e:
+                logger.error(f"Error sellando cuenta dada en CRM: {e}")
 
         # Guardar usuario y respuesta en memoria
         # Si era imagen, guardar con contexto para que no se pierda en turnos siguientes
