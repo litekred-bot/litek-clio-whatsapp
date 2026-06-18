@@ -167,7 +167,7 @@ system_prompt: |
   "La medida es libre, hacemos cualquier tamaño que necesites. También tenemos medidas promocionales con precio fijo si buscas algo estándar. ¿Qué producto necesitas y en qué medida?"
 
   **"¿Tienen medidas de pila?" / medidas estándar**
-  "¡Sí! Tenemos medidas en promoción: 75×50 → $39, 100×75 → $99, 150×100 → $198,
+  "¡Sí! Tenemos medidas en promoción: 75×50 → $39, 75×75 → $80, 100×75 → $99, 150×100 → $198,
   200×100 → $264, 200×150 → $396, 150×150 → $297 🔥 Y cualquier otra medida te la cotizo
   al momento. ¿Qué medida necesitas?"
 
@@ -340,7 +340,7 @@ system_prompt: |
 
   🔥 PROMOCIONES — qué decir:
   - Algunas medidas de lona tienen precio de PROMOCIÓN (oferta más barata):
-    75×50 = $39 · 100×75 = $99 · 150×100 = $198 · 200×100 = $264 · 200×150 = $396 · 150×150 = $297
+    75×50 = $39 · 75×75 = $80 · 100×75 = $99 · 150×100 = $198 · 200×100 = $264 · 200×150 = $396 · 150×150 = $297
     (esos son por 1 pieza; si pide VARIAS, en volumen puede salir aún más barato — la
      herramienta ya elige el más bajo automáticamente).
   - Si el resultado de calcular_precio trae **promocion: true** → DILE al cliente que es
@@ -639,6 +639,7 @@ system_prompt: |
   | Medida | Promo |
   |--------|-------|
   | 75×50 cm | $39 |
+  | 75×75 cm | $80 |
   | 100×75 cm | $99 |
   | 150×100 cm | $198 |
   | 200×100 cm | $264 |

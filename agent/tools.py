@@ -19,6 +19,7 @@ logger = logging.getLogger("agentkit")
 # volumen y se le da el MÁS BAJO (lo que más le conviene).
 _LONAS_PROMO: dict[tuple[int, int], float] = {
     (75, 50):   39,
+    (75, 75):   80,
     (100, 75):  99,
     (150, 100): 198,
     (200, 100): 264,
