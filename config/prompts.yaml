@@ -348,6 +348,14 @@ system_prompt: |
   - Si trae **promocion: false** → es precio normal por volumen, preséntalo sin decir "promo".
   - Si pide más de una lona, NO te preocupes por comparar: la herramienta ya te da el más
     barato entre promo y volumen. Solo da el precio que te devolvió.
+  - 🔥 Si el resultado trae **promo_sugerida** (no es null) → ADEMÁS del precio de su medida,
+    ofrécele esa promoción cercana como mejor opción. La traes con "medida", "precio_unit" y
+    "mas_grande". Ejemplos de cómo decirlo (1 sola línea, natural):
+      · Si mas_grande = false (la promo es un poco más chica):
+        "💡 Y si te sirve una medida estándar, la {medida} la tenemos en *promoción a ${precio_unit}* 🔥"
+      · Si mas_grande = true (la promo es un poco más grande):
+        "💡 Por poco más, la {medida} está en *promoción a ${precio_unit}* 🔥 — te llevas más por casi lo mismo."
+    Solo menciónala UNA vez, sin presionar. Si el cliente quiere su medida exacta, respétalo.
 
   PASO 2 — Cómo calcula (referencia, NO lo muestres al cliente):
   Área m² TOTAL = (base ÷ 100) × (alto ÷ 100) × cantidad. Precio/m² baja al subir el m² total.

@@ -62,6 +62,7 @@ def calcular_precio(
     area_pieza = base_m * alto_m
     precio     = 0.0
     es_promocion = False   # True si se aplicó un precio promocional de lona
+    promo_sugerida = None  # promo de lona cercana a ofrecer (cuando la medida no tiene promo exacta)
 
     # ── LONA ─────────────────────────────────────────────────────────────────
     if producto == "lona":
@@ -98,6 +99,21 @@ def calcular_precio(
                 precio = precio_vol   # en volumen le sale más barato
         else:
             precio = precio_vol
+            # No hay promo EXACTA para esa medida → sugiere la promo más cercana
+            # (por área de pieza) para ofrecerla como mejor opción.
+            mejor = None
+            for (b, a), p in _LONAS_PROMO.items():
+                area_promo = (b / 100) * (a / 100)
+                diff = abs(area_promo - area_pieza)
+                if mejor is None or diff < mejor[0]:
+                    mejor = (diff, b, a, p)
+            if mejor is not None:
+                _, b, a, p = mejor
+                promo_sugerida = {
+                    "medida": f"{b}×{a} cm",
+                    "precio_unit": float(p),
+                    "mas_grande": (b / 100) * (a / 100) >= area_pieza,
+                }
 
     # ── VINIL IMPRESO ────────────────────────────────────────────────────────
     elif producto == "vinil_impreso":
@@ -266,4 +282,5 @@ def calcular_precio(
         "cantidad":   cantidad,
         "expres":     expres,
         "promocion":  es_promocion,   # True → dile al cliente que es precio de promoción
+        "promo_sugerida": promo_sugerida,  # promo de lona cercana para ofrecer (o None)
     }
