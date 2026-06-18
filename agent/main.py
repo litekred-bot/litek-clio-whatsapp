@@ -2,6 +2,7 @@
 # Generado por AgentKit para LiTek
 
 import os
+import re
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
@@ -924,8 +925,6 @@ async def _procesar_mensaje(msg):
             texto_guardado = msg.texto
         await guardar_mensaje(msg.telefono, "user", texto_guardado)
         await guardar_mensaje(msg.telefono, "assistant", respuesta)
-
-        import re
 
         # Detectar escalación [ESCALAR:area]
         area_escalar = None
