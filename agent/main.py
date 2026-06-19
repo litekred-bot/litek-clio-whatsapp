@@ -104,8 +104,10 @@ ADMIN_WHATSAPP = os.getenv("ADMIN_WHATSAPP", "529812710000")
 ASESOR_WHATSAPP = os.getenv("ASESOR_WHATSAPP", "120363425558631008@g.us")  # Campeche/principal
 # Grupo de alertas de la sucursal CARMEN (Alan, Jadiel, Leo)
 ASESOR_WHATSAPP_CARMEN = os.getenv("ASESOR_WHATSAPP_CARMEN", "120363408250148529@g.us")
+# Grupo de alertas de la sucursal MÉRIDA (Edith, Jadiel, Leo)
+ASESOR_WHATSAPP_MERIDA = os.getenv("ASESOR_WHATSAPP_MERIDA", "120363410269425019@g.us")
 # Mapa sucursal → grupo de alertas
-GRUPO_ALERTA_SUCURSAL = {"Carmen": ASESOR_WHATSAPP_CARMEN}
+GRUPO_ALERTA_SUCURSAL = {"Carmen": ASESOR_WHATSAPP_CARMEN, "Mérida": ASESOR_WHATSAPP_MERIDA}
 # Diseñador de LiTek (Erick): recibe aviso de cada diseño PAGADO para realizarlo
 ERICK_WHATSAPP = os.getenv("ERICK_WHATSAPP", "529811388507")
 # Responsables de FACTURACIÓN por sucursal: Campeche→Tere, Carmen y Mérida→Leo
