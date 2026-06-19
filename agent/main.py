@@ -288,6 +288,8 @@ def _crm_usuario_de_request(request: Request) -> dict | None:
 # cada asesor (Anna, Brayan) ve SOLO lo asignado a él.
 CRM_VEN_TODO = {"chino", "tere"}
 CRM_USUARIO_A_ASESOR = {"anna": "Anna", "brayan": "Brayan", "alan": "Alan", "jadiel": "Jadiel", "erick": "Erick"}
+# Logins COMPARTIDOS: un usuario que ve los clientes de VARIOS asesores (se apoyan).
+CRM_USUARIO_MULTI = {"taller": ("Brayan", "Erick")}
 # Administradores de UNA sola sucursal: ven todo lo de SU sucursal (clientes + dinero),
 # pero nada de las demás. Ej: Leo ve solo Carmen.
 CRM_ADMIN_SUCURSAL = {"leo": "Carmen", "edith": "Mérida"}
@@ -375,14 +377,18 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = "",
         raise HTTPException(status_code=401, detail="No autorizado")
     # Filtro por persona: director/admin ven todo, cada asesor solo lo asignado a él
     asesor_filtro = _asesor_filtro_de(u["usuario"])
+    # Login COMPARTIDO (ej. 'taller' = Brayan + Erick): ve los clientes de VARIOS asesores.
+    asesores_multi = CRM_USUARIO_MULTI.get(u["usuario"], ())
+    if asesores_multi:
+        asesor_filtro = ""  # el filtro real lo hace 'asesores'
     # Admin de UNA sucursal (ej. Leo→Carmen): se le FUERZA su sucursal y ve dinero.
     suc_forzada = CRM_ADMIN_SUCURSAL.get(u["usuario"], "")
     if suc_forzada:
         sucursal = suc_forzada
     ve_todo = _es_admin(u["usuario"])
-    registros = await listar_crm(estado=estado, tipo=tipo, asesor=asesor_filtro, sucursal=sucursal)
+    registros = await listar_crm(estado=estado, tipo=tipo, asesor=asesor_filtro, sucursal=sucursal, asesores=asesores_multi)
     # Stats por estado (respetando el filtro de persona y sucursal, sin filtro de estado)
-    todos = await listar_crm(tipo=tipo, asesor=asesor_filtro, sucursal=sucursal, limite=1000)
+    todos = await listar_crm(tipo=tipo, asesor=asesor_filtro, sucursal=sucursal, limite=1000, asesores=asesores_multi)
     stats = {"nuevo": 0, "asignado": 0, "proceso": 0, "vendido": 0, "no_contesto": 0}
     for r in todos:
         stats[r["estado"]] = stats.get(r["estado"], 0) + 1

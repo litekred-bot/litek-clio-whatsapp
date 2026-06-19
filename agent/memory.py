@@ -405,6 +405,8 @@ async def _crear_usuarios_crm_iniciales():
         "edith":  ("merida-edith-08",  "Edith (Admin Mérida)"),
         # Diseñador (todos los diseños pagados de LiTek)
         "erick":  ("erick-diseno-07",  "Erick (Diseñador)"),
+        # Login COMPARTIDO de prueba: Brayan + Erick ven lo de ambos (se apoyan)
+        "taller": ("taller-2026",      "Taller (Brayan + Erick)"),
     }
     async with async_session() as session:
         for usuario, (pwd, nombre) in iniciales.items():
@@ -469,15 +471,18 @@ async def registrar_crm(tipo: str, nombre: str, telefono: str, descripcion: str,
         return reg.id
 
 
-async def listar_crm(estado: str = "", tipo: str = "", asesor: str = "", sucursal: str = "", limite: int = 200) -> list[dict]:
-    """Lista registros del CRM, opcionalmente filtrados por estado, tipo, asesor y sucursal."""
+async def listar_crm(estado: str = "", tipo: str = "", asesor: str = "", sucursal: str = "", limite: int = 200, asesores: tuple = ()) -> list[dict]:
+    """Lista registros del CRM, opcionalmente filtrados por estado, tipo, asesor y sucursal.
+    'asesores' (tupla) = ver los clientes de VARIOS asesores (login compartido, ej. Brayan+Erick)."""
     async with async_session() as session:
         query = select(CrmRegistro)
         if estado:
             query = query.where(CrmRegistro.estado == estado)
         if tipo:
             query = query.where(CrmRegistro.tipo == tipo)
-        if asesor:
+        if asesores:
+            query = query.where(CrmRegistro.asesor.in_(asesores))
+        elif asesor:
             query = query.where(CrmRegistro.asesor == asesor)
         if sucursal:
             query = query.where(CrmRegistro.sucursal == sucursal)
