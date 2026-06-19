@@ -202,7 +202,14 @@ async def generar_respuesta(
             response = await client.messages.create(
                 model="claude-sonnet-4-6",
                 max_tokens=1024,
-                system=system_prompt,
+                # Caché de prompt: el "manual" de Clio (system) y las herramientas son
+                # iguales en cada mensaje → se cachean y los siguientes mensajes los
+                # cobran ~90% más barato (TTL ~5 min, se refresca con el tráfico).
+                system=[{
+                    "type": "text",
+                    "text": system_prompt,
+                    "cache_control": {"type": "ephemeral"},
+                }],
                 messages=mensajes,
                 tools=HERRAMIENTAS_CLAUDE,
             )
