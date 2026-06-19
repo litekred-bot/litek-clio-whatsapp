@@ -185,9 +185,10 @@ async def cargar_cache_ruleta():
 
 async def enviar_seguimiento_ruleta(token: str):
     """
-    A las ~2h, si el GANADOR de ruleta NO ha contestado, manda un AVISO a ERICK
-    (no al cliente) para que Erick le escriba personalmente. Una sola vez por ganador.
-    Horario 9am-9pm Campeche.
+    A las ~2h de que Clio mandó su aviso, si el GANADOR de ruleta NO ha contestado:
+    1) Clio le manda un recordatorio del premio al CLIENTE.
+    2) Además avisa a ERICK (con el WhatsApp del cliente) para que él le escriba.
+    Una sola vez por ganador. Horario 9am-9pm Campeche.
     """
     if not es_horario_permitido():
         return
@@ -197,7 +198,8 @@ async def enviar_seguimiento_ruleta(token: str):
     import httpx
     avisados = 0
     for cli in candidatos:
-        nombre = cli["nombre"] or "Cliente"
+        nombre_completo = cli["nombre"] or "Cliente"
+        nombre = nombre_completo.split(" ")[0]
         conv_tel = await telefono_conversacion(cli["telefono"])
         if conv_tel in _cache_ruleta and (datetime.utcnow() - _cache_ruleta[conv_tel] < timedelta(hours=72)):
             continue
@@ -206,19 +208,32 @@ async def enviar_seguimiento_ruleta(token: str):
         if any(m["role"] == "user" for m in hist):
             continue
         wa_cliente = _destino(conv_tel)
-        aviso = (
+        msg_cliente = (
+            f"Oye {nombre}, tu premio tiene 48 horas para reclamarse. "
+            f"¿Qué necesitas imprimir ahorita — lona, vinil, etiquetas?"
+        )
+        aviso_erick = (
             f"🎰 *GANADOR SIN CONTESTAR — CLIO*\n\n"
-            f"👤 {nombre}\n"
+            f"👤 {nombre_completo}\n"
             f"📱 wa.me/{wa_cliente}\n\n"
-            f"Ganó un premio en la ruleta/gol y no ha contestado en 2h. "
+            f"Ganó un premio en la ruleta/gol y no ha contestado 2h después de mi aviso. "
             f"Por favor mándale un mensaje para reactivarlo. 🙌"
         )
         try:
             _cache_ruleta[conv_tel] = datetime.utcnow()
             async with httpx.AsyncClient() as client:
+                # 1) Recordatorio al cliente
                 r = await client.post(
                     "https://gate.whapi.cloud/messages/text",
-                    json={"to": ERICK_WHATSAPP, "body": aviso},
+                    json={"to": wa_cliente, "body": msg_cliente},
+                    headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                )
+                if r.status_code == 200:
+                    await guardar_mensaje(conv_tel, "assistant", msg_cliente + f" {MARCA_RULETA}")
+                # 2) Aviso a Erick
+                await client.post(
+                    "https://gate.whapi.cloud/messages/text",
+                    json={"to": ERICK_WHATSAPP, "body": aviso_erick},
                     headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
                 )
             if r.status_code == 200:
@@ -226,10 +241,10 @@ async def enviar_seguimiento_ruleta(token: str):
             else:
                 _cache_ruleta.pop(conv_tel, None)
         except Exception as e:
-            logger.error(f"Error avisando a Erick (ruleta) {conv_tel}: {e}")
+            logger.error(f"Error seguimiento ruleta {conv_tel}: {e}")
             _cache_ruleta.pop(conv_tel, None)
     if avisados:
-        logger.info(f"Ruleta-seg: {avisados} aviso(s) a Erick de ganadores sin contestar")
+        logger.info(f"Ruleta-seg: {avisados} recordatorio(s) a cliente + aviso a Erick")
 
 
 def _destino(telefono: str) -> str:

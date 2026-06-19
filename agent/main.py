@@ -108,6 +108,10 @@ ASESOR_WHATSAPP_CARMEN = os.getenv("ASESOR_WHATSAPP_CARMEN", "120363408250148529
 GRUPO_ALERTA_SUCURSAL = {"Carmen": ASESOR_WHATSAPP_CARMEN}
 # Diseñador de LiTek (Erick): recibe aviso de cada diseño PAGADO para realizarlo
 ERICK_WHATSAPP = os.getenv("ERICK_WHATSAPP", "529811388507")
+# Responsables de FACTURACIÓN por sucursal: Campeche→Tere, Carmen y Mérida→Leo
+TERE_WHATSAPP = os.getenv("TERE_WHATSAPP", "529811388508")
+LEO_WHATSAPP = os.getenv("LEO_WHATSAPP", "529818299794")
+FACTURA_WHATSAPP = {"Campeche": TERE_WHATSAPP, "Carmen": LEO_WHATSAPP, "Mérida": LEO_WHATSAPP}
 
 
 async def _grupo_alerta_de(telefono: str) -> str:
@@ -1217,6 +1221,20 @@ async def _procesar_mensaje(msg):
                 rl = (resumen_pedido or "").lower()
                 if re.search(r'factura:\s*s[ií]\b', rl) or "con factura" in rl:
                     await marcar_factura_crm(numero_limpio)
+                    # Aviso de FACTURA al responsable de la sucursal (Campeche→Tere, Carmen/Mérida→Leo)
+                    destino_fact = FACTURA_WHATSAPP.get(suc_cli, TERE_WHATSAPP)
+                    aviso_fact = (
+                        f"🧾 *FACTURA POR HACER — CLIO*\n\n"
+                        f"👤 *Cliente:* {nombre_cli}\n"
+                        f"📱 *WhatsApp:* {num_display}\n"
+                        f"🏢 *Sucursal:* {suc_cli}\n"
+                        f"📋 *Pedido:* {resumen_pedido[:200]}\n\n"
+                        f"El cliente pidió FACTURA. Por favor genérala. 🙌"
+                    )
+                    try:
+                        await proveedor.enviar_mensaje(destino_fact, aviso_fact)
+                    except Exception as e:
+                        logger.error(f"Error avisando factura a {suc_cli}: {e}")
             except Exception as e:
                 logger.error(f"Error registrando pedido en CRM: {e}")
 
