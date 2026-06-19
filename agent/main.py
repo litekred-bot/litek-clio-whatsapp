@@ -59,19 +59,19 @@ from zoneinfo import ZoneInfo as _ZI
 
 def es_horario_atencion(sucursal: str = "") -> bool:
     """True si estamos dentro del horario de atención de la sucursal del cliente.
-    Campeche/Mérida: L-V 9-19h, Sáb 9-16h. Carmen: L-V 9-18h, Sáb 9-14h. Dom cerrado."""
+    Campeche: L-V 9-19h, Sáb 9-16h. Carmen y Mérida: L-V 9-18h, Sáb 9-14h. Dom cerrado."""
     ahora = datetime.now(_ZI("America/Merida"))
     dia = ahora.weekday()  # 0=Lun ... 6=Dom
     h = ahora.hour
     if dia == 6:            # Domingo (cerrado en todas)
         return False
-    if sucursal == "Carmen":
+    if sucursal in ("Carmen", "Mérida"):
         if dia == 5:        # Sábado hasta las 2pm
             return 9 <= h < 14
         return 9 <= h < 18  # Lunes a Viernes hasta las 6pm
-    if dia == 5:            # Sábado hasta las 4pm (Campeche/Mérida)
+    if dia == 5:            # Sábado hasta las 4pm (Campeche)
         return 9 <= h < 16
-    return 9 <= h < 19      # Lunes a Viernes hasta las 7pm (Campeche/Mérida)
+    return 9 <= h < 19      # Lunes a Viernes hasta las 7pm (Campeche)
 
 # ── Reparto POR PRODUCTO (no por turnos) ──────────────────────────────────────
 # El primer producto que identifica el cliente define su asesor; luego no cambia.

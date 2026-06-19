@@ -25,7 +25,7 @@ logger = logging.getLogger("agentkit")
 ZONA_CAMPECHE = ZoneInfo("America/Merida")
 HORA_INICIO = 9
 HORA_FIN = 21
-HORAS_DESPUES_DE_PAGAR = 12   # esperar 12h tras confirmar el pago
+HORAS_DESPUES_DE_PAGAR = 9    # esperar 9h tras confirmar el pago
 DIAS_MAX = 7                   # no agradecer pedidos de hace más de 7 días
 
 # Marcador para saber a quién ya se le agradeció (sin caracteres especiales)
