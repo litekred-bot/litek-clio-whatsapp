@@ -1084,6 +1084,66 @@ async def total_vendido_crm(desde: datetime = None, hasta: datetime = None,
     return {"proceso": proceso, "vendido": vendido, "total": proceso + vendido, "num": num}
 
 
+async def analisis_mensajeria(desde: datetime = None, hasta: datetime = None) -> dict:
+    """
+    Datos para el análisis de costo de la mensajería, POR SUCURSAL y en TOTAL:
+    - entraron: clientes/conversaciones que ENTRARON en el rango (tarjetas creadas)
+    - vendido:  $ de pedidos pagados en el rango
+    - ventas:   cuántas ventas (pedidos con monto) en el rango
+    - mensajes: cuántos mensajes (entrantes+salientes) hubo en el rango
+    Los costos NO se calculan aquí: el panel los pone en pesos y reparte por sucursal
+    según la proporción de mensajes de cada una.
+    """
+    sucursales = ("Campeche", "Carmen", "Mérida")
+    por_suc = {s: {"entraron": 0, "vendido": 0.0, "ventas": 0, "mensajes": 0} for s in sucursales}
+
+    async with async_session() as session:
+        # 1) Entraron: tarjetas creadas en el rango, agrupadas por sucursal
+        filtros_e = []
+        if desde is not None:
+            filtros_e.append(CrmRegistro.creado >= desde)
+        if hasta is not None:
+            filtros_e.append(CrmRegistro.creado < hasta)
+        res = await session.execute(
+            select(CrmRegistro.sucursal, func.count(CrmRegistro.id))
+            .where(*filtros_e).group_by(CrmRegistro.sucursal)
+        )
+        for suc, cnt in res.fetchall():
+            s = suc if suc in por_suc else "Campeche"
+            por_suc[s]["entraron"] += int(cnt or 0)
+
+        # 2) Mapa teléfono(sufijo) → sucursal, para atribuir los mensajes
+        res = await session.execute(select(CrmRegistro.telefono, CrmRegistro.sucursal))
+        suf_a_suc = {}
+        for tel, suc in res.fetchall():
+            suf_a_suc[_sufijo_tel(tel)] = suc if suc in por_suc else "Campeche"
+
+        # 3) Mensajes en el rango → atribuir por sufijo de teléfono
+        filtros_m = []
+        if desde is not None:
+            filtros_m.append(Mensaje.timestamp >= desde)
+        if hasta is not None:
+            filtros_m.append(Mensaje.timestamp < hasta)
+        res = await session.execute(select(Mensaje.telefono).where(*filtros_m))
+        for (tel,) in res.fetchall():
+            s = suf_a_suc.get(_sufijo_tel(tel), "Campeche")
+            por_suc[s]["mensajes"] += 1
+
+    # 4) Ventas ($ y número) por sucursal — reusa total_vendido_crm
+    for s in sucursales:
+        v = await total_vendido_crm(desde=desde, hasta=hasta, sucursal=s)
+        por_suc[s]["vendido"] = v["total"]
+        por_suc[s]["ventas"] = v["num"]
+
+    total = {
+        "entraron": sum(d["entraron"] for d in por_suc.values()),
+        "vendido":  sum(d["vendido"] for d in por_suc.values()),
+        "ventas":   sum(d["ventas"] for d in por_suc.values()),
+        "mensajes": sum(d["mensajes"] for d in por_suc.values()),
+    }
+    return {"por_sucursal": por_suc, "total": total}
+
+
 # Ciclo de vida de un cliente: el estado solo AVANZA, nunca retrocede.
 _ORDEN_ESTADO = {"nuevo": 0, "asignado": 1, "proceso": 2, "vendido": 3}
 # Estados FINALES (fuera del embudo activo): venta cerrada o lead perdido.

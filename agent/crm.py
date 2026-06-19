@@ -110,6 +110,15 @@ HTML_PANEL = r"""<!DOCTYPE html>
   .card.no_contesto { border-left-color: #555; opacity: .65; }
   .card.no_concretado { border-left-color: #d4a017; opacity: .8; }
   .card.esperando_pago { border-left-color: #00897b; background: #e0f2f1; }
+  .costos-box { display:flex; gap:14px; flex-wrap:wrap; align-items:center; background:#fff; border:1px solid #e7e1d7; border-radius:12px; padding:14px; margin-bottom:14px; }
+  .costos-box label { font-size:14px; color:#333; }
+  .costos-box input { width:110px; padding:7px 9px; border:1px solid #ccc; border-radius:8px; font-size:14px; margin-left:4px; }
+  .costos-box .costo-tot { margin-left:auto; font-size:15px; color:#161616; }
+  .tabla-analisis { width:100%; border-collapse:collapse; background:#fff; border-radius:10px; overflow:hidden; font-size:14px; }
+  .tabla-analisis th { background:#161616; color:#fff; padding:9px 8px; text-align:right; font-weight:600; }
+  .tabla-analisis th:first-child { text-align:left; }
+  .tabla-analisis td { padding:9px 8px; text-align:right; border-bottom:1px solid #eee; }
+  .tabla-analisis td:first-child { text-align:left; }
   .card .head { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 8px; }
   .card .nombre { font-weight: bold; font-size: 16px; }
   .card .tipo { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #eee; color: #555; text-transform: uppercase; }
@@ -178,7 +187,7 @@ HTML_PANEL = r"""<!DOCTYPE html>
 <div id="app" style="display:none">
   <div class="top">
     <h1>🤖 CRM LiTek</h1>
-    <div><span class="user" id="quien"></span> &nbsp; <button id="btnEquipo" onclick="abrirEquipo()" style="display:none">👥 Equipo</button> &nbsp; <button onclick="salir()">Salir</button></div>
+    <div><span class="user" id="quien"></span> &nbsp; <button id="btnAnalisis" onclick="toggleAnalisis()" style="display:none">📊 Análisis</button> &nbsp; <button id="btnEquipo" onclick="abrirEquipo()" style="display:none">👥 Equipo</button> &nbsp; <button onclick="salir()">Salir</button></div>
   </div>
   <div class="wrap">
     <div class="sucursales" id="sucursales">
@@ -215,7 +224,7 @@ HTML_PANEL = r"""<!DOCTYPE html>
       <button data-f="tipo" data-v="cliente">Clientes nuevos</button>
       <button data-f="tipo" data-v="ruleta">Ruleta</button>
     </div>
-    <div class="filtros">
+    <div class="filtros" id="filtros3">
       <button id="btnRevisar" onclick="toggleRevisar()" style="background:#ffe0e0;color:#b71c1c;border-color:#ffb3b3;">⚠️ Solo a revisar</button>
       <button id="btnExpres" onclick="toggleSoloExpres()" style="background:#fff3e0;color:#e65100;border-color:#ffb74d;">⚡ Solo exprés</button>
       <button id="btnCalif" onclick="toggleSoloCalif()" style="background:#e8f5e9;color:#2e7d32;border-color:#a5d6a7;">⭐ Calificaciones</button>
@@ -223,6 +232,7 @@ HTML_PANEL = r"""<!DOCTYPE html>
       <button id="btnDiseno" onclick="toggleSoloDiseno()" style="background:#ede7f6;color:#5e35b1;border-color:#b39ddb;">🎨 Solo diseño</button>
     </div>
     <div id="lista"></div>
+    <div id="analisisPanel" style="display:none"></div>
   </div>
 </div>
 
@@ -307,22 +317,23 @@ function initVentas(){
   if (a) a.value = m;
   if (b) b.value = m;
 }
+function redibujar(){ if (MODO_ANALISIS){ cargarAnalisis(); } else { cargar(); } }
 function aplicarVentas(){
   V_TODO = false;
   V_DESDE = document.getElementById("vDesde").value || "";
   V_HASTA = document.getElementById("vHasta").value || "";
   resaltarTodo(false);
-  cargar();
+  redibujar();
 }
 function ventasMesActual(){
   initVentas();
   resaltarTodo(false);
-  cargar();
+  redibujar();
 }
 function ventasTodo(){
   V_TODO = true;
   resaltarTodo(true);
-  cargar();
+  redibujar();
 }
 function resaltarTodo(on){
   var b = document.getElementById("btnVentasTodo");
@@ -341,6 +352,7 @@ async function cargar(){
     var d = await r.json();
     document.getElementById("quien").textContent = "👤 " + (d.nombre || "") + (d.es_director ? "" : " · viendo solo lo tuyo");
     document.getElementById("btnEquipo").style.display = (d.es_director && !d.solo_sucursal) ? "inline-block" : "none";
+    document.getElementById("btnAnalisis").style.display = d.es_director ? "inline-block" : "none";
     ES_DIRECTOR = !!d.es_director;
     document.getElementById("ventasFiltro").style.display = ES_DIRECTOR ? "flex" : "none";
     // Admin de UNA sola sucursal (ej. Leo→Carmen): se le fija y se oculta el selector.
@@ -354,6 +366,97 @@ async function cargar(){
     ULTIMOS_REGISTROS = d.registros || [];
     aplicarBusqueda();
   }catch(e){ console.log(e); }
+}
+
+// ── Panel de análisis de mensajería (solo director) ──
+var MODO_ANALISIS = false;
+var ANALISIS_DATA = null;
+var _ELEMS_NORMALES = ["buscar","stats","filtros","filtros2","filtros3","lista","carga"];
+
+function toggleAnalisis(){
+  MODO_ANALISIS = !MODO_ANALISIS;
+  _ELEMS_NORMALES.forEach(function(id){ var e=document.getElementById(id); if(e) e.style.display = MODO_ANALISIS ? "none" : ""; });
+  document.getElementById("ventasFiltro").style.display = "flex"; // el filtro de mes se queda para elegir periodo
+  document.getElementById("analisisPanel").style.display = MODO_ANALISIS ? "block" : "none";
+  document.getElementById("btnAnalisis").textContent = MODO_ANALISIS ? "← Volver" : "📊 Análisis";
+  if (MODO_ANALISIS){ cargarAnalisis(); } else { cargar(); }
+}
+
+function _claveCostos(rango){ return "costos_" + (rango||"mes"); }
+function _costosGuardados(rango){ try{ return JSON.parse(localStorage.getItem(_claveCostos(rango))||"{}"); }catch(e){ return {}; } }
+function _money(n){ return "$" + (Math.round(n||0)).toLocaleString("es-MX"); }
+
+async function cargarAnalisis(){
+  var panel = document.getElementById("analisisPanel");
+  panel.innerHTML = "<div style='padding:20px;color:#777'>Calculando…</div>";
+  var url = "/crm/api/analisis";
+  if (V_TODO){ url += "?desde=todo&hasta=todo"; }
+  else if (V_DESDE || V_HASTA){ url += "?desde=" + encodeURIComponent(V_DESDE||V_HASTA) + "&hasta=" + encodeURIComponent(V_HASTA||V_DESDE); }
+  try{
+    var r = await fetch(url, {headers:{"Authorization":"Bearer "+TOKEN}});
+    if (r.status === 401){ salir(); return; }
+    if (r.status === 403){ panel.innerHTML = "<div style='padding:20px'>Solo el director ve el análisis.</div>"; return; }
+    ANALISIS_DATA = await r.json();
+    pintarAnalisis();
+  }catch(e){ console.log(e); panel.innerHTML = "<div style='padding:20px'>Error cargando el análisis.</div>"; }
+}
+
+function guardarCostos(){
+  if(!ANALISIS_DATA) return;
+  var c = {
+    ia: parseFloat(document.getElementById("cIA").value)||0,
+    whapi: parseFloat(document.getElementById("cWhapi").value)||0,
+    railway: parseFloat(document.getElementById("cRailway").value)||0
+  };
+  localStorage.setItem(_claveCostos(ANALISIS_DATA.rango), JSON.stringify(c));
+  pintarAnalisis();
+}
+
+function pintarAnalisis(){
+  var d = ANALISIS_DATA; if(!d) return;
+  var c = _costosGuardados(d.rango);
+  var costoTotal = (c.ia||0) + (c.whapi||0) + (c.railway||0);
+  var totMsg = d.total.mensajes || 0;
+  function fila(nombre, x, esTotal){
+    var share = esTotal ? 1 : (totMsg>0 ? (x.mensajes/totMsg) : 0);
+    var costo = costoTotal * share;
+    var ganancia = x.vendido - costo;
+    var cpc = x.entraron>0 ? costo/x.entraron : 0;
+    var cpv = x.ventas>0 ? costo/x.ventas : 0;
+    var pct = x.vendido>0 ? (costo/x.vendido*100) : 0;
+    var gcol = ganancia>=0 ? "#2e7d32" : "#c62828";
+    var estilo = esTotal ? " style='background:#fff8e1;border-top:2px solid #e30613'" : "";
+    var b0=esTotal?"<b>":"", b1=esTotal?"</b>":"";
+    return "<tr"+estilo+">"+
+      "<td>"+b0+nombre+b1+"</td>"+
+      "<td>"+b0+x.entraron+b1+"</td>"+
+      "<td>"+b0+x.mensajes+b1+"</td>"+
+      "<td>"+b0+_money(x.vendido)+b1+"</td>"+
+      "<td>"+b0+x.ventas+b1+"</td>"+
+      "<td>"+b0+_money(costo)+b1+"</td>"+
+      "<td style='color:"+gcol+";font-weight:bold'>"+_money(ganancia)+"</td>"+
+      "<td>"+b0+_money(cpc)+b1+"</td>"+
+      "<td>"+b0+_money(cpv)+b1+"</td>"+
+      "<td>"+b0+pct.toFixed(0)+"%"+b1+"</td>"+
+    "</tr>";
+  }
+  var sucs = ["Campeche","Carmen","Mérida"];
+  var filas = sucs.map(function(s){ return fila(s, d.por_sucursal[s], false); }).join("");
+  filas += fila("TOTAL", d.total, true);
+
+  document.getElementById("analisisPanel").innerHTML =
+    "<h2 style='margin:6px 0'>📊 Análisis de mensajería — "+d.rango+"</h2>"+
+    "<p style='color:#777;margin:2px 0 14px'>Elige el mes con el filtro de 💰 Ventas de arriba. Escribe los costos del mes EN PESOS (es el total del negocio); se reparten por sucursal según sus mensajes.</p>"+
+    "<div class='costos-box'>"+
+      "<label>🤖 IA (Anthropic) $ <input id='cIA' type='number' min='0' placeholder='0' value='"+(c.ia||"")+"' oninput='guardarCostos()'></label>"+
+      "<label>📱 Whapi $ <input id='cWhapi' type='number' min='0' placeholder='0' value='"+(c.whapi||"")+"' oninput='guardarCostos()'></label>"+
+      "<label>☁️ Railway $ <input id='cRailway' type='number' min='0' placeholder='0' value='"+(c.railway||"")+"' oninput='guardarCostos()'></label>"+
+      "<span class='costo-tot'>Costo total del mes: <b>"+_money(costoTotal)+"</b></span>"+
+    "</div>"+
+    "<div style='overflow-x:auto'><table class='tabla-analisis'><thead><tr>"+
+      "<th>Sucursal</th><th>Entraron</th><th>Mensajes</th><th>Vendido</th><th>Ventas</th><th>Costo</th><th>Ganancia</th><th>$/conv</th><th>$/venta</th><th>% costo</th>"+
+    "</tr></thead><tbody>"+filas+"</tbody></table></div>"+
+    "<p style='color:#999;font-size:12px;margin-top:10px'>💡 \"Ganancia\" = Vendido − Costo. \"$/conv\" = costo por conversación. \"$/venta\" = costo por cada venta. \"% costo\" = qué parte de lo vendido se fue en mensajería.</p>";
 }
 
 var ULTIMOS_REGISTROS = [];

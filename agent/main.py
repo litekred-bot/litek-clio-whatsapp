@@ -50,6 +50,7 @@ from agent.memory import (
     reactivar_cliente_no_contesto, marcar_no_contesto_automatico,
     marcar_no_concretado_automatico, marcar_esperando_pago_automatico, marcar_expres_crm,
     guardar_calificacion_crm, guardar_monto_crm, total_vendido_crm, backfill_montos_crm,
+    analisis_mensajeria,
     guardar_sucursal_crm, sucursal_crm_por_telefono, marcar_factura_crm, forzar_asesor_crm,
     canalizar_diseno_brayan, marcar_diseno_crm,
 )
@@ -428,6 +429,36 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = "",
         "solo_sucursal": suc_forzada,
         "carga": carga,
     }
+
+
+@app.get("/crm/api/analisis")
+async def crm_analisis(request: Request, desde: str = "", hasta: str = ""):
+    """
+    Análisis de costo de mensajería (entraron / vendido / mensajes) por sucursal y total.
+    SOLO para el director/administrador (es información de dinero). Los costos los pone
+    el panel en pesos; aquí solo damos los conteos para repartirlos.
+    """
+    u = _crm_usuario_de_request(request)
+    if not u:
+        raise HTTPException(status_code=401, detail="No autorizado")
+    if not _es_admin(u["usuario"]):
+        raise HTTPException(status_code=403, detail="Solo administradores")
+
+    es_todo = (desde == "todo" or hasta == "todo")
+    if es_todo:
+        d_ini = d_fin = None
+        rango_label = "Todo"
+    else:
+        mes_actual = datetime.now(_TZ_CAMP).strftime("%Y-%m")
+        mes_desde = desde or mes_actual
+        mes_hasta = hasta or mes_desde
+        d_ini = _mes_inicio_utc(mes_desde)
+        d_fin = _mes_siguiente_utc(mes_hasta)
+        rango_label = mes_desde if mes_desde == mes_hasta else (mes_desde + " a " + mes_hasta)
+
+    data = await analisis_mensajeria(desde=d_ini, hasta=d_fin)
+    data["rango"] = rango_label
+    return data
 
 
 @app.get("/crm/api/chat")
