@@ -52,7 +52,7 @@ from agent.memory import (
     guardar_calificacion_crm, guardar_monto_crm, total_vendido_crm, backfill_montos_crm,
     analisis_mensajeria,
     guardar_sucursal_crm, sucursal_crm_por_telefono, marcar_factura_crm, forzar_asesor_crm,
-    canalizar_diseno_brayan, marcar_diseno_crm, rutear_asesor_merida,
+    canalizar_diseno_disenador, marcar_diseno_crm, rutear_asesor_merida,
 )
 from zoneinfo import ZoneInfo as _ZI
 
@@ -105,6 +105,8 @@ ASESOR_WHATSAPP = os.getenv("ASESOR_WHATSAPP", "120363425558631008@g.us")  # Cam
 ASESOR_WHATSAPP_CARMEN = os.getenv("ASESOR_WHATSAPP_CARMEN", "120363408250148529@g.us")
 # Mapa sucursal → grupo de alertas
 GRUPO_ALERTA_SUCURSAL = {"Carmen": ASESOR_WHATSAPP_CARMEN}
+# Diseñador de LiTek (Erick): recibe aviso de cada diseño PAGADO para realizarlo
+ERICK_WHATSAPP = os.getenv("ERICK_WHATSAPP", "529811388507")
 
 
 async def _grupo_alerta_de(telefono: str) -> str:
@@ -284,7 +286,7 @@ def _crm_usuario_de_request(request: Request) -> dict | None:
 # Quién ve qué: director (Chino) y administradora (Tere) ven TODO;
 # cada asesor (Anna, Brayan) ve SOLO lo asignado a él.
 CRM_VEN_TODO = {"chino", "tere"}
-CRM_USUARIO_A_ASESOR = {"anna": "Anna", "brayan": "Brayan", "alan": "Alan", "jadiel": "Jadiel"}
+CRM_USUARIO_A_ASESOR = {"anna": "Anna", "brayan": "Brayan", "alan": "Alan", "jadiel": "Jadiel", "erick": "Erick"}
 # Administradores de UNA sola sucursal: ven todo lo de SU sucursal (clientes + dinero),
 # pero nada de las demás. Ej: Leo ve solo Carmen.
 CRM_ADMIN_SUCURSAL = {"leo": "Carmen", "edith": "Mérida"}
@@ -1211,14 +1213,25 @@ async def _procesar_mensaje(msg):
             except Exception as e:
                 logger.error(f"Error registrando pedido en CRM: {e}")
 
-            # Carmen: pedido PAGADO marcado con diseño (🎨) → pasa a Brayan (diseño).
-            # La tarjeta se mueve al módulo de Campeche; Brayan la regresa a Carmen al
-            # terminar. canalizar_diseno_brayan solo actúa si la tarjeta es diseño + Carmen.
+            # Pedido PAGADO marcado con diseño (🎨), de CUALQUIER sucursal → pasa a ERICK
+            # (diseñador de todo LiTek) y se le avisa. Erick lo regresa al asesor al terminar.
             try:
-                if await canalizar_diseno_brayan(numero_limpio):
-                    logger.info(f"Pedido pagado con diseño (Carmen) → Brayan: {numero_limpio}")
+                info_dis = await canalizar_diseno_disenador(numero_limpio)
+                if info_dis:
+                    logger.info(f"Pedido pagado con diseño → Erick: {numero_limpio}")
+                    aviso_erick = (
+                        f"🎨 *DISEÑO POR HACER — CLIO*\n\n"
+                        f"👤 *Cliente:* {info_dis['nombre']}\n"
+                        f"📱 *WhatsApp:* {num_display}\n"
+                        f"📋 *Pedido:* {info_dis['descripcion'][:200]}\n"
+                        f"🏢 *Sucursal:* {info_dis['sucursal']}\n"
+                        f"🙋 *Asesor del producto:* {info_dis['asesor_original'] or 'sin asignar'}\n\n"
+                        f"Favor de realizar el diseño. Cuando esté listo, en el panel "
+                        f"reasígnalo a *{info_dis['asesor_original'] or 'su asesor'}* y avísale. 🙌"
+                    )
+                    await proveedor.enviar_mensaje(ERICK_WHATSAPP, aviso_erick)
             except Exception as e:
-                logger.error(f"Error canalizando diseño a Brayan: {e}")
+                logger.error(f"Error canalizando diseño a Erick: {e}")
             msg_asesor = (
                 f"✅ *PEDIDO CONFIRMADO — CLIO*\n\n"
                 f"👤 *Cliente:* {nombre_cli}\n"

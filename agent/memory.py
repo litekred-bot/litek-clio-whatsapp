@@ -403,6 +403,8 @@ async def _crear_usuarios_crm_iniciales():
         "jadiel": ("carmen-jadiel-39", "Jadiel (Asesor Carmen/Mérida)"),
         # Sucursal Mérida
         "edith":  ("merida-edith-08",  "Edith (Admin Mérida)"),
+        # Diseñador (todos los diseños pagados de LiTek)
+        "erick":  ("erick-diseno-07",  "Erick (Diseñador)"),
     }
     async with async_session() as session:
         for usuario, (pwd, nombre) in iniciales.items():
@@ -670,14 +672,15 @@ async def rutear_asesor_merida(telefono: str, producto: str) -> bool:
     return False
 
 
-async def canalizar_diseno_brayan(telefono: str) -> bool:
+async def canalizar_diseno_disenador(telefono: str) -> dict | None:
     """
-    Pedido PAGADO con diseño (🎨) de CUALQUIER sucursal → lo lleva Brayan (especialista
-    de diseño de todo LiTek). La tarjeta se mueve al módulo de Campeche (donde Brayan
-    trabaja). Al terminar el diseño, se regresa a su sucursal/asesor a mano en el panel.
+    Pedido PAGADO con diseño (🎨) de CUALQUIER sucursal → se asigna a ERICK (diseñador
+    de todo LiTek). Erick hace el diseño y al terminar lo regresa al asesor del producto
+    desde el panel. Guarda en notas a quién regresarlo y NO cambia la sucursal (para que
+    el admin de esa sucursal lo siga viendo).
 
-    Solo actúa si la tarjeta está marcada como diseño; si no, no hace nada.
-    Se llama al confirmarse el pago.
+    Solo actúa si la tarjeta está marcada como diseño. Retorna un dict con los datos para
+    avisarle a Erick {nombre, descripcion, asesor_original, sucursal}, o None si no aplica.
     """
     sufijo = _sufijo_tel(telefono)
     async with async_session() as session:
@@ -689,13 +692,23 @@ async def canalizar_diseno_brayan(telefono: str) -> bool:
         for r in result.scalars().all():
             if _sufijo_tel(r.telefono) == sufijo:
                 if not getattr(r, "diseno", False):
-                    return False
-                r.asesor = "Brayan"
-                r.sucursal = "Campeche"
+                    return None
+                if r.asesor == "Erick":
+                    return None  # ya está con Erick, no re-avisar
+                info = {
+                    "nombre": r.nombre or "Cliente",
+                    "descripcion": r.descripcion or "",
+                    "asesor_original": r.asesor or "",
+                    "sucursal": getattr(r, "sucursal", "") or "Campeche",
+                }
+                # Recordar a quién regresarlo cuando termine el diseño
+                regresar = info["asesor_original"] or "su asesor"
+                r.notas = (f"🎨 Diseño — regresar a: {regresar} ({info['sucursal']}). " + (r.notas or ""))[:480]
+                r.asesor = "Erick"
                 r.actualizado = datetime.utcnow()
                 await session.commit()
-                return True
-    return False
+                return info
+    return None
 
 
 async def estado_crm_por_telefono(telefono: str) -> str:
