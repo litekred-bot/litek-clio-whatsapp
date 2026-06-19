@@ -400,7 +400,9 @@ async def _crear_usuarios_crm_iniciales():
         # Sucursal Carmen
         "leo":    ("carmen-leo-86",    "Leo (Admin Carmen)"),
         "alan":   ("carmen-alan-71",   "Alan (Asesor Carmen)"),
-        "jadiel": ("carmen-jadiel-39", "Jadiel (Asesor Carmen)"),
+        "jadiel": ("carmen-jadiel-39", "Jadiel (Asesor Carmen/Mérida)"),
+        # Sucursal Mérida
+        "edith":  ("merida-edith-08",  "Edith (Admin Mérida)"),
     }
     async with async_session() as session:
         for usuario, (pwd, nombre) in iniciales.items():
@@ -625,19 +627,56 @@ async def guardar_sucursal_crm(telefono: str, sucursal: str) -> bool:
                     r.asesor = await _asesor_carmen_default(session)
                     if r.estado == "nuevo":
                         r.estado = "asignado"
+                # Mérida: dueño por defecto Jadiel (productos "otros"); las lonas/viniles
+                # se mueven a Edith al cotizar (rutear_asesor_merida).
+                if sucursal == "Mérida" and r.asesor not in ("Edith", "Jadiel"):
+                    r.asesor = "Jadiel"
+                    if r.estado == "nuevo":
+                        r.estado = "asignado"
                 r.actualizado = datetime.utcnow()
                 await session.commit()
                 return True
     return False
 
 
+# Productos que en MÉRIDA atiende Edith (lonas y viniles). Lo demás → Jadiel.
+_MERIDA_EDITH = {"lona", "vinil_impreso", "vinil_pvc", "corte_vinil", "coroplast", "microperforado"}
+
+
+async def rutear_asesor_merida(telefono: str, producto: str) -> bool:
+    """
+    Reparto de MÉRIDA por producto: lonas/viniles → Edith; los demás productos → Jadiel.
+    Solo toca tarjetas de Mérida. Se llama al cotizar (cuando ya se conoce el producto).
+    """
+    destino = "Edith" if producto in _MERIDA_EDITH else "Jadiel"
+    sufijo = _sufijo_tel(telefono)
+    async with async_session() as session:
+        result = await session.execute(
+            select(CrmRegistro)
+            .where(CrmRegistro.estado.not_in(ESTADOS_FINALES))
+            .order_by(CrmRegistro.creado.desc())
+        )
+        for r in result.scalars().all():
+            if _sufijo_tel(r.telefono) == sufijo:
+                if getattr(r, "sucursal", "") != "Mérida":
+                    return False
+                if r.asesor != destino:
+                    r.asesor = destino
+                    if r.estado == "nuevo":
+                        r.estado = "asignado"
+                    r.actualizado = datetime.utcnow()
+                    await session.commit()
+                return True
+    return False
+
+
 async def canalizar_diseno_brayan(telefono: str) -> bool:
     """
-    Pedido PAGADO con diseño (🎨) en Carmen → lo lleva Brayan (especialista de diseño).
-    La tarjeta se mueve al módulo de Campeche (donde Brayan trabaja). Brayan, al
-    terminar el diseño, la regresa a Carmen a mano (cambia sucursal + asesor en el panel).
+    Pedido PAGADO con diseño (🎨) de CUALQUIER sucursal → lo lleva Brayan (especialista
+    de diseño de todo LiTek). La tarjeta se mueve al módulo de Campeche (donde Brayan
+    trabaja). Al terminar el diseño, se regresa a su sucursal/asesor a mano en el panel.
 
-    Solo actúa si la tarjeta está marcada como diseño Y es de Carmen; si no, no hace nada.
+    Solo actúa si la tarjeta está marcada como diseño; si no, no hace nada.
     Se llama al confirmarse el pago.
     """
     sufijo = _sufijo_tel(telefono)
@@ -649,7 +688,7 @@ async def canalizar_diseno_brayan(telefono: str) -> bool:
         )
         for r in result.scalars().all():
             if _sufijo_tel(r.telefono) == sufijo:
-                if not getattr(r, "diseno", False) or getattr(r, "sucursal", "") != "Carmen":
+                if not getattr(r, "diseno", False):
                     return False
                 r.asesor = "Brayan"
                 r.sucursal = "Campeche"

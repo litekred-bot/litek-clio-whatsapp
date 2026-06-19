@@ -52,7 +52,7 @@ from agent.memory import (
     guardar_calificacion_crm, guardar_monto_crm, total_vendido_crm, backfill_montos_crm,
     analisis_mensajeria,
     guardar_sucursal_crm, sucursal_crm_por_telefono, marcar_factura_crm, forzar_asesor_crm,
-    canalizar_diseno_brayan, marcar_diseno_crm,
+    canalizar_diseno_brayan, marcar_diseno_crm, rutear_asesor_merida,
 )
 from zoneinfo import ZoneInfo as _ZI
 
@@ -287,11 +287,12 @@ CRM_VEN_TODO = {"chino", "tere"}
 CRM_USUARIO_A_ASESOR = {"anna": "Anna", "brayan": "Brayan", "alan": "Alan", "jadiel": "Jadiel"}
 # Administradores de UNA sola sucursal: ven todo lo de SU sucursal (clientes + dinero),
 # pero nada de las demás. Ej: Leo ve solo Carmen.
-CRM_ADMIN_SUCURSAL = {"leo": "Carmen"}
+CRM_ADMIN_SUCURSAL = {"leo": "Carmen", "edith": "Mérida"}
 # Asesores que pertenecen a cada sucursal (para la carga "Clientes por atender").
 ASESORES_POR_SUCURSAL = {
     "Campeche": ("Anna", "Brayan", "Tere"),
     "Carmen": ("Alan", "Jadiel"),
+    "Mérida": ("Edith", "Jadiel"),
 }
 
 
@@ -928,6 +929,9 @@ async def _procesar_mensaje(msg):
                     asesor_si_nuevo=asesor_prod,  # dueño fijo según el producto
                     cotizo=True,  # sella la hora de cotización → 'no concretado' si calla 10h
                 )
+                # Mérida: reparto por producto (lonas/viniles→Edith, otros→Jadiel).
+                if await sucursal_crm_por_telefono(tel_limpio) == "Mérida":
+                    await rutear_asesor_merida(tel_limpio, producto)
             except Exception as e:
                 logger.error(f"Error asignando lead cotizado en CRM: {e}")
 

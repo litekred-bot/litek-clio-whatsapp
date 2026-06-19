@@ -258,7 +258,7 @@ HTML_PANEL = r"""<!DOCTYPE html>
 <script>
 var TOKEN = localStorage.getItem("crm_token") || "";
 var fEstado = "", fTipo = "";
-var ASESORES = ["", "Anna", "Brayan", "Tere", "Chino", "Alan", "Jadiel"];
+var ASESORES = ["", "Anna", "Brayan", "Tere", "Chino", "Alan", "Jadiel", "Edith"];
 var ESTADOS = {nuevo:"🔵 Nuevo", asignado:"🟠 Asignado", proceso:"🟣 En proceso", vendido:"✅ Vendido", esperando_pago:"💳 Esperando pago", no_contesto:"⚫ No contestó", no_concretado:"🟡 No concretado"};
 var TIPOS = {escalacion:"Escalación", pedido:"Pedido", cliente:"Cliente", ruleta:"Ruleta"};
 
