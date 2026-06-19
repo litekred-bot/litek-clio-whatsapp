@@ -200,7 +200,7 @@ async def lifespan(app: FastAPI):
         minutes=30,
         args=[proveedor.token],
         id="seguimiento_ruleta",
-        name="Recordatorio de premio a ganadores que no contestan (+2h)",
+        name="Aviso a Erick de ganadores de ruleta que no contestan (+2h)",
         replace_existing=True,
     )
     # Reparto de ganadores de ruleta que llevan +2h sin avanzar (sin dueño).
@@ -210,7 +210,7 @@ async def lifespan(app: FastAPI):
         "interval",
         minutes=30,
         id="reparto_ruleta",
-        name="Repartir ganadores de ruleta sin avanzar (+2h) entre Anna y Brayan",
+        name="Asignar ganadores de ruleta sin avanzar (+2h) a Erick",
         replace_existing=True,
     )
     # Marcar 'No contestó' los leads sin actividad en 2 días (cada 3 horas).
@@ -652,8 +652,8 @@ async def ruleta_ping(nombre: str = "", telefono: str = "", premio: str = "", de
         return {"ok": False, "razon": "ya_jugo"}
 
     # Registrar en el CRM SIN dueño todavía. Si el cliente avanza (cotiza/compra),
-    # se le asigna por el flujo normal. Si NO avanza en 2h, un job lo reparte por
-    # turnos (ver asignar_ruletas_sin_avanzar). Así no se duplica si compra rápido.
+    # se le asigna por el flujo normal. Si NO avanza en 2h, un job lo asigna a Erick
+    # (ver asignar_ruletas_sin_avanzar). Así no se duplica si compra rápido.
     es_gol = juego == "gol"
     try:
         origen = "gol" if es_gol else "ruleta"

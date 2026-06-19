@@ -1400,11 +1400,10 @@ async def consolidar_duplicados_crm() -> dict:
     return {"grupos": grupos_borrados, "borrados": total_borrados}
 
 
-async def asignar_ruletas_sin_avanzar(horas: int = 2, asesor_default: str = "Anna") -> int:
+async def asignar_ruletas_sin_avanzar(horas: int = 2, asesor_default: str = "Erick") -> int:
     """
     Asigna los ganadores de ruleta que llevan +N horas SIN dueño y sin avanzar
-    (siguen en 'nuevo'). Como aún no identifican producto, van al asesor por
-    defecto (Anna, impresión general) para que alguien les dé seguimiento.
+    (siguen en 'nuevo') a ERICK, que da seguimiento a los premios de ruleta.
     Si ya cotizaron/compraron, ya tienen dueño por su producto y se ignoran.
     Retorna cuántos se asignaron.
     """
