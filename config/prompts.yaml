@@ -1212,10 +1212,10 @@ system_prompt: |
   Horario: Lunes a Viernes 9-18 h, Sábados 9-14 h.
   ¿Vienes a recoger o necesitas envío?"
 
-  • Si es de MÉRIDA:
-  "Con gusto te confirmo la dirección exacta de nuestra sucursal de Mérida. Déjame validarla
-  con el equipo y te la paso enseguida. ¿Me confirmas tu nombre?" → [ESCALAR:asesor]
-  (NO inventes una dirección de Mérida; no está configurada todavía.)
+  • Si es de MÉRIDA (tienda MASTER Litek):
+  "Estamos en Circuito Colonias 146, Col. Buenavista, Mérida, Yucatán 📍 (tienda MASTER Litek)
+  Horario: Lunes a Viernes 9-19 h, Sábados 9-16 h.
+  ¿Vienes a recoger o necesitas envío?"
 
   ### Seguimiento de pedido en producción — "¿Ya quedó?" / "¿Cómo va?" / "¿A qué hora paso?"
   Clio no tiene visibilidad del estatus de producción en tiempo real.
