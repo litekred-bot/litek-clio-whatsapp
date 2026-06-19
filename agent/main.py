@@ -114,6 +114,8 @@ ERICK_WHATSAPP = os.getenv("ERICK_WHATSAPP", "529811388507")
 TERE_WHATSAPP = os.getenv("TERE_WHATSAPP", "529811388508")
 LEO_WHATSAPP = os.getenv("LEO_WHATSAPP", "529818299794")
 FACTURA_WHATSAPP = {"Campeche": TERE_WHATSAPP, "Carmen": LEO_WHATSAPP, "Mérida": LEO_WHATSAPP}
+# Chino (director): recibe directo las quejas de Mérida (además del grupo)
+CHINO_WHATSAPP = os.getenv("CHINO_WHATSAPP", "529812710000")
 
 
 async def _grupo_alerta_de(telefono: str) -> str:
@@ -1372,6 +1374,20 @@ async def _procesar_mensaje(msg):
                 grupo=ASESOR_WHATSAPP,
             )
             logger.info(f"Escalación enviada a área: {area_escalar} (sucursal: {suc_cliente})")
+
+            # Quejas de MÉRIDA (escalación al director) → también directo a Chino.
+            if suc_cliente == "Mérida" and area_escalar == "director":
+                try:
+                    tel_q = msg.telefono.replace("@s.whatsapp.net", "")
+                    aviso_chino = (
+                        f"😠 *QUEJA / MÉRIDA — CLIO*\n\n"
+                        f"👤 {msg.nombre_perfil or 'Cliente'}\n"
+                        f"📱 wa.me/{''.join(c for c in tel_q if c.isdigit())}\n\n"
+                        f"{resumen_completo[:300]}"
+                    )
+                    await proveedor.enviar_mensaje(CHINO_WHATSAPP, aviso_chino)
+                except Exception as e:
+                    logger.error(f"Error avisando queja Mérida a Chino: {e}")
 
             # Registrar la escalación en el CRM, asignada al asesor correspondiente.
             # En Carmen NO se reasigna: el dueño por turnos (Alan/Jadiel) se queda.
