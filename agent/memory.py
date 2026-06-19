@@ -587,9 +587,9 @@ async def telefono_conversacion(telefono: str) -> str:
 async def _asesor_carmen_default(session=None) -> str:
     """Dueño por defecto en Carmen: SIEMPRE Jadiel.
     Jadiel cotiza y cierra la venta (aunque después se pague, se queda con él).
-    Alan (producción) y Brayan (diseño) reciben las tarjetas DESPUÉS: Brayan por la
-    regla automática de pago+diseño (canalizar_diseno_brayan), y Alan a mano cuando
-    Brayan/el equipo la pasan a producción."""
+    Erick (diseño) y Alan (producción) reciben las tarjetas DESPUÉS: Erick por la regla
+    automática de pago+diseño (canalizar_diseno_disenador), y Alan a mano cuando el
+    equipo la pasa a producción."""
     return "Jadiel"
 
 
