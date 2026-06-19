@@ -76,11 +76,12 @@ def es_horario_atencion(sucursal: str = "") -> bool:
 # ── Reparto POR PRODUCTO (no por turnos) ──────────────────────────────────────
 # El primer producto que identifica el cliente define su asesor; luego no cambia.
 PRODUCTO_A_ASESOR = {
-    # Anna — impresión general
-    "lona": "Anna", "vinil_impreso": "Anna", "vinil_pvc": "Anna",
-    "coroplast": "Anna", "microperforado": "Anna", "papel_couche": "Anna",
-    "papel_bond": "Anna", "tabloide_laser": "Anna", "corte_vinil": "Anna",
-    # Brayan — letreros, rótulos y etiquetas
+    # Anna — lonas, vinil impreso e impresión general
+    "lona": "Anna", "vinil_impreso": "Anna", "microperforado": "Anna",
+    "tabloide_laser": "Anna", "corte_vinil": "Anna",
+    # Brayan — letreros/etiquetas + vinil rígido (PVC/coroplast) y papel gran formato
+    "vinil_pvc": "Brayan", "coroplast": "Brayan",
+    "papel_couche": "Brayan", "papel_bond": "Brayan",
     "etiqueta_5x5": "Brayan", "etiqueta_personalizada": "Brayan",
 }
 
