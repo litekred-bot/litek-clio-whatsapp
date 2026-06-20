@@ -154,7 +154,10 @@ async def generar_respuesta(
     `señales` (opcional): si se pasa un dict, se rellena con banderas del turno.
     Hoy: señales["cotizo"] = True si Clio dio un precio (producto identificado).
     """
-    if not mensaje or len(mensaje.strip()) < 2:
+    # Mensaje vacío o un solo carácter NO numérico → fallback.
+    # Pero un dígito suelto (1/2/3) SÍ se procesa: es la respuesta a la calificación.
+    _m = (mensaje or "").strip()
+    if not _m or (len(_m) < 2 and not _m.isdigit()):
         return obtener_mensaje_fallback()
 
     system_prompt = cargar_system_prompt()
