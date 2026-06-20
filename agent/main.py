@@ -1173,6 +1173,11 @@ async def _procesar_mensaje(msg):
             await proveedor.enviar_sticker(msg.telefono, "logo")
             logger.info("Sticker de bienvenida enviado: logo")
 
+        # Sticker CALIDAD PERRONA — cuando el cliente señaló producto (hubo cotización)
+        elif señales.get("cotizo") and hasattr(proveedor, 'enviar_sticker'):
+            await proveedor.enviar_sticker(msg.telefono, "calidad")
+            logger.info("Sticker enviado: calidad (cotización)")
+
         logger.info(f"Respuesta a {msg.telefono}: {respuesta}")
 
         # Enviar copia de cotización al dueño (productos que no son lonas)
