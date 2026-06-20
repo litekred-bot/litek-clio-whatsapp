@@ -51,6 +51,9 @@ class ProveedorWhapi(ProveedorWhatsApp):
         "asesor_ana":     BASE + "asesor_ana.JPG",
         "asesor_brayan":  BASE + "asesor_brayan.JPG",
         "asesor_tere":    BASE + "asesor_tere.JPG",
+        # Fotos de los LOCALES por sucursal (para mandar con la ubicación)
+        "local_carmen":   BASE + "local_carmen.jpg",
+        "local_merida":   BASE + "local_merida.jpg",
         # Catálogo general (si no hay foto específica, usar lonas como referencia)
         "catalogo":           BASE + "img_lonas.JPG",
     }
