@@ -51,7 +51,7 @@ from agent.memory import (
     marcar_no_concretado_automatico, marcar_esperando_pago_automatico, marcar_expres_crm,
     guardar_calificacion_crm, guardar_monto_crm, total_vendido_crm, backfill_montos_crm,
     analisis_mensajeria,
-    guardar_sucursal_crm, sucursal_crm_por_telefono, marcar_factura_crm, forzar_asesor_crm,
+    guardar_sucursal_crm, sucursal_crm_por_telefono, asesor_crm_por_telefono, marcar_factura_crm, forzar_asesor_crm,
     canalizar_diseno_disenador, marcar_diseno_crm, rutear_asesor_merida,
 )
 from zoneinfo import ZoneInfo as _ZI
@@ -116,6 +116,24 @@ LEO_WHATSAPP = os.getenv("LEO_WHATSAPP", "529818299794")
 FACTURA_WHATSAPP = {"Campeche": TERE_WHATSAPP, "Carmen": LEO_WHATSAPP, "Mérida": LEO_WHATSAPP}
 # Chino (director): recibe directo las quejas de Mérida (además del grupo)
 CHINO_WHATSAPP = os.getenv("CHINO_WHATSAPP", "529812710000")
+# WhatsApp PERSONAL de cada asesor → para mandarle la alerta también en privado
+# (además del grupo, que el director usa como seguimiento).
+ASESOR_PERSONAL = {
+    "Anna": "529818290272", "Brayan": "529811670283", "Tere": "529811388508",
+    "Leo": "529818299794", "Alan": "529381881109", "Jadiel": "529901017233",
+    "Edith": "529811068908", "Erick": "529811388507", "Chino": "529812710000",
+}
+
+
+async def _avisar_personal(asesor: str, mensaje: str):
+    """Manda la alerta en privado al asesor (además del grupo). Silencioso si falla."""
+    num = ASESOR_PERSONAL.get((asesor or "").strip())
+    if not num:
+        return
+    try:
+        await proveedor.enviar_mensaje(num, mensaje)
+    except Exception as e:
+        logger.error(f"Error avisando en privado a {asesor}: {e}")
 
 
 async def _grupo_alerta_de(telefono: str) -> str:
@@ -1272,6 +1290,12 @@ async def _procesar_mensaje(msg):
             try:
                 await proveedor.enviar_mensaje(ASESOR_WHATSAPP, msg_asesor)
                 logger.info(f"Pedido confirmado enviado al asesor ({ASESOR_WHATSAPP})")
+                # Además, en privado al asesor dueño de la tarjeta (el grupo queda de seguimiento).
+                try:
+                    _dueno = await asesor_crm_por_telefono(numero_limpio)
+                    await _avisar_personal(_dueno, msg_asesor)
+                except Exception as e:
+                    logger.error(f"Error aviso privado pedido: {e}")
 
                 # 1) Reenviar el COMPROBANTE de pago.
                 # Si el turno actual trae imagen/doc, ese es el comprobante.
@@ -1410,6 +1434,16 @@ async def _procesar_mensaje(msg):
                 # En Carmen, el DISEÑO/letreros lo lleva Jadiel (especialista). Forzamos.
                 if es_carmen and area_escalar == "letreros":
                     await forzar_asesor_crm(msg.telefono.replace("@s.whatsapp.net", ""), "Jadiel")
+                # Aviso en PRIVADO al asesor dueño (además del grupo, que es seguimiento).
+                _tel_esc = msg.telefono.replace("@s.whatsapp.net", "")
+                _dueno_esc = await asesor_crm_por_telefono(_tel_esc)
+                aviso_esc = (
+                    f"🔔 *ESCALACIÓN — CLIO*\n\n"
+                    f"👤 {msg.nombre_perfil or 'Cliente'}\n"
+                    f"📱 wa.me/{''.join(c for c in _tel_esc if c.isdigit())}\n\n"
+                    f"{resumen_completo[:300]}"
+                )
+                await _avisar_personal(_dueno_esc, aviso_esc)
             except Exception as e:
                 logger.error(f"Error registrando escalación en CRM: {e}")
 
