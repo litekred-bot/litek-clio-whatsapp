@@ -303,9 +303,10 @@ CRM_USUARIO_MULTI = {"taller": ("Brayan", "Erick")}
 CRM_ADMIN_SUCURSAL = {"leo": "Carmen", "edith": "Mérida"}
 # Asesores que pertenecen a cada sucursal (para la carga "Clientes por atender").
 ASESORES_POR_SUCURSAL = {
-    "Campeche": ("Anna", "Brayan", "Tere"),
-    "Carmen": ("Alan", "Jadiel"),
-    "Mérida": ("Edith", "Jadiel"),
+    # Erick (diseñador) aparece en las 3 porque atiende diseños de todas.
+    "Campeche": ("Anna", "Brayan", "Tere", "Erick"),
+    "Carmen": ("Alan", "Jadiel", "Erick"),
+    "Mérida": ("Edith", "Jadiel", "Erick"),
 }
 
 

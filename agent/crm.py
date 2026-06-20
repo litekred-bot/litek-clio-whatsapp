@@ -83,7 +83,7 @@ HTML_PANEL = r"""<!DOCTYPE html>
   .card .acciones .bfact { background: #fff3e0; color: #e65100; border: 1px solid #ffb74d; border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
   .card .acciones .bfact.on { background: #2e7d32; color: #fff; border-color: #2e7d32; }
   .carga { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0 6px; }
-  .carga .a { background: #fff3e0; border: 1px solid #ffcc80; border-radius: 20px; padding: 8px 16px; font-size: 14px; }
+  .carga .a { background: #fff3e0; border: 1px solid #ffcc80; border-radius: 20px; padding: 8px 16px; font-size: 14px; cursor: pointer; }
   .carga .a b { color: #e65100; font-size: 17px; }
   .carga .titulo { width: 100%; font-size: 12px; color: #888; margin-bottom: 2px; }
   .buscador { width: 100%; padding: 11px 14px; border: 1px solid #ccc; border-radius: 10px; font-size: 15px; margin: 6px 0 12px; }
@@ -361,6 +361,7 @@ async function cargar(){
       var sucBar = document.getElementById("sucursales");
       if (sucBar) sucBar.style.display = "none";
     }
+    window._cargaCache = d.carga;
     pintarCarga(d.carga);
     pintarStats(d.stats, d.ventas);
     ULTIMOS_REGISTROS = d.registros || [];
@@ -475,6 +476,7 @@ function aplicarBusqueda(){
   if (SOLO_CALIF){ regs = regs.filter(function(r){ return r.calificacion; }); }
   if (SOLO_FACTURA){ regs = regs.filter(function(r){ return r.factura && !r.facturado; }); }
   if (SOLO_DISENO){ regs = regs.filter(function(r){ return r.diseno; }); }
+  if (fAsesorChip){ regs = regs.filter(function(r){ return r.asesor === fAsesorChip && FINALES_JS.indexOf(r.estado) === -1; }); }
   if (q){
     regs = regs.filter(function(r){
       var nom = (r.nombre || "").toLowerCase();
@@ -545,13 +547,23 @@ async function toggleFacturado(id, valor){
   cargar();
 }
 
+var fAsesorChip = "";
+var FINALES_JS = ["vendido","no_contesto","no_concretado","esperando_pago","cerrado"];
+
 function pintarCarga(c){
   var el = document.getElementById("carga");
   if(!c){ el.innerHTML = ""; return; }
   var chips = Object.keys(c).map(function(a){
-    return '<div class="a">'+a+' <b>'+c[a]+'</b></div>';
+    var act = (fAsesorChip === a) ? ' style="background:#e30613;color:#fff;border-color:#e30613;"' : '';
+    return '<div class="a" onclick="filtrarPorAsesor(\''+a+'\')"'+act+'>'+a+' <b>'+c[a]+'</b></div>';
   }).join("");
-  el.innerHTML = '<div class="titulo">Clientes por atender (pendientes):</div>' + chips;
+  el.innerHTML = '<div class="titulo">Clientes por atender (pendientes) — toca un nombre para ver los suyos:</div>' + chips;
+}
+
+function filtrarPorAsesor(a){
+  fAsesorChip = (fAsesorChip === a) ? "" : a;  // toca otra vez para quitar
+  aplicarBusqueda();
+  if (window._cargaCache) pintarCarga(window._cargaCache);
 }
 
 function fmtDinero(n){
