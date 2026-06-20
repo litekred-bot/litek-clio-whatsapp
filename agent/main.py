@@ -1168,10 +1168,10 @@ async def _procesar_mensaje(msg):
             await proveedor.enviar_sticker(msg.telefono, sticker_nombre)
             logger.info(f"Sticker enviado: {sticker_nombre}")
 
-        # Sticker de bienvenida — primer mensaje del cliente
+        # Sticker de bienvenida — primer mensaje del cliente → el LOGO de LiTek
         elif es_primer_mensaje and hasattr(proveedor, 'enviar_sticker'):
-            await proveedor.enviar_sticker(msg.telefono, "calidad")
-            logger.info("Sticker de bienvenida enviado: calidad")
+            await proveedor.enviar_sticker(msg.telefono, "logo")
+            logger.info("Sticker de bienvenida enviado: logo")
 
         logger.info(f"Respuesta a {msg.telefono}: {respuesta}")
 
