@@ -16,7 +16,7 @@ class ProveedorWhapi(ProveedorWhatsApp):
     # URLs de stickers en GitHub (raw)
     STICKERS = {
         "calidad": "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/sticker_calidad.webp",
-        "logo":    "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/sticker_logo.webp",
+        "logo":    "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/red_litek.webp",
         "lona":    "https://raw.githubusercontent.com/litekred-bot/litek-clio-whatsapp/main/knowledge/sticker_lona.webp",
     }
 
