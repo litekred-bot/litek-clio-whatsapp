@@ -413,9 +413,12 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = "",
     if suc_forzada:
         sucursal = suc_forzada
     ve_todo = _es_admin(u["usuario"])
-    registros = await listar_crm(estado=estado, tipo=tipo, asesor=asesor_filtro, sucursal=sucursal, asesores=asesores_multi)
+    # Erick (diseñador) ve, además de lo suyo, TODA tarjeta con diseño 🎨 (disena pedidos
+    # de cualquier asesor sin ser su dueño). Igual el login compartido 'taller' (Brayan+Erick).
+    incluir_diseno = (asesor_filtro == "Erick") or ("Erick" in asesores_multi)
+    registros = await listar_crm(estado=estado, tipo=tipo, asesor=asesor_filtro, sucursal=sucursal, asesores=asesores_multi, incluir_diseno=incluir_diseno)
     # Stats por estado (respetando el filtro de persona y sucursal, sin filtro de estado)
-    todos = await listar_crm(tipo=tipo, asesor=asesor_filtro, sucursal=sucursal, limite=1000, asesores=asesores_multi)
+    todos = await listar_crm(tipo=tipo, asesor=asesor_filtro, sucursal=sucursal, limite=1000, asesores=asesores_multi, incluir_diseno=incluir_diseno)
     stats = {"nuevo": 0, "asignado": 0, "proceso": 0, "vendido": 0, "no_contesto": 0}
     for r in todos:
         stats[r["estado"]] = stats.get(r["estado"], 0) + 1
@@ -1266,25 +1269,26 @@ async def _procesar_mensaje(msg):
             except Exception as e:
                 logger.error(f"Error registrando pedido en CRM: {e}")
 
-            # Pedido PAGADO marcado con diseño (🎨), de CUALQUIER sucursal → pasa a ERICK
-            # (diseñador de todo LiTek) y se le avisa. Erick lo regresa al asesor al terminar.
+            # Pedido PAGADO marcado con diseño (🎨) → se le AVISA a ERICK (diseñador de todo
+            # LiTek) para que lo haga. El pedido SIGUE siendo del asesor (Erick nunca es dueño).
             try:
                 info_dis = await canalizar_diseno_disenador(numero_limpio)
                 if info_dis:
-                    logger.info(f"Pedido pagado con diseño → Erick: {numero_limpio}")
+                    logger.info(f"Pedido pagado con diseño → aviso a Erick: {numero_limpio}")
+                    _asesor_dis = info_dis['asesor'] or 'su asesor'
                     aviso_erick = (
                         f"🎨 *DISEÑO POR HACER — CLIO*\n\n"
                         f"👤 *Cliente:* {info_dis['nombre']}\n"
                         f"📱 *WhatsApp:* {num_display}\n"
                         f"📋 *Pedido:* {info_dis['descripcion'][:200]}\n"
                         f"🏢 *Sucursal:* {info_dis['sucursal']}\n"
-                        f"🙋 *Asesor del producto:* {info_dis['asesor_original'] or 'sin asignar'}\n\n"
-                        f"Favor de realizar el diseño. Cuando esté listo, en el panel "
-                        f"reasígnalo a *{info_dis['asesor_original'] or 'su asesor'}* y avísale. 🙌"
+                        f"🙋 *Asesor del pedido:* {info_dis['asesor'] or 'sin asignar'}\n\n"
+                        f"Favor de realizar el diseño. El pedido es de *{_asesor_dis}* "
+                        f"(tú solo lo diseñas); cuando esté listo, avísale. 🙌"
                     )
                     await proveedor.enviar_mensaje(ERICK_WHATSAPP, aviso_erick)
             except Exception as e:
-                logger.error(f"Error canalizando diseño a Erick: {e}")
+                logger.error(f"Error avisando diseño a Erick: {e}")
             # Dueño de la tarjeta (a quién le toca atender el pedido).
             _dueno = await asesor_crm_por_telefono(numero_limpio)
             msg_asesor = (

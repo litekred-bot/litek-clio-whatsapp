@@ -7,7 +7,7 @@ import logging
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import String, Text, DateTime, select, Integer, func, Boolean, text, Float
+from sqlalchemy import String, Text, DateTime, select, Integer, func, Boolean, text, Float, or_
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -66,6 +66,7 @@ class CrmRegistro(Base):
     alerta: Mapped[str] = mapped_column(String(200), default="")  # motivo a revisar (⚠️) o vacío
     expres: Mapped[bool] = mapped_column(Boolean, default=False)  # ⚡ pedido exprés (prioritario)
     diseno: Mapped[bool] = mapped_column(Boolean, default=False)  # 🎨 lleva diseño nuestro
+    diseno_avisado: Mapped[bool] = mapped_column(Boolean, default=False)  # ya se avisó a Erick
     calificacion: Mapped[str] = mapped_column(String(20), default="")  # bueno|regular|malo (post-venta)
     factura: Mapped[bool] = mapped_column(Boolean, default=False)     # 🧾 el cliente pidió factura
     facturado: Mapped[bool] = mapped_column(Boolean, default=False)   # ✅ ya se hizo la factura
@@ -116,6 +117,7 @@ async def inicializar_db():
         "ALTER TABLE crm_registros ADD COLUMN factura BOOLEAN DEFAULT false",
         "ALTER TABLE crm_registros ADD COLUMN facturado BOOLEAN DEFAULT false",
         "ALTER TABLE crm_registros ADD COLUMN diseno BOOLEAN DEFAULT false",
+        "ALTER TABLE crm_registros ADD COLUMN diseno_avisado BOOLEAN DEFAULT false",
         "ALTER TABLE crm_registros ADD COLUMN cotizado_en TIMESTAMP",
         "ALTER TABLE crm_registros ADD COLUMN cuenta_en TIMESTAMP",
         # 'cerrado' viejo = venta concretada → renombrar a 'vendido'
@@ -471,9 +473,11 @@ async def registrar_crm(tipo: str, nombre: str, telefono: str, descripcion: str,
         return reg.id
 
 
-async def listar_crm(estado: str = "", tipo: str = "", asesor: str = "", sucursal: str = "", limite: int = 200, asesores: tuple = ()) -> list[dict]:
+async def listar_crm(estado: str = "", tipo: str = "", asesor: str = "", sucursal: str = "", limite: int = 200, asesores: tuple = (), incluir_diseno: bool = False) -> list[dict]:
     """Lista registros del CRM, opcionalmente filtrados por estado, tipo, asesor y sucursal.
-    'asesores' (tupla) = ver los clientes de VARIOS asesores (login compartido, ej. Brayan+Erick)."""
+    'asesores' (tupla) = ver los clientes de VARIOS asesores (login compartido, ej. Brayan+Erick).
+    'incluir_diseno' = además de lo del asesor, incluir TODA tarjeta con diseño 🎨 (para Erick,
+    que disena pedidos de cualquier asesor sin ser su dueno)."""
     async with async_session() as session:
         query = select(CrmRegistro)
         if estado:
@@ -481,9 +485,13 @@ async def listar_crm(estado: str = "", tipo: str = "", asesor: str = "", sucursa
         if tipo:
             query = query.where(CrmRegistro.tipo == tipo)
         if asesores:
-            query = query.where(CrmRegistro.asesor.in_(asesores))
+            cond = CrmRegistro.asesor.in_(asesores)
+            query = query.where(or_(cond, CrmRegistro.diseno == True) if incluir_diseno else cond)
         elif asesor:
-            query = query.where(CrmRegistro.asesor == asesor)
+            cond = (CrmRegistro.asesor == asesor)
+            query = query.where(or_(cond, CrmRegistro.diseno == True) if incluir_diseno else cond)
+        elif incluir_diseno:
+            query = query.where(CrmRegistro.diseno == True)
         if sucursal:
             query = query.where(CrmRegistro.sucursal == sucursal)
         # Ordenar por ÚLTIMA ACTIVIDAD (no por creación): así un cliente que ya
@@ -563,6 +571,9 @@ async def marcar_diseno_crm(telefono: str, valor: bool = True) -> bool:
         for r in result.scalars().all():
             if _sufijo_tel(r.telefono) == sufijo:
                 r.diseno = valor
+                # Si se (re)marca un diseño, permitir que se vuelva a avisar a Erick.
+                if valor:
+                    r.diseno_avisado = False
                 r.actualizado = datetime.utcnow()
                 await session.commit()
                 return True
@@ -679,13 +690,14 @@ async def rutear_asesor_merida(telefono: str, producto: str) -> bool:
 
 async def canalizar_diseno_disenador(telefono: str) -> dict | None:
     """
-    Pedido PAGADO con diseño (🎨) de CUALQUIER sucursal → se asigna a ERICK (diseñador
-    de todo LiTek). Erick hace el diseño y al terminar lo regresa al asesor del producto
-    desde el panel. Guarda en notas a quién regresarlo y NO cambia la sucursal (para que
-    el admin de esa sucursal lo siga viendo).
+    Pedido PAGADO con diseño (🎨) de CUALQUIER sucursal → se le AVISA a ERICK (diseñador
+    de todo LiTek) para que lo haga. Erick NUNCA se vuelve dueño del pedido: el dueño
+    sigue siendo el asesor de la sucursal (Edith/Anna/Alan...). Erick ve sus pendientes
+    de diseño con el filtro 🎨 del panel.
 
-    Solo actúa si la tarjeta está marcada como diseño. Retorna un dict con los datos para
-    avisarle a Erick {nombre, descripcion, asesor_original, sucursal}, o None si no aplica.
+    Solo avisa UNA vez por pedido (marca la tarjeta con 'diseno_avisado'). Retorna un dict
+    con los datos para avisarle a Erick {nombre, descripcion, asesor, sucursal}, o None si
+    no aplica (sin diseño o ya avisado).
     """
     sufijo = _sufijo_tel(telefono)
     async with async_session() as session:
@@ -698,18 +710,15 @@ async def canalizar_diseno_disenador(telefono: str) -> dict | None:
             if _sufijo_tel(r.telefono) == sufijo:
                 if not getattr(r, "diseno", False):
                     return None
-                if r.asesor == "Erick":
-                    return None  # ya está con Erick, no re-avisar
+                if getattr(r, "diseno_avisado", False):
+                    return None  # ya se le avisó a Erick, no repetir
                 info = {
                     "nombre": r.nombre or "Cliente",
                     "descripcion": r.descripcion or "",
-                    "asesor_original": r.asesor or "",
+                    "asesor": r.asesor or "",   # el dueño SIGUE siendo el asesor
                     "sucursal": getattr(r, "sucursal", "") or "Campeche",
                 }
-                # Recordar a quién regresarlo cuando termine el diseño
-                regresar = info["asesor_original"] or "su asesor"
-                r.notas = (f"🎨 Diseño — regresar a: {regresar} ({info['sucursal']}). " + (r.notas or ""))[:480]
-                r.asesor = "Erick"
+                r.diseno_avisado = True   # marcar que ya se avisó (no cambia el dueño)
                 r.actualizado = datetime.utcnow()
                 await session.commit()
                 return info
