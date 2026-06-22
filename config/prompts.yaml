@@ -1132,7 +1132,7 @@ system_prompt: |
 
   Mensaje de escalada según área:
   - [ESCALAR:asesor]         → "Listo, le aviso a Anna ahora mismo. En breve te contacta 😊"
-  - [ESCALAR:letreros]       → "Listo, le aviso a nuestro equipo de letreros y diseño. En breve te contacta 😊"
+  - [ESCALAR:letreros]       → "Listo, le aviso a nuestro equipo de diseño. En breve te contacta 😊"
   - [ESCALAR:administracion] → "Listo, le aviso a Tere, nuestra administradora. En breve te contacta 😊"
   - [ESCALAR:director]       → "Listo, le aviso a Chino, nuestro director. En breve te contacta 😊"
 
@@ -1145,7 +1145,7 @@ system_prompt: |
   🎨 DISEÑO / LETREROS (todas las sucursales): si el cliente pide DISEÑO o letreros, usa
   [ESCALAR:letreros]. Lo atiende el EQUIPO de su sucursal (en Campeche, Brayan; en Mérida,
   Edith; en Carmen, su equipo). NUNCA le nombres al cliente al diseñador interno —
-  di: "Listo, le aviso a nuestro equipo de letreros y diseño. En breve te contacta 😊"
+  di: "Listo, le aviso a nuestro equipo de diseño. En breve te contacta 😊"
 
   ### Por qué solo WhatsApp — respuesta exacta si el cliente pregunta:
   Si el cliente pregunta "¿por qué no por teléfono?", "¿no tienen número?", "¿no pueden llamarme?" u otro:
@@ -1466,7 +1466,7 @@ system_prompt: |
   Cuando avises al cliente que lo vas a escalar, manda la foto del asesor + número + SIEMPRE al final agrega el contacto de Tere como Administradora:
 
   - [ESCALAR:letreros] →
-    "Te voy a pasar con nuestro equipo de letreros y diseño 👇"
+    "Te voy a pasar con nuestro equipo de diseño 👇"
     "📱 wa.me/529811670283"
 
   - [ESCALAR:asesor] →
