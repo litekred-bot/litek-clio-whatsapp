@@ -1285,9 +1285,12 @@ async def _procesar_mensaje(msg):
                     await proveedor.enviar_mensaje(ERICK_WHATSAPP, aviso_erick)
             except Exception as e:
                 logger.error(f"Error canalizando diseño a Erick: {e}")
+            # Dueño de la tarjeta (a quién le toca atender el pedido).
+            _dueno = await asesor_crm_por_telefono(numero_limpio)
             msg_asesor = (
                 f"✅ *PEDIDO CONFIRMADO — CLIO*\n\n"
                 f"👤 *Cliente:* {nombre_cli}\n"
+                f"🙋 *Atender:* {_dueno or 'sin asignar'}\n"
                 f"📱 *WhatsApp:* {num_display}\n\n"
                 f"{resumen_pedido}\n\n"
                 f"👉 Contactar: wa.me/{numero_limpio}"
@@ -1297,7 +1300,6 @@ async def _procesar_mensaje(msg):
                 logger.info(f"Pedido confirmado enviado al asesor ({ASESOR_WHATSAPP})")
                 # Además, en privado al asesor dueño de la tarjeta (el grupo queda de seguimiento).
                 try:
-                    _dueno = await asesor_crm_por_telefono(numero_limpio)
                     await _avisar_personal(_dueno, msg_asesor)
                 except Exception as e:
                     logger.error(f"Error aviso privado pedido: {e}")
