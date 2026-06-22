@@ -1423,7 +1423,7 @@ async def _procesar_mensaje(msg):
             # En Carmen NO se reasigna: el dueño por turnos (Alan/Jadiel) se queda.
             _asesor_area = {
                 "asesor": "Anna", "director": "Chino",
-                "letreros": "Brayan", "administracion": "Tere",
+                "letreros": "Erick", "administracion": "Tere",
             }.get(area_escalar, "")
             if es_carmen:
                 _asesor_area = ""
@@ -1436,9 +1436,10 @@ async def _procesar_mensaje(msg):
                     estado_minimo="asignado",
                     asesor=_asesor_area,
                 )
-                # En Carmen, el DISEÑO/letreros lo lleva Jadiel (especialista). Forzamos.
+                # El DISEÑO lo lleva Erick (diseñador de todo LiTek) en TODAS las sucursales,
+                # incluida Carmen (en Carmen el resto del flujo NO se reasigna, pero el diseño sí).
                 if es_carmen and area_escalar == "letreros":
-                    await forzar_asesor_crm(msg.telefono.replace("@s.whatsapp.net", ""), "Jadiel")
+                    await forzar_asesor_crm(msg.telefono.replace("@s.whatsapp.net", ""), "Erick")
                 # Aviso en PRIVADO al asesor dueño (además del grupo, que es seguimiento).
                 _tel_esc = msg.telefono.replace("@s.whatsapp.net", "")
                 _dueno_esc = await asesor_crm_por_telefono(_tel_esc)
@@ -1458,7 +1459,6 @@ async def _procesar_mensaje(msg):
                 foto_asesor = {
                     "asesor":         "asesor_ana",
                     "director":       "asesor_ana",
-                    "letreros":       "asesor_brayan",
                     "administracion": "asesor_tere",
                 }.get(area_escalar)
                 if foto_asesor:

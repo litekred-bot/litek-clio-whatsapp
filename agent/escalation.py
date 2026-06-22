@@ -19,7 +19,7 @@ GRUPO_ALERTAS = "120363425558631008@g.us"
 AREAS = {
     "director":        {"nombre": "Chino LiTek (Fco Sánchez)"},
     "asesor":          {"nombre": "Anna"},
-    "letreros":        {"nombre": "Brayan"},
+    "letreros":        {"nombre": "Erick"},
     "administracion":  {"nombre": "Tere (Administración)"},
 }
 
