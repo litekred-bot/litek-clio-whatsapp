@@ -1406,11 +1406,17 @@ async def _procesar_mensaje(msg):
             # administracion→Tere). Excepción: el "asesor" depende de la sucursal —
             # Mérida lo atiende Edith; Carmen, su dueño actual (Alan/Jadiel).
             _atender = AREAS.get(area_escalar, {}).get("nombre", "")
-            if area_escalar == "asesor":
+            if area_escalar in ("asesor", "letreros"):
+                # 'asesor' y 'letreros' (diseño) los atiende el equipo de la sucursal.
+                # Erick NO entra en la escalación (pre-venta): solo se le avisa cuando ya PAGÓ.
                 if es_merida:
                     _atender = "Edith"
                 elif es_carmen:
                     _atender = await asesor_crm_por_telefono(_tel_esc) or "el equipo de Carmen"
+                elif area_escalar == "letreros":
+                    _atender = "Brayan"   # Campeche: letreros lo ve Brayan
+                else:
+                    _atender = "Anna"
 
             # La alerta va al grupo de SU sucursal (ASESOR_WHATSAPP local ya es el correcto).
             await enviar_alerta_asesor(
@@ -1442,10 +1448,10 @@ async def _procesar_mensaje(msg):
             # En Carmen NO se reasigna: el dueño por turnos (Alan/Jadiel) se queda.
             _asesor_area = {
                 "asesor": "Anna", "director": "Chino",
-                "letreros": "Erick", "administracion": "Tere",
+                "letreros": "Brayan", "administracion": "Tere",
             }.get(area_escalar, "")
-            # Mérida: el asesor general lo lleva Edith (no Anna, que es de Campeche).
-            if area_escalar == "asesor" and es_merida:
+            # Mérida: el asesor general Y los letreros/diseño los lleva Edith (no los de Campeche).
+            if area_escalar in ("asesor", "letreros") and es_merida:
                 _asesor_area = "Edith"
             if es_carmen:
                 _asesor_area = ""
@@ -1458,10 +1464,10 @@ async def _procesar_mensaje(msg):
                     estado_minimo="asignado",
                     asesor=_asesor_area,
                 )
-                # El DISEÑO lo lleva Erick (diseñador de todo LiTek) en TODAS las sucursales,
-                # incluida Carmen (en Carmen el resto del flujo NO se reasigna, pero el diseño sí).
-                if es_carmen and area_escalar == "letreros":
-                    await forzar_asesor_crm(msg.telefono.replace("@s.whatsapp.net", ""), "Erick")
+                # Diseño/letreros: marcar 🎨 para que Erick lo VEA en su panel (3 sucursales).
+                # OJO: a Erick NO se le avisa aquí — solo cuando el pedido esté PAGADO.
+                if area_escalar == "letreros":
+                    await marcar_diseno_crm(msg.telefono, True)
                 # Aviso en PRIVADO al asesor dueño (además del grupo, que es seguimiento).
                 _tel_esc = msg.telefono.replace("@s.whatsapp.net", "")
                 _dueno_esc = await asesor_crm_por_telefono(_tel_esc)
