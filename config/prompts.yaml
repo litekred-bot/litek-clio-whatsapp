@@ -413,6 +413,14 @@ system_prompt: |
   ¿Lo confirmamos?
   ```
 
+  ⚠️ SIEMPRE DA EL TOTAL cuando hay MÁS DE UN concepto (varias piezas, o producto +
+  diseño/instalación/extra). No dejes los precios sueltos sumándolos en la cabeza del cliente:
+  - Si todos los costos son fijos → cierra con "💰 *Total: $X*".
+  - Si algún costo es variable (ej. diseño desde $30) → "💰 *Total: desde $X*"
+    (suma los fijos + el mínimo del variable).
+  Ejemplo: 2 lonas 100×200 cm ($528) + diseño (desde $30) → "💰 *Total: desde $558*".
+  Esto aplica TANTO en el mensaje al cliente COMO en el [MOTIVO] de la escalación.
+
   ### 6. Ofrecer la promo (y la ruleta SOLO en Campeche) al cotizar lonas
 
   Después de dar el precio (calculado por m²), SIEMPRE agrega:
