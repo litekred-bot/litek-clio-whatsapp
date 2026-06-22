@@ -1390,9 +1390,21 @@ async def _procesar_mensaje(msg):
             else:
                 resumen_completo = "\n".join(resumen_lineas) if resumen_lineas else "(sin historial)"
 
-            # ¿De qué sucursal es el cliente? Carmen se atiende con su propio equipo.
+            # ¿De qué sucursal es el cliente? Cada sucursal se atiende con su propio equipo.
             suc_cliente = await sucursal_crm_por_telefono(msg.telefono)
             es_carmen = (suc_cliente == "Carmen")
+            es_merida = (suc_cliente == "Mérida")
+            _tel_esc = msg.telefono.replace("@s.whatsapp.net", "")
+
+            # ¿Quién atiende? El default del área (letreros→Erick, director→Chino, asesor→Anna,
+            # administracion→Tere). Excepción: el "asesor" depende de la sucursal —
+            # Mérida lo atiende Edith; Carmen, su dueño actual (Alan/Jadiel).
+            _atender = AREAS.get(area_escalar, {}).get("nombre", "")
+            if area_escalar == "asesor":
+                if es_merida:
+                    _atender = "Edith"
+                elif es_carmen:
+                    _atender = await asesor_crm_por_telefono(_tel_esc) or "el equipo de Carmen"
 
             # La alerta va al grupo de SU sucursal (ASESOR_WHATSAPP local ya es el correcto).
             await enviar_alerta_asesor(
@@ -1402,6 +1414,7 @@ async def _procesar_mensaje(msg):
                 whapi_token=proveedor.token,
                 nombre_cliente=msg.nombre_perfil,
                 grupo=ASESOR_WHATSAPP,
+                atender=_atender,
             )
             logger.info(f"Escalación enviada a área: {area_escalar} (sucursal: {suc_cliente})")
 
@@ -1425,6 +1438,9 @@ async def _procesar_mensaje(msg):
                 "asesor": "Anna", "director": "Chino",
                 "letreros": "Erick", "administracion": "Tere",
             }.get(area_escalar, "")
+            # Mérida: el asesor general lo lleva Edith (no Anna, que es de Campeche).
+            if area_escalar == "asesor" and es_merida:
+                _asesor_area = "Edith"
             if es_carmen:
                 _asesor_area = ""
             try:
@@ -1453,9 +1469,9 @@ async def _procesar_mensaje(msg):
             except Exception as e:
                 logger.error(f"Error registrando escalación en CRM: {e}")
 
-            # Foto del asesor al cliente según el área. En Carmen NO mandamos foto
-            # (los asesores de Campeche no aplican). Solo si Clio no la envió ya.
-            if hasattr(proveedor, 'enviar_imagen') and not imagen_nombre and not es_carmen:
+            # Foto del asesor al cliente según el área. En Carmen y Mérida NO mandamos foto
+            # (los asesores de Campeche no aplican ahí). Solo si Clio no la envió ya.
+            if hasattr(proveedor, 'enviar_imagen') and not imagen_nombre and not es_carmen and not es_merida:
                 foto_asesor = {
                     "asesor":         "asesor_ana",
                     "director":       "asesor_ana",

@@ -31,6 +31,7 @@ async def enviar_alerta_asesor(
     whapi_token: str,
     nombre_cliente: str = "",
     grupo: str = "",
+    atender: str = "",
 ) -> bool:
     """
     Envía un mensaje de alerta al grupo del equipo LiTek.
@@ -49,7 +50,9 @@ async def enviar_alerta_asesor(
         logger.warning(f"Área desconocida: {area}")
         return False
 
-    nombre_area = AREAS[area]["nombre"]
+    # 'atender' permite override del responsable según la sucursal del cliente
+    # (ej. en Mérida el asesor es Edith, no Anna). Si no se pasa, usa el default del área.
+    nombre_area = atender or AREAS[area]["nombre"]
     numero_limpio = telefono_cliente.replace('@s.whatsapp.net', '')
     # Números mexicanos en Whapi: 521XXXXXXXXXX (52 + 1 + 10 dígitos)
     # Formato legible: +52 981 105 0955

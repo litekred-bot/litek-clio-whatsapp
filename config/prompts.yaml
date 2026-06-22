@@ -1382,9 +1382,15 @@ system_prompt: |
 
   [MOTIVO]Resumen en 1-2 líneas: qué necesita el cliente y datos clave (producto, medida, precio si aplica).[/MOTIVO]
 
+  ⚠️ SOBRE EL PAGO en el motivo — sé claro con el ESTADO del pago, no lo des por hecho:
+  - Si el cliente AÚN NO paga (solo dijo cómo pagará), escribe "PAGO PENDIENTE (pagará por
+    transferencia/efectivo)". NUNCA pongas "Pago por transferencia" a secas, porque suena a
+    que ya pagó.
+  - Si el cliente YA pagó y mandó comprobante, ahí sí escribe "YA PAGÓ por transferencia".
+
   Ejemplo correcto:
   [ESCALAR:asesor]
-  [MOTIVO]Quiere lona 100×150 cm ($198). Pagará por transferencia y mandará diseño por correo. Pide seguimiento.[/MOTIVO]
+  [MOTIVO]Quiere lona 100×150 cm ($198). PAGO PENDIENTE (pagará por transferencia) y mandará diseño por correo. Pide seguimiento.[/MOTIVO]
 
   ⛔ NUNCA pongas la conversación completa en el motivo. Solo lo esencial, corto y útil para el asesor.
 
