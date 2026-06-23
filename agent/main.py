@@ -1036,10 +1036,12 @@ async def _procesar_mensaje(msg):
                 tel_apro = msg.telefono.replace("@s.whatsapp.net", "")
                 await marcar_diseno_aprobado_crm(msg.telefono, True)
                 _dueno_apro = await asesor_crm_por_telefono(tel_apro)
+                _suc_apro = await sucursal_crm_por_telefono(msg.telefono)
                 aviso_apro = (
                     f"✅ *DISEÑO APROBADO — CLIO*\n\n"
                     f"👤 *Cliente:* {msg.nombre_perfil or 'Cliente'}\n"
                     f"🙋 *Atender:* {_dueno_apro or 'sin asignar'}\n"
+                    f"🏢 *Sucursal:* {_suc_apro}\n"
                     f"📱 wa.me/{''.join(c for c in tel_apro if c.isdigit())}\n\n"
                     f"El cliente APROBÓ su diseño. Ya está listo para producir/entregar. 🙌"
                 )
@@ -1285,7 +1287,9 @@ async def _procesar_mensaje(msg):
                         f"El cliente pidió FACTURA. Por favor genérala. 🙌"
                     )
                     try:
-                        await proveedor.enviar_mensaje(destino_fact, aviso_fact)
+                        await proveedor.enviar_mensaje(destino_fact, aviso_fact)  # privado a Tere/Leo
+                        if ASESOR_WHATSAPP:                                        # + al grupo de la sucursal
+                            await proveedor.enviar_mensaje(ASESOR_WHATSAPP, aviso_fact)
                     except Exception as e:
                         logger.error(f"Error avisando factura a {suc_cli}: {e}")
             except Exception as e:
@@ -1308,7 +1312,9 @@ async def _procesar_mensaje(msg):
                         f"Favor de realizar el diseño. El pedido es de *{_asesor_dis}* "
                         f"(tú solo lo diseñas); cuando esté listo, avísale. 🙌"
                     )
-                    await proveedor.enviar_mensaje(ERICK_WHATSAPP, aviso_erick)
+                    await proveedor.enviar_mensaje(ERICK_WHATSAPP, aviso_erick)  # privado a Erick
+                    if ASESOR_WHATSAPP:                                          # + al grupo de la sucursal
+                        await proveedor.enviar_mensaje(ASESOR_WHATSAPP, aviso_erick)
             except Exception as e:
                 logger.error(f"Error avisando diseño a Erick: {e}")
             # Dueño de la tarjeta (a quién le toca atender el pedido).
@@ -1317,6 +1323,7 @@ async def _procesar_mensaje(msg):
                 f"✅ *PEDIDO CONFIRMADO — CLIO*\n\n"
                 f"👤 *Cliente:* {nombre_cli}\n"
                 f"🙋 *Atender:* {_dueno or 'sin asignar'}\n"
+                f"🏢 *Sucursal:* {suc_cli}\n"
                 f"📱 *WhatsApp:* {num_display}\n\n"
                 f"{resumen_pedido}\n\n"
                 f"👉 Contactar: wa.me/{numero_limpio}"
@@ -1368,11 +1375,13 @@ async def _procesar_mensaje(msg):
                 else:
                     # El cliente pagó pero NO ha mandado su archivo de impresión
                     _pago_sin_archivo[msg.telefono] = nombre_cli
-                    await proveedor.enviar_mensaje(
-                        ASESOR_WHATSAPP,
+                    aviso_falta = (
                         f"⚠️ *{nombre_cli} YA PAGÓ pero falta su archivo para imprimir.*\n"
+                        f"🏢 Sucursal: {suc_cli} · 🙋 Atender: {_dueno or 'sin asignar'}\n"
                         f"Clio se lo está pidiendo. Si no lo manda pronto, contáctalo: wa.me/{numero_limpio}"
                     )
+                    await proveedor.enviar_mensaje(ASESOR_WHATSAPP, aviso_falta)  # grupo
+                    await _avisar_personal(_dueno, aviso_falta)                   # + privado al dueño
                     # Prender alerta ⚠️ en el panel para que el asesor lo revise
                     try:
                         await marcar_alerta_crm(msg.telefono, "⚠️ Pagó pero falta archivo")
@@ -1449,6 +1458,7 @@ async def _procesar_mensaje(msg):
                 nombre_cliente=msg.nombre_perfil,
                 grupo=ASESOR_WHATSAPP,
                 atender=_atender,
+                sucursal=suc_cliente,
             )
             logger.info(f"Escalación enviada a área: {area_escalar} (sucursal: {suc_cliente})")
 
@@ -1496,6 +1506,7 @@ async def _procesar_mensaje(msg):
                 aviso_esc = (
                     f"🔔 *ESCALACIÓN — CLIO*\n\n"
                     f"👤 {msg.nombre_perfil or 'Cliente'}\n"
+                    f"🏢 *Sucursal:* {suc_cliente} · 🙋 *Atender:* {_atender or _dueno_esc or 'equipo'}\n"
                     f"📱 wa.me/{''.join(c for c in _tel_esc if c.isdigit())}\n\n"
                     f"{resumen_completo[:300]}"
                 )

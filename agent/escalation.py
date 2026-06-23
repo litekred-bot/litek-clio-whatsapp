@@ -32,6 +32,7 @@ async def enviar_alerta_asesor(
     nombre_cliente: str = "",
     grupo: str = "",
     atender: str = "",
+    sucursal: str = "",
 ) -> bool:
     """
     Envía un mensaje de alerta al grupo del equipo LiTek.
@@ -69,9 +70,11 @@ async def enviar_alerta_asesor(
         numero_display = f"+{numero_limpio}"
 
     linea_cliente = f"🙋 *Cliente:* {nombre_cliente}\n" if nombre_cliente else ""
+    linea_suc = f"🏢 *Sucursal:* {sucursal}\n" if sucursal else ""
     mensaje = (
         f"🔔 *ALERTA CLIO — {area.upper()}*\n\n"
         f"👤 *Atender:* {nombre_area}\n"
+        f"{linea_suc}"
         f"{linea_cliente}"
         f"📱 *Tel:* {numero_display}\n"
         f"📋 *Necesita:* {resumen}\n\n"
