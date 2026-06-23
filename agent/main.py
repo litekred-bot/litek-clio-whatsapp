@@ -1556,6 +1556,31 @@ async def diag_brain():
     return {"ultimo_error_brain": getattr(_brain, "ULTIMO_ERROR_BRAIN", None)}
 
 
+@app.get("/diag/test-alerta")
+async def diag_test_alerta(sucursal: str = "Campeche", asesor: str = ""):
+    """Envía un mensaje de PRUEBA al grupo de la sucursal y, si se indica, al privado del asesor.
+    Ej: /diag/test-alerta?sucursal=Campeche&asesor=Anna — sirve para verificar los envíos."""
+    msg = "🔔 *PRUEBA DE CLIO* — si ves esto, los envíos de alerta funcionan. ✅"
+    grupo = GRUPO_ALERTA_SUCURSAL.get(sucursal, ASESOR_WHATSAPP)
+    res = {}
+    try:
+        ok = await proveedor.enviar_mensaje(grupo, msg)
+        res["grupo"] = {"sucursal": sucursal, "destino": grupo, "enviado": ok}
+    except Exception as e:
+        res["grupo"] = {"sucursal": sucursal, "destino": grupo, "error": str(e)}
+    if asesor:
+        num = ASESOR_PERSONAL.get(asesor)
+        if not num:
+            res["privado"] = {"asesor": asesor, "error": "ese asesor no está en ASESOR_PERSONAL"}
+        else:
+            try:
+                ok = await proveedor.enviar_mensaje(num, msg)
+                res["privado"] = {"asesor": asesor, "destino": num, "enviado": ok}
+            except Exception as e:
+                res["privado"] = {"asesor": asesor, "destino": num, "error": str(e)}
+    return res
+
+
 @app.get("/diag/grupos")
 async def diag_grupos():
     """Lista los grupos de WhatsApp con su ID (para configurar alertas por sucursal)."""
