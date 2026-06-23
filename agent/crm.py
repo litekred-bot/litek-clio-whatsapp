@@ -126,6 +126,7 @@ HTML_PANEL = r"""<!DOCTYPE html>
   .card.expres-on { box-shadow: 0 0 0 2px #ff9800, 0 1px 4px rgba(0,0,0,.05); }
   .card .expres-badge { display: inline-block; background: #ff9800; color: #fff; font-size: 11px; font-weight: bold; border-radius: 10px; padding: 2px 9px; margin-left: 6px; }
   .card .diseno-badge { display: inline-block; background: #7e57c2; color: #fff; font-size: 11px; font-weight: bold; border-radius: 10px; padding: 2px 9px; margin-left: 6px; }
+  .card .aprobado-badge { display: inline-block; background: #2e7d32; color: #fff; font-size: 11px; font-weight: bold; border-radius: 10px; padding: 2px 9px; margin-left: 6px; }
   .card .calif-badge { display: inline-block; font-size: 11px; font-weight: bold; border-radius: 10px; padding: 2px 9px; margin-left: 6px; }
   .card .calif-bueno { background: #e8f5e9; color: #2e7d32; }
   .card .calif-regular { background: #fff8e1; color: #f57f17; }
@@ -139,6 +140,8 @@ HTML_PANEL = r"""<!DOCTYPE html>
   .card .acciones .bexpres.on { background: #ff9800; color: #fff; border-color: #ff9800; }
   .card .acciones .bdiseno { background: #ede7f6; color: #5e35b1; border: 1px solid #b39ddb; border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
   .card .acciones .bdiseno.on { background: #7e57c2; color: #fff; border-color: #7e57c2; }
+  .card .acciones .baprob { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
+  .card .acciones .baprob.on { background: #2e7d32; color: #fff; border-color: #2e7d32; }
   .card .alerta-banner { background: #ffe0e0; color: #b71c1c; border-radius: 8px; padding: 7px 10px; margin: 8px 0; font-size: 13px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .card .alerta-banner button { background: #b71c1c; color: #fff; border: none; border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
   .card .desc { color: #444; font-size: 14px; margin: 8px 0; white-space: pre-wrap; }
@@ -542,6 +545,11 @@ async function toggleDiseno(id, valor){
   cargar();
 }
 
+async function toggleDisenoAprobado(id, valor){
+  await fetch("/crm/api/registro/"+id, {method:"POST", headers:{"Authorization":"Bearer "+TOKEN, "Content-Type":"application/json"}, body: JSON.stringify({diseno_aprobado: valor})});
+  cargar();
+}
+
 async function toggleFacturado(id, valor){
   await fetch("/crm/api/registro/"+id, {method:"POST", headers:{"Authorization":"Bearer "+TOKEN, "Content-Type":"application/json"}, body: JSON.stringify({facturado: valor})});
   cargar();
@@ -637,6 +645,7 @@ function pintar(regs){
     var alertaHtml = r.alerta ? '<div class="alerta-banner"><span>'+esc(r.alerta)+'</span><button onclick="resolverAlerta('+r.id+')">✓ Resuelto</button></div>' : '';
     var badgeExpres = r.expres ? '<span class="expres-badge">⚡ EXPRÉS</span>' : '';
     var badgeDiseno = r.diseno ? '<span class="diseno-badge">🎨 DISEÑO</span>' : '';
+    var badgeAprob = r.diseno_aprobado ? '<span class="aprobado-badge">✅ APROBADO</span>' : '';
     var CALIF = {bueno:'😀 Bueno', regular:'😐 Regular', malo:'😞 Malo'};
     var badgeCalif = r.calificacion ? '<span class="calif-badge calif-'+r.calificacion+'">'+(CALIF[r.calificacion]||r.calificacion)+'</span>' : '';
     var badgeSuc = '<span class="suc-badge">🏢 '+(r.sucursal||"Campeche")+'</span>';
@@ -645,7 +654,7 @@ function pintar(regs){
         : '<span class="fact-badge fact-pend">🧾 Por facturar</span>') : '';
     var opcSuc = ["Campeche","Mérida","Carmen"].map(function(su){ return '<option value="'+su+'"'+((r.sucursal||"Campeche")===su?' selected':'')+'>'+su+'</option>'; }).join("");
     return '<div class="card '+r.estado+(r.alerta?' alertado':'')+(r.expres?' expres-on':'')+'">'+
-      '<div class="head"><span class="nombre">'+esc(r.nombre||"Sin nombre")+badgeExpres+badgeDiseno+badgeCalif+badgeSuc+badgeFact+'</span>'+
+      '<div class="head"><span class="nombre">'+esc(r.nombre||"Sin nombre")+badgeExpres+badgeDiseno+badgeAprob+badgeCalif+badgeSuc+badgeFact+'</span>'+
       '<span class="tipo">'+(TIPOS[r.tipo]||r.tipo)+'</span></div>'+
       alertaHtml+
       '<div class="desc">'+esc(r.descripcion||"")+'</div>'+
@@ -656,6 +665,7 @@ function pintar(regs){
         '<select onchange="upd('+r.id+',\'sucursal\',this.value)" title="Sucursal">'+opcSuc+'</select>'+
         '<button class="bexpres'+(r.expres?' on':'')+'" onclick="toggleExpres('+r.id+','+(r.expres?'false':'true')+')" title="Marcar/quitar exprés">⚡ Exprés</button>'+
         '<button class="bdiseno'+(r.diseno?' on':'')+'" onclick="toggleDiseno('+r.id+','+(r.diseno?'false':'true')+')" title="Marcar/quitar diseño">🎨 Diseño</button>'+
+        '<button class="baprob'+(r.diseno_aprobado?' on':'')+'" onclick="toggleDisenoAprobado('+r.id+','+(r.diseno_aprobado?'false':'true')+')" title="Marcar/quitar diseño aprobado">✅ Aprobado</button>'+
         (r.factura ? '<button class="bfact'+(r.facturado?' on':'')+'" onclick="toggleFacturado('+r.id+','+(r.facturado?'false':'true')+')" title="Marcar/quitar facturado">'+(r.facturado?'✅ Facturado':'🧾 Marcar facturado')+'</button>' : '')+
         (ES_DIRECTOR ? '<input class="monto" type="number" min="0" step="1" placeholder="$ monto" value="'+(r.monto?Math.round(r.monto):"")+'" title="Monto $ del pedido (para el total vendido)" onblur="upd('+r.id+',\'monto\',this.value)">' : '')+
         '<input class="nota" placeholder="Nota..." value="'+esc(r.notas||"")+'" onblur="upd('+r.id+',\'notas\',this.value)">'+

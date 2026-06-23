@@ -52,7 +52,7 @@ from agent.memory import (
     guardar_calificacion_crm, guardar_monto_crm, total_vendido_crm, backfill_montos_crm,
     analisis_mensajeria,
     guardar_sucursal_crm, sucursal_crm_por_telefono, asesor_crm_por_telefono, marcar_factura_crm, forzar_asesor_crm,
-    canalizar_diseno_disenador, marcar_diseno_crm, rutear_asesor_merida,
+    canalizar_diseno_disenador, marcar_diseno_crm, marcar_diseno_aprobado_crm, rutear_asesor_merida,
 )
 from zoneinfo import ZoneInfo as _ZI
 
@@ -635,6 +635,7 @@ async def crm_actualizar(registro_id: int, request: Request):
         factura=data.get("factura"),
         facturado=data.get("facturado"),
         diseno=data.get("diseno"),
+        diseno_aprobado=data.get("diseno_aprobado"),
     )
     return {"ok": ok}
 
@@ -1026,6 +1027,27 @@ async def _procesar_mensaje(msg):
                 await marcar_expres_crm(msg.telefono, True)
             except Exception as e:
                 logger.error(f"Error marcando exprés CRM: {e}")
+
+        # Detectar [DISENO_APROBADO] — el CLIENTE aprobó el diseño en el chat. Marca ✅
+        # en la tarjeta (sigue con 🎨) y avisa al asesor dueño que ya está listo a producir.
+        if "[DISENO_APROBADO]" in respuesta:
+            respuesta = respuesta.replace("[DISENO_APROBADO]", "").strip()
+            try:
+                tel_apro = msg.telefono.replace("@s.whatsapp.net", "")
+                await marcar_diseno_aprobado_crm(msg.telefono, True)
+                _dueno_apro = await asesor_crm_por_telefono(tel_apro)
+                aviso_apro = (
+                    f"✅ *DISEÑO APROBADO — CLIO*\n\n"
+                    f"👤 *Cliente:* {msg.nombre_perfil or 'Cliente'}\n"
+                    f"🙋 *Atender:* {_dueno_apro or 'sin asignar'}\n"
+                    f"📱 wa.me/{''.join(c for c in tel_apro if c.isdigit())}\n\n"
+                    f"El cliente APROBÓ su diseño. Ya está listo para producir/entregar. 🙌"
+                )
+                if ASESOR_WHATSAPP:
+                    await proveedor.enviar_mensaje(ASESOR_WHATSAPP, aviso_apro)
+                await _avisar_personal(_dueno_apro, aviso_apro)
+            except Exception as e:
+                logger.error(f"Error en diseño aprobado CRM: {e}")
 
         # Detectar [DISENO] — el pedido incluye que NOSOTROS hagamos/modifiquemos el
         # diseño (no trae arte listo). Marca 🎨 en la tarjeta para que el equipo lo

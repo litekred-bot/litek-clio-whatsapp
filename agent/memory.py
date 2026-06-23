@@ -67,6 +67,7 @@ class CrmRegistro(Base):
     expres: Mapped[bool] = mapped_column(Boolean, default=False)  # ⚡ pedido exprés (prioritario)
     diseno: Mapped[bool] = mapped_column(Boolean, default=False)  # 🎨 lleva diseño nuestro
     diseno_avisado: Mapped[bool] = mapped_column(Boolean, default=False)  # ya se avisó a Erick
+    diseno_aprobado: Mapped[bool] = mapped_column(Boolean, default=False)  # ✅ el cliente aprobó el diseño
     calificacion: Mapped[str] = mapped_column(String(20), default="")  # bueno|regular|malo (post-venta)
     factura: Mapped[bool] = mapped_column(Boolean, default=False)     # 🧾 el cliente pidió factura
     facturado: Mapped[bool] = mapped_column(Boolean, default=False)   # ✅ ya se hizo la factura
@@ -118,6 +119,7 @@ async def inicializar_db():
         "ALTER TABLE crm_registros ADD COLUMN facturado BOOLEAN DEFAULT false",
         "ALTER TABLE crm_registros ADD COLUMN diseno BOOLEAN DEFAULT false",
         "ALTER TABLE crm_registros ADD COLUMN diseno_avisado BOOLEAN DEFAULT false",
+        "ALTER TABLE crm_registros ADD COLUMN diseno_aprobado BOOLEAN DEFAULT false",
         "ALTER TABLE crm_registros ADD COLUMN cotizado_en TIMESTAMP",
         "ALTER TABLE crm_registros ADD COLUMN cuenta_en TIMESTAMP",
         # 'cerrado' viejo = venta concretada → renombrar a 'vendido'
@@ -512,6 +514,7 @@ async def listar_crm(estado: str = "", tipo: str = "", asesor: str = "", sucursa
             "alerta": getattr(r, "alerta", "") or "",
             "expres": bool(getattr(r, "expres", False)),
             "diseno": bool(getattr(r, "diseno", False)),
+            "diseno_aprobado": bool(getattr(r, "diseno_aprobado", False)),
             "calificacion": getattr(r, "calificacion", "") or "",
             "factura": bool(getattr(r, "factura", False)),
             "facturado": bool(getattr(r, "facturado", False)),
@@ -574,6 +577,28 @@ async def marcar_diseno_crm(telefono: str, valor: bool = True) -> bool:
                 # Si se (re)marca un diseño, permitir que se vuelva a avisar a Erick.
                 if valor:
                     r.diseno_avisado = False
+                r.actualizado = datetime.utcnow()
+                await session.commit()
+                return True
+    return False
+
+
+async def marcar_diseno_aprobado_crm(telefono: str, valor: bool = True) -> bool:
+    """Marca ✅ que el CLIENTE aprobó el diseño (la tarjeta sigue con 🎨 — 'lleva diseño y
+    ya está aprobado'). Lo prende Clio con [DISENO_APROBADO] cuando el cliente da el visto
+    bueno, o el equipo a mano desde el panel."""
+    sufijo = _sufijo_tel(telefono)
+    async with async_session() as session:
+        result = await session.execute(
+            select(CrmRegistro)
+            .where(CrmRegistro.estado.not_in(ESTADOS_FINALES))
+            .order_by(CrmRegistro.creado.desc())
+        )
+        for r in result.scalars().all():
+            if _sufijo_tel(r.telefono) == sufijo:
+                r.diseno_aprobado = valor
+                if valor:
+                    r.diseno = True  # aprobado ⇒ obviamente lleva diseño (muestra 🎨 + ✅)
                 r.actualizado = datetime.utcnow()
                 await session.commit()
                 return True
@@ -954,8 +979,8 @@ async def actualizar_crm(registro_id: int, estado: str = None, asesor: str = Non
                          notas: str = None, alerta: str = None, expres: bool = None,
                          monto: float = None, sucursal: str = None,
                          factura: bool = None, facturado: bool = None,
-                         diseno: bool = None) -> bool:
-    """Actualiza estado, asesor, notas, alerta, exprés, diseño, monto, sucursal o factura de un registro."""
+                         diseno: bool = None, diseno_aprobado: bool = None) -> bool:
+    """Actualiza estado, asesor, notas, alerta, exprés, diseño, aprobación, monto, sucursal o factura."""
     async with async_session() as session:
         resultado = await session.execute(
             select(CrmRegistro).where(CrmRegistro.id == registro_id)
@@ -975,6 +1000,10 @@ async def actualizar_crm(registro_id: int, estado: str = None, asesor: str = Non
             r.expres = expres
         if diseno is not None:
             r.diseno = diseno
+        if diseno_aprobado is not None:
+            r.diseno_aprobado = diseno_aprobado
+            if diseno_aprobado:
+                r.diseno = True
         if monto is not None:
             try:
                 r.monto = float(monto)
