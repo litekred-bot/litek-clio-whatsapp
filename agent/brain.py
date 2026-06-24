@@ -144,6 +144,7 @@ async def generar_respuesta(
     tipo: str = "text",
     nombre_perfil: str = "",
     señales: dict | None = None,
+    contexto_extra: str = "",
 ) -> str:
     """
     Genera una respuesta usando Claude API con soporte de tool_use.
@@ -170,6 +171,10 @@ async def generar_respuesta(
             f"Dirígete a él por su nombre de forma natural cuando sea apropiado, "
             f"sin repetirlo en cada mensaje. Si su nombre parece un negocio o algo genérico, úsalo con criterio."
         )
+
+    # Contexto extra del turno (ej. estado de la entrega del pedido)
+    if contexto_extra:
+        system_prompt += f"\n\n## Contexto del momento\n{contexto_extra}\n"
 
     # Construir historial de mensajes
     mensajes: list[dict] = []

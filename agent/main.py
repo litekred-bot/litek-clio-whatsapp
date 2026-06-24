@@ -51,7 +51,8 @@ from agent.memory import (
     marcar_no_concretado_automatico, marcar_esperando_pago_automatico, marcar_expres_crm,
     guardar_calificacion_crm, guardar_monto_crm, total_vendido_crm, backfill_montos_crm,
     analisis_mensajeria,
-    guardar_sucursal_crm, sucursal_crm_por_telefono, asesor_crm_por_telefono, marcar_factura_crm, forzar_asesor_crm,
+    guardar_sucursal_crm, sucursal_crm_por_telefono, asesor_crm_por_telefono,
+    guardar_entrega_crm, entrega_crm_por_telefono, marcar_factura_crm, forzar_asesor_crm,
     canalizar_diseno_disenador, marcar_diseno_crm, marcar_diseno_aprobado_crm, rutear_asesor_merida,
 )
 from zoneinfo import ZoneInfo as _ZI
@@ -941,6 +942,31 @@ async def _procesar_mensaje(msg):
             logger.info(f"Modo humano activo para {msg.telefono} — Clio no responde")
             return
 
+        # Contexto de ENTREGA: si el cliente tiene un pedido con hora prometida, le
+        # decimos a Clio si YA PASÓ (para "ya puedes pasar") o si aún falta.
+        _dias_sem = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+        ahora_local = datetime.now(_TZ_CAMP)
+        ctx_entrega = f"Ahora es {_dias_sem[ahora_local.weekday()]} {ahora_local.strftime('%d/%m/%Y %H:%M')} (hora local)."
+        try:
+            _entrega = await entrega_crm_por_telefono(tel_limpio)
+            if _entrega:
+                ent_local = _entrega.replace(tzinfo=timezone.utc).astimezone(_TZ_CAMP)
+                if ahora_local >= ent_local:
+                    ctx_entrega += (
+                        f"\n⚠️ ENTREGA: el cliente tiene un pedido cuya hora de entrega "
+                        f"({ent_local.strftime('%d/%m a las %H:%M')}) YA PASÓ. Si pregunta por su "
+                        f"pedido, dile con gusto que YA ESTÁ LISTO y puede pasar a recogerlo, y "
+                        f"agrega al final la etiqueta [VA_EN_CAMINO] (invisible) para avisar al asesor."
+                    )
+                else:
+                    ctx_entrega += (
+                        f"\nENTREGA: el pedido del cliente estará listo el "
+                        f"{ent_local.strftime('%d/%m a las %H:%M')} (aún no es la hora). Si pregunta, "
+                        f"dile que estará listo a esa hora."
+                    )
+        except Exception as e:
+            logger.error(f"Error contexto entrega: {e}")
+
         # Generar respuesta con Claude (con soporte de imagen si aplica).
         # `señales` nos dice si Clio cotizó en este turno (producto identificado).
         señales: dict = {}
@@ -952,6 +978,7 @@ async def _procesar_mensaje(msg):
             tipo=msg.tipo,
             nombre_perfil=msg.nombre_perfil,
             señales=señales,
+            contexto_extra=ctx_entrega,
         )
 
         # Si Clio dio un precio → producto identificado → repartir por turnos
@@ -1019,6 +1046,40 @@ async def _procesar_mensaje(msg):
                 await marcar_alerta_crm(msg.telefono, f"⚠️ {motivo_alerta}")
             except Exception as e:
                 logger.error(f"Error marcando alerta CRM: {e}")
+
+        # Detectar [ENTREGA:YYYY-MM-DD HH:MM] — Clio calculó la fecha/hora de entrega
+        # (con pago + archivo listos). La guardamos para comparar después.
+        match_entrega = re.search(r'\[ENTREGA:\s*(\d{4}-\d{2}-\d{2})[ T](\d{1,2}):(\d{2})\]', respuesta)
+        if match_entrega:
+            respuesta = re.sub(r'\[ENTREGA:[^\]]*\]', '', respuesta).strip()
+            try:
+                y, mo, d = [int(x) for x in match_entrega.group(1).split("-")]
+                hh, mm = int(match_entrega.group(2)), int(match_entrega.group(3))
+                ent_local = datetime(y, mo, d, hh, mm, tzinfo=_TZ_CAMP)
+                ent_utc = ent_local.astimezone(timezone.utc).replace(tzinfo=None)
+                await guardar_entrega_crm(tel_limpio, ent_utc)
+                logger.info(f"Entrega guardada para {tel_limpio}: {ent_local.strftime('%d/%m %H:%M')}")
+            except Exception as e:
+                logger.error(f"Error guardando entrega: {e}")
+
+        # Detectar [VA_EN_CAMINO] — el cliente va a recoger su pedido ya listo → avisar al asesor
+        if "[VA_EN_CAMINO]" in respuesta:
+            respuesta = respuesta.replace("[VA_EN_CAMINO]", "").strip()
+            try:
+                _suc_vc = await sucursal_crm_por_telefono(tel_limpio)
+                _grupo_vc = await _grupo_alerta_de(msg.telefono)
+                aviso_vc = (
+                    f"🚶 *CLIENTE VA EN CAMINO — CLIO*\n\n"
+                    f"👤 {msg.nombre_perfil or 'Cliente'}\n"
+                    f"📱 wa.me/{''.join(c for c in tel_limpio if c.isdigit())}\n"
+                    f"🏢 {_suc_vc}\n\n"
+                    f"Su pedido ya está listo y va en camino a recogerlo. 🙌"
+                )
+                await proveedor.enviar_mensaje(_grupo_vc, aviso_vc)
+                _dueno_vc = await asesor_crm_por_telefono(tel_limpio)
+                await _avisar_personal(_dueno_vc, aviso_vc)
+            except Exception as e:
+                logger.error(f"Error avisando va en camino: {e}")
 
         # Detectar [EXPRES] — Clio marca el pedido como exprés (prioritario) en el panel
         if "[EXPRES]" in respuesta:

@@ -75,6 +75,7 @@ class CrmRegistro(Base):
     pagado_en: Mapped[datetime] = mapped_column(DateTime, nullable=True)  # fecha del pago (para ventas por mes)
     cotizado_en: Mapped[datetime] = mapped_column(DateTime, nullable=True)  # cuándo se le dio precio (para 'no concretado' a las 10h)
     cuenta_en: Mapped[datetime] = mapped_column(DateTime, nullable=True)  # cuándo se le dio la cuenta de pago (para 'esperando pago' a las 2h)
+    entrega_en: Mapped[datetime] = mapped_column(DateTime, nullable=True)  # fecha/hora prometida de entrega (calculada al tener pago+archivo)
     notas: Mapped[str] = mapped_column(Text, default="")
     creado: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     actualizado: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -122,6 +123,7 @@ async def inicializar_db():
         "ALTER TABLE crm_registros ADD COLUMN diseno_aprobado BOOLEAN DEFAULT false",
         "ALTER TABLE crm_registros ADD COLUMN cotizado_en TIMESTAMP",
         "ALTER TABLE crm_registros ADD COLUMN cuenta_en TIMESTAMP",
+        "ALTER TABLE crm_registros ADD COLUMN entrega_en TIMESTAMP",
         # 'cerrado' viejo = venta concretada → renombrar a 'vendido'
         "UPDATE crm_registros SET estado='vendido' WHERE estado='cerrado'",
     ]
@@ -774,6 +776,37 @@ async def sucursal_crm_por_telefono(telefono: str) -> str:
             if _sufijo_tel(r.telefono) == sufijo:
                 return getattr(r, "sucursal", "") or "Campeche"
     return "Campeche"
+
+
+async def guardar_entrega_crm(telefono: str, entrega: datetime) -> bool:
+    """Guarda la fecha/hora prometida de entrega en la tarjeta abierta del cliente."""
+    sufijo = _sufijo_tel(telefono)
+    async with async_session() as session:
+        result = await session.execute(
+            select(CrmRegistro)
+            .where(CrmRegistro.estado.not_in(ESTADOS_FINALES))
+            .order_by(CrmRegistro.creado.desc())
+        )
+        for r in result.scalars().all():
+            if _sufijo_tel(r.telefono) == sufijo:
+                r.entrega_en = entrega
+                r.actualizado = datetime.utcnow()
+                await session.commit()
+                return True
+    return False
+
+
+async def entrega_crm_por_telefono(telefono: str) -> datetime | None:
+    """Devuelve la fecha/hora de entrega prometida de la tarjeta más reciente, o None."""
+    sufijo = _sufijo_tel(telefono)
+    async with async_session() as session:
+        result = await session.execute(
+            select(CrmRegistro).order_by(CrmRegistro.creado.desc())
+        )
+        for r in result.scalars().all():
+            if _sufijo_tel(r.telefono) == sufijo:
+                return getattr(r, "entrega_en", None)
+    return None
 
 
 async def asesor_crm_por_telefono(telefono: str) -> str:
