@@ -52,8 +52,8 @@ from agent.memory import (
     guardar_calificacion_crm, guardar_monto_crm, total_vendido_crm, backfill_montos_crm,
     analisis_mensajeria,
     guardar_sucursal_crm, sucursal_crm_por_telefono, asesor_crm_por_telefono,
-    guardar_entrega_crm, entrega_crm_por_telefono, pedidos_listos_para_entregar,
-    marcar_factura_crm, forzar_asesor_crm,
+    guardar_entrega_crm, entrega_crm_por_telefono, info_pedido_por_telefono,
+    pedidos_listos_para_entregar, marcar_factura_crm, forzar_asesor_crm,
     canalizar_diseno_disenador, marcar_diseno_crm, marcar_diseno_aprobado_crm, rutear_asesor_merida,
 )
 from zoneinfo import ZoneInfo as _ZI
@@ -986,9 +986,9 @@ async def _procesar_mensaje(msg):
         ahora_local = datetime.now(_TZ_CAMP)
         ctx_entrega = f"Ahora es {_dias_sem[ahora_local.weekday()]} {ahora_local.strftime('%d/%m/%Y %H:%M')} (hora local)."
         try:
-            _entrega = await entrega_crm_por_telefono(tel_limpio)
-            if _entrega:
-                ent_local = _entrega.replace(tzinfo=timezone.utc).astimezone(_TZ_CAMP)
+            _info = await info_pedido_por_telefono(tel_limpio)
+            if _info and _info.get("entrega_en"):
+                ent_local = _info["entrega_en"].replace(tzinfo=timezone.utc).astimezone(_TZ_CAMP)
                 if ahora_local >= ent_local:
                     ctx_entrega += (
                         f"\n⚠️ ENTREGA: el cliente tiene un pedido cuya hora de entrega "
@@ -1002,6 +1002,19 @@ async def _procesar_mensaje(msg):
                         f"{ent_local.strftime('%d/%m a las %H:%M')} (aún no es la hora). Si pregunta, "
                         f"dile que estará listo a esa hora."
                     )
+            elif _info and _info.get("estado") == "proceso" and _info.get("pagado_en"):
+                # Pedido viejo: pagó pero no tiene hora calculada → estimar y guardar.
+                pago_local = _info["pagado_en"].replace(tzinfo=timezone.utc).astimezone(_TZ_CAMP)
+                ctx_entrega += (
+                    f"\nENTREGA (estimar): el cliente YA PAGÓ su pedido el "
+                    f"{pago_local.strftime('%d/%m a las %H:%M')}"
+                    + (" (es EXPRÉS)" if _info.get("expres") else "")
+                    + f". Producto/pedido: \"{_info['descripcion'][:120]}\". AÚN no tiene hora de entrega "
+                    f"calculada. Si pregunta por su pedido: CALCULA la entrega (políticas + exprés + "
+                    f"horas hábiles desde que pagó) y dale el estatus CONCRETO (si ya pasó la hora, dile "
+                    f"que ya está listo + [VA_EN_CAMINO]; si no, dile a qué hora estará). Agrega "
+                    f"[ENTREGA:AAAA-MM-DD HH:MM] al final para guardarla. NO escales si puedes darle el estatus."
+                )
         except Exception as e:
             logger.error(f"Error contexto entrega: {e}")
 

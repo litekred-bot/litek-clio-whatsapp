@@ -828,6 +828,25 @@ async def pedidos_listos_para_entregar() -> list[dict]:
     return listos
 
 
+async def info_pedido_por_telefono(telefono: str) -> dict | None:
+    """Datos del pedido más reciente del cliente (para estimar entrega de pedidos viejos)."""
+    sufijo = _sufijo_tel(telefono)
+    async with async_session() as session:
+        result = await session.execute(
+            select(CrmRegistro).order_by(CrmRegistro.creado.desc())
+        )
+        for r in result.scalars().all():
+            if _sufijo_tel(r.telefono) == sufijo:
+                return {
+                    "estado": r.estado,
+                    "pagado_en": getattr(r, "pagado_en", None),
+                    "entrega_en": getattr(r, "entrega_en", None),
+                    "descripcion": r.descripcion or "",
+                    "expres": bool(getattr(r, "expres", False)),
+                }
+    return None
+
+
 async def entrega_crm_por_telefono(telefono: str) -> datetime | None:
     """Devuelve la fecha/hora de entrega prometida de la tarjeta más reciente, o None."""
     sufijo = _sufijo_tel(telefono)
