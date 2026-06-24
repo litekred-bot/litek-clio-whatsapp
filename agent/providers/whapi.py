@@ -238,11 +238,30 @@ class ProveedorWhapi(ProveedorWhatsApp):
             logger.info(f"Reenvío documento a {telefono}: {r.status_code} — {r.text[:100]}")
             return r.status_code in (200, 201)
 
+    @staticmethod
+    def _normalizar_destino(to: str) -> str:
+        """Asegura el formato Whapi México (521 + 10 dígitos) para celulares, para que SÍ
+        entregue. Deja intactos los grupos (@g.us) y JIDs (@s.whatsapp.net), que ya van bien.
+        Sin esto, un número '52XXXXXXXXXX' (sin el '1') es aceptado por Whapi pero NO se entrega."""
+        if not to or "@" in to:
+            return to  # grupo o JID ya formado
+        d = "".join(c for c in to if c.isdigit())
+        if d.startswith("521") and len(d) == 13:
+            return d
+        if d.startswith("52") and len(d) == 12:
+            return "521" + d[2:]      # 52 + 10  →  521 + 10 (faltaba el "1")
+        if len(d) == 10:
+            return "521" + d          # 10 dígitos  →  521 + 10
+        if len(d) >= 10:
+            return "521" + d[-10:]
+        return to
+
     async def enviar_mensaje(self, telefono: str, mensaje: str) -> bool:
         """Envía mensaje via Whapi.cloud."""
         if not self.token:
             logger.warning("WHAPI_TOKEN no configurado — mensaje no enviado")
             return False
+        telefono = self._normalizar_destino(telefono)
         headers = {
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json",
