@@ -76,6 +76,7 @@ class CrmRegistro(Base):
     cotizado_en: Mapped[datetime] = mapped_column(DateTime, nullable=True)  # cuándo se le dio precio (para 'no concretado' a las 10h)
     cuenta_en: Mapped[datetime] = mapped_column(DateTime, nullable=True)  # cuándo se le dio la cuenta de pago (para 'esperando pago' a las 2h)
     entrega_en: Mapped[datetime] = mapped_column(DateTime, nullable=True)  # fecha/hora prometida de entrega (calculada al tener pago+archivo)
+    entrega_avisada: Mapped[bool] = mapped_column(Boolean, default=False)  # ya se avisó "listo para entregar" (no repetir)
     notas: Mapped[str] = mapped_column(Text, default="")
     creado: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     actualizado: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -124,6 +125,7 @@ async def inicializar_db():
         "ALTER TABLE crm_registros ADD COLUMN cotizado_en TIMESTAMP",
         "ALTER TABLE crm_registros ADD COLUMN cuenta_en TIMESTAMP",
         "ALTER TABLE crm_registros ADD COLUMN entrega_en TIMESTAMP",
+        "ALTER TABLE crm_registros ADD COLUMN entrega_avisada BOOLEAN DEFAULT false",
         # 'cerrado' viejo = venta concretada → renombrar a 'vendido'
         "UPDATE crm_registros SET estado='vendido' WHERE estado='cerrado'",
     ]
@@ -522,6 +524,8 @@ async def listar_crm(estado: str = "", tipo: str = "", asesor: str = "", sucursa
             "facturado": bool(getattr(r, "facturado", False)),
             "monto": float(getattr(r, "monto", 0) or 0),
             "notas": r.notas,
+            "entrega_en": r.entrega_en.strftime("%d/%m/%Y %H:%M") if getattr(r, "entrega_en", None) else "",
+            "listo_entregar": bool(getattr(r, "entrega_en", None) and r.estado == "proceso" and r.entrega_en <= datetime.utcnow()),
             "creado": r.creado.strftime("%d/%m/%Y %H:%M"),
             "actualizado": (r.actualizado or r.creado).strftime("%d/%m/%Y %H:%M"),
         } for r in registros]
@@ -794,6 +798,34 @@ async def guardar_entrega_crm(telefono: str, entrega: datetime) -> bool:
                 await session.commit()
                 return True
     return False
+
+
+async def pedidos_listos_para_entregar() -> list[dict]:
+    """
+    Pedidos en 'proceso' cuya hora de entrega YA PASÓ y aún NO se ha avisado.
+    Los marca como avisados y los devuelve para mandar la alerta 'listo para entregar'.
+    """
+    ahora = datetime.utcnow()
+    listos = []
+    async with async_session() as session:
+        result = await session.execute(
+            select(CrmRegistro).where(
+                CrmRegistro.estado == "proceso",
+                CrmRegistro.entrega_en.is_not(None),
+                CrmRegistro.entrega_en <= ahora,
+                CrmRegistro.entrega_avisada == False,  # noqa: E712
+            )
+        )
+        for r in result.scalars().all():
+            listos.append({
+                "telefono": r.telefono, "nombre": r.nombre or "Cliente",
+                "asesor": r.asesor or "", "sucursal": getattr(r, "sucursal", "") or "Campeche",
+                "descripcion": r.descripcion or "",
+            })
+            r.entrega_avisada = True
+        if listos:
+            await session.commit()
+    return listos
 
 
 async def entrega_crm_por_telefono(telefono: str) -> datetime | None:

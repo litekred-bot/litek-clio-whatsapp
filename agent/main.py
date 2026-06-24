@@ -52,7 +52,8 @@ from agent.memory import (
     guardar_calificacion_crm, guardar_monto_crm, total_vendido_crm, backfill_montos_crm,
     analisis_mensajeria,
     guardar_sucursal_crm, sucursal_crm_por_telefono, asesor_crm_por_telefono,
-    guardar_entrega_crm, entrega_crm_por_telefono, marcar_factura_crm, forzar_asesor_crm,
+    guardar_entrega_crm, entrega_crm_por_telefono, pedidos_listos_para_entregar,
+    marcar_factura_crm, forzar_asesor_crm,
     canalizar_diseno_disenador, marcar_diseno_crm, marcar_diseno_aprobado_crm, rutear_asesor_merida,
 )
 from zoneinfo import ZoneInfo as _ZI
@@ -135,6 +136,34 @@ async def _avisar_personal(asesor: str, mensaje: str):
         await proveedor.enviar_mensaje(num, mensaje)
     except Exception as e:
         logger.error(f"Error avisando en privado a {asesor}: {e}")
+
+
+async def enviar_avisos_listos_para_entregar(*_):
+    """Job: avisa al grupo + asesor cuando un pedido llega a su hora de entrega."""
+    try:
+        listos = await pedidos_listos_para_entregar()
+    except Exception as e:
+        logger.error(f"Error buscando pedidos listos: {e}")
+        return
+    for p in listos:
+        wa = "".join(c for c in (p["telefono"] or "") if c.isdigit())
+        msg = (
+            f"📦 *LISTO PARA ENTREGAR — CLIO*\n\n"
+            f"👤 *Cliente:* {p['nombre']}\n"
+            f"📱 wa.me/{wa}\n"
+            f"🏢 *Sucursal:* {p['sucursal']}\n"
+            f"📋 *Pedido:* {p['descripcion'][:160]}\n\n"
+            f"Ya llegó su hora de entrega. Cuando lo entreguen, márquenlo "
+            f"como *✅ Entregado* en el panel para quitarlo de pendientes. 🙌"
+        )
+        grupo = GRUPO_ALERTA_SUCURSAL.get(p["sucursal"], ASESOR_WHATSAPP)
+        try:
+            await proveedor.enviar_mensaje(grupo, msg)
+        except Exception as e:
+            logger.error(f"Error aviso listo (grupo): {e}")
+        await _avisar_personal(p["asesor"], msg)
+    if listos:
+        logger.info(f"Listos para entregar: {len(listos)} aviso(s) enviado(s)")
 
 
 async def _grupo_alerta_de(telefono: str) -> str:
@@ -265,6 +294,15 @@ async def lifespan(app: FastAPI):
         minutes=15,
         id="marcar_esperando_pago",
         name="Mover a 'Esperando pago' leads con cuenta dada sin pagar en 2h",
+        replace_existing=True,
+    )
+    # Avisar 'Listo para entregar' cuando un pedido llega a su hora de entrega (cada 15 min).
+    scheduler.add_job(
+        enviar_avisos_listos_para_entregar,
+        "interval",
+        minutes=15,
+        id="listos_para_entregar",
+        name="Avisar pedidos listos para entregar (hora de entrega cumplida)",
         replace_existing=True,
     )
     scheduler.start()

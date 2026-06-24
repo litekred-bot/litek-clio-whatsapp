@@ -140,6 +140,9 @@ HTML_PANEL = r"""<!DOCTYPE html>
   .card .acciones .bexpres.on { background: #ff9800; color: #fff; border-color: #ff9800; }
   .card .acciones .bdiseno { background: #ede7f6; color: #5e35b1; border: 1px solid #b39ddb; border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
   .card .acciones .bdiseno.on { background: #7e57c2; color: #fff; border-color: #7e57c2; }
+  .card .acciones .bentregar { background: #00897b; color: #fff; border: 1px solid #00897b; border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
+  .entrega-badge { display:inline-block; background:#00897b; color:#fff; border-radius:10px; padding:2px 9px; font-size:11px; font-weight:bold; margin-left:6px; }
+  .entrega-prog { display:inline-block; background:#e0f2f1; color:#00695c; border-radius:10px; padding:2px 9px; font-size:11px; margin-left:6px; }
   .card .acciones .baprob { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
   .card .acciones .baprob.on { background: #2e7d32; color: #fff; border-color: #2e7d32; }
   .card .alerta-banner { background: #ffe0e0; color: #b71c1c; border-radius: 8px; padding: 7px 10px; margin: 8px 0; font-size: 13px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -233,6 +236,7 @@ HTML_PANEL = r"""<!DOCTYPE html>
       <button id="btnCalif" onclick="toggleSoloCalif()" style="background:#e8f5e9;color:#2e7d32;border-color:#a5d6a7;">⭐ Calificaciones</button>
       <button id="btnFactura" onclick="toggleSoloFactura()" style="background:#fff3e0;color:#e65100;border-color:#ffb74d;">🧾 Por facturar</button>
       <button id="btnDiseno" onclick="toggleSoloDiseno()" style="background:#ede7f6;color:#5e35b1;border-color:#b39ddb;">🎨 Solo diseño</button>
+      <button id="btnListo" onclick="toggleSoloListo()" style="background:#e0f2f1;color:#00695c;border-color:#80cbc4;">📦 Listo para entregar</button>
     </div>
     <div id="lista"></div>
     <div id="analisisPanel" style="display:none"></div>
@@ -470,6 +474,7 @@ var SOLO_EXPRES = false;
 var SOLO_CALIF = false;
 var SOLO_FACTURA = false;
 var SOLO_DISENO = false;
+var SOLO_LISTO = false;
 function aplicarBusqueda(){
   var q = (document.getElementById("buscar").value || "").toLowerCase().trim();
   var qDig = q.replace(/\D/g, "");
@@ -479,6 +484,7 @@ function aplicarBusqueda(){
   if (SOLO_CALIF){ regs = regs.filter(function(r){ return r.calificacion; }); }
   if (SOLO_FACTURA){ regs = regs.filter(function(r){ return r.factura && !r.facturado; }); }
   if (SOLO_DISENO){ regs = regs.filter(function(r){ return r.diseno; }); }
+  if (SOLO_LISTO){ regs = regs.filter(function(r){ return r.listo_entregar; }); }
   if (fAsesorChip){ regs = regs.filter(function(r){ return r.asesor === fAsesorChip && FINALES_JS.indexOf(r.estado) === -1; }); }
   if (q){
     regs = regs.filter(function(r){
@@ -516,6 +522,14 @@ function toggleSoloDiseno(){
   var b = document.getElementById("btnDiseno");
   b.style.background = SOLO_DISENO ? "#7e57c2" : "#ede7f6";
   b.style.color = SOLO_DISENO ? "#fff" : "#5e35b1";
+  aplicarBusqueda();
+}
+
+function toggleSoloListo(){
+  SOLO_LISTO = !SOLO_LISTO;
+  var b = document.getElementById("btnListo");
+  b.style.background = SOLO_LISTO ? "#00897b" : "#e0f2f1";
+  b.style.color = SOLO_LISTO ? "#fff" : "#00695c";
   aplicarBusqueda();
 }
 
@@ -653,8 +667,11 @@ function pintar(regs){
         ? '<span class="fact-badge fact-ok">✅ Facturado</span>'
         : '<span class="fact-badge fact-pend">🧾 Por facturar</span>') : '';
     var opcSuc = ["Campeche","Mérida","Carmen"].map(function(su){ return '<option value="'+su+'"'+((r.sucursal||"Campeche")===su?' selected':'')+'>'+su+'</option>'; }).join("");
+    var badgeEntrega = r.listo_entregar
+        ? '<span class="entrega-badge">📦 Listo para entregar</span>'
+        : (r.entrega_en ? '<span class="entrega-prog">📦 Entrega: '+r.entrega_en+'</span>' : '');
     return '<div class="card '+r.estado+(r.alerta?' alertado':'')+(r.expres?' expres-on':'')+'">'+
-      '<div class="head"><span class="nombre">'+esc(r.nombre||"Sin nombre")+badgeExpres+badgeDiseno+badgeAprob+badgeCalif+badgeSuc+badgeFact+'</span>'+
+      '<div class="head"><span class="nombre">'+esc(r.nombre||"Sin nombre")+badgeExpres+badgeDiseno+badgeAprob+badgeCalif+badgeSuc+badgeFact+badgeEntrega+'</span>'+
       '<span class="tipo">'+(TIPOS[r.tipo]||r.tipo)+'</span></div>'+
       alertaHtml+
       '<div class="desc">'+esc(r.descripcion||"")+'</div>'+
@@ -666,6 +683,7 @@ function pintar(regs){
         '<button class="bexpres'+(r.expres?' on':'')+'" onclick="toggleExpres('+r.id+','+(r.expres?'false':'true')+')" title="Marcar/quitar exprés">⚡ Exprés</button>'+
         '<button class="bdiseno'+(r.diseno?' on':'')+'" onclick="toggleDiseno('+r.id+','+(r.diseno?'false':'true')+')" title="Marcar/quitar diseño">🎨 Diseño</button>'+
         '<button class="baprob'+(r.diseno_aprobado?' on':'')+'" onclick="toggleDisenoAprobado('+r.id+','+(r.diseno_aprobado?'false':'true')+')" title="Marcar/quitar diseño aprobado">✅ Aprobado</button>'+
+        (r.estado==="proceso" ? '<button class="bentregar" onclick="if(confirm(\'¿Marcar como ENTREGADO? Pasa a Vendidos.\'))upd('+r.id+',\'estado\',\'vendido\')" title="Marcar pedido entregado">📦 Entregado</button>' : '')+
         (r.factura ? '<button class="bfact'+(r.facturado?' on':'')+'" onclick="toggleFacturado('+r.id+','+(r.facturado?'false':'true')+')" title="Marcar/quitar facturado">'+(r.facturado?'✅ Facturado':'🧾 Marcar facturado')+'</button>' : '')+
         (ES_DIRECTOR ? '<input class="monto" type="number" min="0" step="1" placeholder="$ monto" value="'+(r.monto?Math.round(r.monto):"")+'" title="Monto $ del pedido (para el total vendido)" onblur="upd('+r.id+',\'monto\',this.value)">' : '')+
         '<input class="nota" placeholder="Nota..." value="'+esc(r.notas||"")+'" onblur="upd('+r.id+',\'notas\',this.value)">'+
