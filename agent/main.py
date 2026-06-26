@@ -59,6 +59,55 @@ from agent.memory import (
 from zoneinfo import ZoneInfo as _ZI
 
 
+def _horario_sucursal(sucursal: str):
+    """(apertura, cierre L-V, cierre Sáb) de la sucursal. Todas abren 9."""
+    if sucursal in ("Carmen", "Mérida"):
+        return 9, 18, 14
+    return 9, 19, 16  # Campeche
+
+
+def sumar_horas_habiles(inicio_utc, horas: float, sucursal: str = ""):
+    """Suma N HORAS HÁBILES a un datetime (UTC naive), contando SOLO dentro del horario
+    de la sucursal (sin noches ni domingos). Devuelve UTC naive. Para auditar la entrega."""
+    apertura, cierre_lv, cierre_sab = _horario_sucursal(sucursal)
+    cur = inicio_utc.replace(tzinfo=timezone.utc).astimezone(_TZ_CAMP)
+    rem = float(horas)
+    guard = 0
+    while rem > 1e-6 and guard < 200:
+        guard += 1
+        wd = cur.weekday()
+        if wd == 6:  # domingo → siguiente día 9am
+            cur = (cur + timedelta(days=1)).replace(hour=apertura, minute=0, second=0, microsecond=0)
+            continue
+        cierre_h = cierre_sab if wd == 5 else cierre_lv
+        ap = cur.replace(hour=apertura, minute=0, second=0, microsecond=0)
+        ci = cur.replace(hour=cierre_h, minute=0, second=0, microsecond=0)
+        if cur < ap:
+            cur = ap
+        if cur >= ci:
+            cur = (cur + timedelta(days=1)).replace(hour=apertura, minute=0, second=0, microsecond=0)
+            continue
+        disp = (ci - cur).total_seconds() / 3600.0
+        if rem <= disp:
+            cur = cur + timedelta(hours=rem)
+            rem = 0
+        else:
+            rem -= disp
+            cur = (cur + timedelta(days=1)).replace(hour=apertura, minute=0, second=0, microsecond=0)
+    return cur.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def _horas_producto(descripcion: str, expres: bool) -> float:
+    """Horas hábiles de entrega según el producto (texto del pedido) + exprés."""
+    d = (descripcion or "").lower()
+    if any(k in d for k in ["coroplast", "pvc", "tarjeta"]):
+        return 6 if expres else 17
+    if "corte de vinil" in d or "corte vinil" in d:
+        return 8 if expres else 17
+    # lona, vinil impreso, etiquetas (y por defecto)
+    return 3 if expres else 9
+
+
 def es_horario_atencion(sucursal: str = "") -> bool:
     """True si estamos dentro del horario de atención de la sucursal del cliente.
     Campeche: L-V 9-19h, Sáb 9-16h. Carmen y Mérida: L-V 9-18h, Sáb 9-14h. Dom cerrado."""
@@ -1726,6 +1775,30 @@ async def diag_grupos():
         return {"total": len(grupos), "grupos": grupos}
     except Exception as e:
         return {"error": str(e)}
+
+
+@app.get("/diag/entrega")
+async def diag_entrega(tel: str = ""):
+    """Audita la entrega de un cliente: pago, entrega guardada vs recalculada con horas hábiles."""
+    info = await info_pedido_por_telefono(tel)
+    if not info:
+        return {"error": "No se encontró pedido para ese teléfono"}
+    suc = await sucursal_crm_por_telefono(tel)
+    expres = bool(info.get("expres"))
+    horas = _horas_producto(info.get("descripcion", ""), expres)
+    def _loc(dt):
+        return dt.replace(tzinfo=timezone.utc).astimezone(_TZ_CAMP).strftime("%a %d/%m %H:%M") if dt else None
+    pago = info.get("pagado_en")
+    esperada = sumar_horas_habiles(pago, horas, suc) if pago else None
+    return {
+        "telefono": tel, "sucursal": suc, "estado": info.get("estado"),
+        "producto": info.get("descripcion", "")[:80], "expres": expres,
+        "horas_habiles_producto": horas,
+        "pago_en": _loc(pago),
+        "entrega_GUARDADA": _loc(info.get("entrega_en")),
+        "entrega_RECALCULADA_desde_pago": _loc(esperada),
+        "nota": "La RECALCULADA cuenta desde el PAGO. Si el archivo llegó después, el inicio real sería esa fecha (más tarde).",
+    }
 
 
 @app.get("/diag/webhook")
