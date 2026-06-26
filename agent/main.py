@@ -162,6 +162,16 @@ async def enviar_avisos_listos_para_entregar(*_):
         except Exception as e:
             logger.error(f"Error aviso listo (grupo): {e}")
         await _avisar_personal(p["asesor"], msg)
+        # Avisar también al CLIENTE que su pedido ya está listo para recoger
+        try:
+            nom = (p["nombre"] or "").split(" ")[0]
+            msg_cli = (
+                f"¡Hola {nom}! 📦 ¡Buenas noticias! Tu pedido ya está listo. "
+                f"Puedes pasar a recogerlo cuando gustes 😊"
+            )
+            await proveedor.enviar_mensaje(p["telefono"], msg_cli)
+        except Exception as e:
+            logger.error(f"Error avisando al cliente listo: {e}")
     if listos:
         logger.info(f"Listos para entregar: {len(listos)} aviso(s) enviado(s)")
 

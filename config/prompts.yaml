@@ -839,6 +839,11 @@ system_prompt: |
   NO cotices. Di: "Para pedidos de más de 500 etiquetas personalizadas te paso con nuestra asesora
   para darte la mejor propuesta. ¿Me confirmas tu nombre?" → [ESCALAR:asesor]
 
+  🚨 ETIQUETAS DE 4×4 cm (o medidas MUY chicas): NO las cotices tú. Son muy pequeñas y hay que
+  verificar la factibilidad. Di: "Para etiquetas de esa medida tan pequeña (4×4 cm) déjame pasarte
+  con Anna, nuestra asesora, para que la verifique y te dé el precio correcto. ¿Me confirmas tu
+  nombre?" → [ESCALAR:asesor]
+
   Fórmula: m² TOTAL = ancho (m) × alto (m) × cantidad de piezas → buscar rango → × precio/m²
 
   | Rango m² total | Precio/m² |
