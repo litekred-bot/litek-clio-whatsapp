@@ -1442,6 +1442,24 @@ async def _procesar_mensaje(msg):
                 suc_cli = await sucursal_crm_por_telefono(numero_limpio)
                 if not es_horario_atencion(suc_cli):
                     await marcar_alerta_crm(numero_limpio, "⚠️ Pidió fuera de horario")
+                # FECHA DE ENTREGA — calculada en CÓDIGO (horas hábiles exactas), no por la IA.
+                try:
+                    _rl = (resumen_pedido or "").lower()
+                    _expres = bool(re.search(r'expr[eé]s', _rl))
+                    _horas = _horas_producto(resumen_pedido, _expres)
+                    _ahora_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+                    _entrega_utc = sumar_horas_habiles(_ahora_utc, _horas, suc_cli)
+                    await guardar_entrega_crm(numero_limpio, _entrega_utc)
+                    _ent_loc = _entrega_utc.replace(tzinfo=timezone.utc).astimezone(_TZ_CAMP)
+                    _dn = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+                    await proveedor.enviar_mensaje(
+                        msg.telefono,
+                        f"📦 Tu pedido estará listo aproximadamente el {_dn[_ent_loc.weekday()]} "
+                        f"{_ent_loc.strftime('%d/%m a las %H:%M')}. En cuanto esté, te avisamos. 😊"
+                    )
+                    logger.info(f"Entrega (código) {numero_limpio}: {_ent_loc.strftime('%d/%m %H:%M')} ({_horas}h háb)")
+                except Exception as e:
+                    logger.error(f"Error calculando entrega en código: {e}")
                 # ¿El pedido es CON factura? → marcar 🧾 para que el equipo de la
                 # sucursal la haga (el resumen trae "Factura: Sí/No").
                 rl = (resumen_pedido or "").lower()

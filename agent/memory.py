@@ -794,6 +794,7 @@ async def guardar_entrega_crm(telefono: str, entrega: datetime) -> bool:
         for r in result.scalars().all():
             if _sufijo_tel(r.telefono) == sufijo:
                 r.entrega_en = entrega
+                r.entrega_avisada = False  # nueva hora → re-armar el aviso "listo para entregar"
                 r.actualizado = datetime.utcnow()
                 await session.commit()
                 return True
