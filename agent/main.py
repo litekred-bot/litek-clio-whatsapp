@@ -187,6 +187,30 @@ async def _avisar_personal(asesor: str, mensaje: str):
         logger.error(f"Error avisando en privado a {asesor}: {e}")
 
 
+async def _calcular_entrega_y_avisar(telefono_chat: str, tel_limpio: str, resumen: str = "", expres=None):
+    """Calcula la entrega EN CÓDIGO (horas hábiles) y avisa al cliente la fecha.
+    Se llama SOLO cuando ya están pago + archivo (los dos). Reloj arranca AHORA."""
+    try:
+        info = await info_pedido_por_telefono(tel_limpio)
+        sucursal = await sucursal_crm_por_telefono(tel_limpio)
+        desc = resumen or (info.get("descripcion", "") if info else "")
+        exp = expres if expres is not None else (info.get("expres", False) if info else False)
+        horas = _horas_producto(desc, exp)
+        ahora = datetime.now(timezone.utc).replace(tzinfo=None)
+        entrega_utc = sumar_horas_habiles(ahora, horas, sucursal)
+        await guardar_entrega_crm(tel_limpio, entrega_utc)
+        ent_loc = entrega_utc.replace(tzinfo=timezone.utc).astimezone(_TZ_CAMP)
+        dn = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+        await proveedor.enviar_mensaje(
+            telefono_chat,
+            f"📦 ¡Listo! Ya tenemos tu pago y tu archivo. Tu pedido estará listo aproximadamente el "
+            f"{dn[ent_loc.weekday()]} {ent_loc.strftime('%d/%m a las %H:%M')}. En cuanto esté, te avisamos. 😊"
+        )
+        logger.info(f"Entrega calculada {tel_limpio}: {ent_loc.strftime('%d/%m %H:%M')} ({horas}h háb, {sucursal})")
+    except Exception as e:
+        logger.error(f"Error calculando entrega: {e}")
+
+
 async def enviar_avisos_listos_para_entregar(*_):
     """Job: avisa al grupo + asesor cuando un pedido llega a su hora de entrega."""
     try:
@@ -1310,6 +1334,8 @@ async def _procesar_mensaje(msg):
                         except Exception:
                             pass
                         logger.info(f"Archivo tardío reenviado al asesor para {msg.telefono}")
+                        # PAGO + ARCHIVO listos (archivo llegó después) → calcular la entrega ahora.
+                        await _calcular_entrega_y_avisar(msg.telefono, tel_limpio)
                     except Exception as e:
                         logger.error(f"Error reenviando archivo tardío: {e}")
                 else:
@@ -1442,24 +1468,6 @@ async def _procesar_mensaje(msg):
                 suc_cli = await sucursal_crm_por_telefono(numero_limpio)
                 if not es_horario_atencion(suc_cli):
                     await marcar_alerta_crm(numero_limpio, "⚠️ Pidió fuera de horario")
-                # FECHA DE ENTREGA — calculada en CÓDIGO (horas hábiles exactas), no por la IA.
-                try:
-                    _rl = (resumen_pedido or "").lower()
-                    _expres = bool(re.search(r'expr[eé]s', _rl))
-                    _horas = _horas_producto(resumen_pedido, _expres)
-                    _ahora_utc = datetime.now(timezone.utc).replace(tzinfo=None)
-                    _entrega_utc = sumar_horas_habiles(_ahora_utc, _horas, suc_cli)
-                    await guardar_entrega_crm(numero_limpio, _entrega_utc)
-                    _ent_loc = _entrega_utc.replace(tzinfo=timezone.utc).astimezone(_TZ_CAMP)
-                    _dn = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
-                    await proveedor.enviar_mensaje(
-                        msg.telefono,
-                        f"📦 Tu pedido estará listo aproximadamente el {_dn[_ent_loc.weekday()]} "
-                        f"{_ent_loc.strftime('%d/%m a las %H:%M')}. En cuanto esté, te avisamos. 😊"
-                    )
-                    logger.info(f"Entrega (código) {numero_limpio}: {_ent_loc.strftime('%d/%m %H:%M')} ({_horas}h háb)")
-                except Exception as e:
-                    logger.error(f"Error calculando entrega en código: {e}")
                 # ¿El pedido es CON factura? → marcar 🧾 para que el equipo de la
                 # sucursal la haga (el resumen trae "Factura: Sí/No").
                 rl = (resumen_pedido or "").lower()
@@ -1561,6 +1569,9 @@ async def _procesar_mensaje(msg):
                 if archivo_guardado:
                     ok_arch = await _reenviar_media(ASESOR_WHATSAPP, tipo_arch, url_arch, id_arch, caption=f"🎨 Archivo para imprimir — {nombre_cli}")
                     logger.info(f"Archivo de diseño reenviado al asesor: {ok_arch}")
+                    # PAGO + ARCHIVO listos → calcular la entrega (reloj arranca ahora).
+                    _exp_p = bool(re.search(r'expr[eé]s', (resumen_pedido or '').lower()))
+                    await _calcular_entrega_y_avisar(msg.telefono, numero_limpio, resumen_pedido, _exp_p)
                 else:
                     # El cliente pagó pero NO ha mandado su archivo de impresión
                     _pago_sin_archivo[msg.telefono] = nombre_cli

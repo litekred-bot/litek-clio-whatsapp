@@ -139,12 +139,18 @@ class ProveedorWhapi(ProveedorWhatsApp):
                     media_id = doc_data.get("id", "")
                     if media_id:
                         media_url = f"https://gate.whapi.cloud/media/{media_id}"
+                # Si el "documento" es en realidad una IMAGEN (png/jpg/etc.) → tratarlo como
+                # imagen, no como documento (un PNG no tiene texto que extraer).
+                _es_imagen = mime_type.startswith("image/") or filename.lower().endswith(
+                    (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".heic", ".heif", ".tif", ".tiff")
+                )
                 mensajes.append(MensajeEntrante(
                     telefono=telefono,
-                    texto=caption or f"[El cliente envió un documento: {filename}]",
+                    texto=caption or ("[El cliente envió una imagen]" if _es_imagen
+                                      else f"[El cliente envió un documento: {filename}]"),
                     mensaje_id=mensaje_id,
                     es_propio=es_propio,
-                    tipo="document",
+                    tipo="image" if _es_imagen else "document",
                     media_url=media_url,
                     nombre_perfil=nombre_perfil,
                 ))
