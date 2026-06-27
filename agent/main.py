@@ -662,16 +662,19 @@ def _es_lona_gratis(premio: str) -> bool:
     return ("lona" in pl and "gratis" in pl)
 
 
-def _mensaje_premio(nombre: str, premio: str, es_gol: bool) -> str:
+def _mensaje_premio(nombre: str, premio: str, es_gol: bool, sucursal: str = "Campeche") -> str:
     """
     Mensaje 1 — entrega del premio. La lona gratis se regala (sin compra);
     cualquier otro premio se valida haciendo un pedido (cualquier producto).
     """
     gancho = "⚽ *¡GOOOL!* Metiste el gol y" if es_gol else "🎡 Giraste la ruleta y"
     if _es_lona_gratis(premio):
+        direccion = ("Circuito Colonias 146, Col. Buenavista, Mérida (tienda MASTER Litek)"
+                     if sucursal == "Mérida"
+                     else "Av. Colosio No. 414, Col. Pensiones, Campeche")
         return (
             f"¡Felicidades {nombre}! {gancho} ganaste *{premio}* 🎉\n\n"
-            f"Es tuya sin compra 🎁 Pasa a recogerla a Av. Colosio No. 414, Col. Pensiones "
+            f"Es tuya sin compra 🎁 Pasa a recogerla a {direccion} "
             f"y muestra este chat. ¿Te late aprovechar y mandar a imprimir algo más?"
         )
     return (
@@ -775,20 +778,23 @@ async def crm_backfill_montos(request: Request):
 
 
 @app.get("/ruleta/ping")
-async def ruleta_ping(nombre: str = "", telefono: str = "", premio: str = "", descripcion: str = "", juego: str = "ruleta"):
+async def ruleta_ping(nombre: str = "", telefono: str = "", premio: str = "", descripcion: str = "", juego: str = "ruleta", ciudad: str = ""):
     """
     Endpoint GET sin preflight CORS — llamado via Image pixel desde la ruleta o el juego de gol.
     Registra al ganador y manda WhatsApp automáticamente. `juego`: "ruleta" o "gol".
+    `ciudad`: del selector de la página — "campeche" o "merida".
     """
     import httpx as _httpx
     if not all([nombre, telefono, premio]):
         return {"ok": False}
 
-    # Promo SOLO de Campeche: si el número ya es cliente conocido de Carmen/Mérida,
-    # la ruleta/gol NO aplica → no registrar ni mandar premio.
-    if await sucursal_crm_por_telefono(telefono) in ("Carmen", "Mérida"):
-        logger.info(f"Ruleta/gol ignorada — {telefono} no es de Campeche (promo solo Campeche)")
-        return {"ok": False, "razon": "solo_campeche"}
+    # La ruleta/gol aplica para CAMPECHE y MÉRIDA (según el selector de ciudad).
+    # Carmen NO tiene juego: si el número ya es cliente conocido de Carmen, no aplica.
+    _ciudad = (ciudad or "").strip().lower()
+    suc_juego = "Mérida" if ("merida" in _ciudad or "mérida" in _ciudad) else "Campeche"
+    if await sucursal_crm_por_telefono(telefono) == "Carmen":
+        logger.info(f"Ruleta/gol ignorada — {telefono} es de Carmen (sin juego)")
+        return {"ok": False, "razon": "carmen_sin_juego"}
 
     tel = telefono.replace("+", "").replace(" ", "").replace("-", "")
     if len(tel) == 10:
@@ -817,10 +823,14 @@ async def ruleta_ping(nombre: str = "", telefono: str = "", premio: str = "", de
             tipo="ruleta",
             estado_minimo="nuevo",
         )
+        # Fijar la sucursal del ganador según el selector. Si es MÉRIDA, guardar_sucursal_crm
+        # además lo asigna al equipo de Mérida (Jadiel) — no a Erick.
+        if suc_juego == "Mérida":
+            await guardar_sucursal_crm(telefono, "Mérida")
     except Exception as e:
         logger.error(f"Error registrando ruleta en CRM: {e}")
 
-    msg_wa = _mensaje_premio(nombre, premio, es_gol)
+    msg_wa = _mensaje_premio(nombre, premio, es_gol, suc_juego)
     await guardar_mensaje(tel_wa, "assistant", msg_wa)
 
     # Mensaje al cliente ganador
