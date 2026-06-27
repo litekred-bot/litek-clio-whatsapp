@@ -16,7 +16,7 @@ add_action('wp_footer', function() {
     {n:"24 tarjetas",d:"24 tarjetas de presentaci\u00f3n gratis con cualquier compra."},
     {n:"Diseno gratis",d:"Dise\u00f1o gratis con tu pedido. Aplica con compra."}
   ];
-  var nombre="",telefono="",startAngle=0,arc=Math.PI*2/premios.length,ctx,girando=false;
+  var nombre="",telefono="",ciudad="",startAngle=0,arc=Math.PI*2/premios.length,ctx,girando=false;
   var COLORES=["#e30613","#0d3b80","#00897b","#c2185b","#f57c00","#3949ab","#43a047","#8e24aa","#d35400"];
 
   function genFolio(){return "LK-"+Math.floor(100000+Math.random()*900000);}
@@ -53,8 +53,9 @@ add_action('wp_footer', function() {
       +   '<p style="color:#555;font-size:15px;margin:2px 0 6px;">D\u00e9janos tus datos y gira la ruleta \ud83d\udc47</p>'
       +   '<input id="lk-nom" placeholder="Tu nombre" autocomplete="name">'
       +   '<input id="lk-tel" type="tel" inputmode="numeric" placeholder="Tu WhatsApp (10 d\u00edgitos)" autocomplete="tel">'
+      +   '<select id="lk-ciudad" style="width:100%;padding:13px;margin:7px 0;border:1.5px solid #e0d8cf;border-radius:10px;font-size:16px;background:#fff;color:#333;"><option value="">\u00bfDe qu\u00e9 sucursal eres?</option><option value="campeche">Campeche</option><option value="merida">M\u00e9rida</option></select>'
       +   '<button id="lk-bd" class="lk-btn">Obt\u00e9n tu descuento \ud83c\udf81</button>'
-      +   '<div class="lk-nota">1 giro por persona \u00b7 \ud83d\udccd Aplica solo en sucursal <b>Campeche</b></div>'
+      +   '<div class="lk-nota">1 giro por persona \u00b7 \ud83d\udccd Aplica en sucursales <b>Campeche</b> y <b>M\u00e9rida</b></div>'
       + '</div>'
       + '<div id="lk-rul" style="display:none;"><h2 style="color:#e30613;margin:2px 0 10px;font-size:20px;">\u00a1Gira la ruleta!</h2>'
       +   '<canvas id="lk-cv" width="360" height="360"></canvas>'
@@ -113,13 +114,15 @@ add_action('wp_footer', function() {
     document.getElementById("lk-folio").textContent=folio;
     document.getElementById("lk-vence").textContent=vence;
     var desc=pr.d+" | Folio: "+folio+" | Vence: "+vence;
-    var url=API+"/ruleta/ping?nombre="+encodeURIComponent(nombre)+"&telefono="+encodeURIComponent(telefono)+"&premio="+encodeURIComponent(pr.n)+"&descripcion="+encodeURIComponent(desc);
+    var url=API+"/ruleta/ping?nombre="+encodeURIComponent(nombre)+"&telefono="+encodeURIComponent(telefono)+"&premio="+encodeURIComponent(pr.n)+"&descripcion="+encodeURIComponent(desc)+"&ciudad="+encodeURIComponent(ciudad);
     fetch(url,{mode:"no-cors",keepalive:true}).catch(function(){new Image().src=url;});
   }
   async function enviarDatos(){
     nombre=document.getElementById("lk-nom").value.trim();
     telefono=document.getElementById("lk-tel").value.trim().replace(/\D/g,"");
+    ciudad=document.getElementById("lk-ciudad").value;
     if(!nombre||telefono.length<10){alert("Pon tu nombre y WhatsApp de 10 d\u00edgitos");return;}
+    if(!ciudad){alert("Elige tu sucursal (Campeche o M\u00e9rida)");return;}
     try{var r=await fetch(API+"/ruleta/verificar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({telefono:telefono})});
       var d=await r.json();
       if(d.ya_jugo){

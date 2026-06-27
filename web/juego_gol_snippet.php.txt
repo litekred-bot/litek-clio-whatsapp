@@ -84,8 +84,9 @@ add_action('wp_footer', function () {
       +     '<div id="lg-form">'
       +       '<input id="lg-nombre" placeholder="Tu nombre" autocomplete="name">'
       +       '<input id="lg-tel" placeholder="Tu WhatsApp (10 d\u00edgitos)" inputmode="numeric" autocomplete="tel">'
+      +       '<select id="lg-ciudad" style="width:100%;padding:13px;margin:7px 0;border:1.5px solid #e0d8cf;border-radius:10px;font-size:16px;background:#fff;color:#333;"><option value="">\u00bfDe qu\u00e9 sucursal eres?</option><option value="campeche">Campeche</option><option value="merida">M\u00e9rida</option></select>'
       +       '<button id="lg-btn">\u26bd \u00a1PATEAR!</button>'
-      +       '<div id="lg-nota">1 tiro por persona \u00b7 \u00a1descubre tu premio!<br>\ud83d\udccd Aplica solo en sucursal <b>Campeche</b></div>'
+      +       '<div id="lg-nota">1 tiro por persona \u00b7 \u00a1descubre tu premio!<br>\ud83d\udccd Aplica en sucursales <b>Campeche</b> y <b>M\u00e9rida</b></div>'
       +     '</div>'
       +   '</div>'
       +   '<div id="lg-result"></div>'
@@ -96,14 +97,17 @@ add_action('wp_footer', function () {
     var zonas = ov.querySelectorAll(".lg-zona");
     var btn = ov.querySelector("#lg-btn");
     var balon = ov.querySelector("#lg-balon");
+    var ciudad = "";  // sucursal elegida en el selector (compartida con registrar())
 
     ov.querySelector("#lg-x").onclick = function () { ov.remove(); window.__litekGolCargado = false; };
 
     btn.onclick = function () {
       var nombre = ov.querySelector("#lg-nombre").value.trim();
       var tel = ov.querySelector("#lg-tel").value.replace(/\D/g, "");
+      ciudad = ov.querySelector("#lg-ciudad").value;
       if (nombre.length < 2) { alert("Escribe tu nombre \ud83d\ude42"); return; }
       if (tel.length < 10) { alert("Escribe tu WhatsApp a 10 d\u00edgitos \ud83d\udcf1"); return; }
+      if (!ciudad) { alert("Elige tu sucursal (Campeche o M\u00e9rida)"); return; }
       btn.disabled = true; btn.textContent = "Verificando...";
 
       // \u00bfYa jug\u00f3? (bloqueo 15 d\u00edas, lo controla el backend)
@@ -152,6 +156,7 @@ add_action('wp_footer', function () {
         + "&premio=" + encodeURIComponent(premio.nombre)
         + "&descripcion=" + encodeURIComponent(premio.desc)
         + "&juego=gol"
+        + "&ciudad=" + encodeURIComponent(ciudad)
         + "&_=" + Date.now();
     }
 
