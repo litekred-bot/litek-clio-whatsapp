@@ -791,10 +791,12 @@ async def ruleta_ping(nombre: str = "", telefono: str = "", premio: str = "", de
     # La ruleta/gol aplica para CAMPECHE y MÉRIDA (según el selector de ciudad).
     # Carmen NO tiene juego: si el número ya es cliente conocido de Carmen, no aplica.
     _ciudad = (ciudad or "").strip().lower()
-    suc_juego = "Mérida" if ("merida" in _ciudad or "mérida" in _ciudad) else "Campeche"
-    if await sucursal_crm_por_telefono(telefono) == "Carmen":
+    _suc_conocida = await sucursal_crm_por_telefono(telefono)
+    if _suc_conocida == "Carmen":
         logger.info(f"Ruleta/gol ignorada — {telefono} es de Carmen (sin juego)")
         return {"ok": False, "razon": "carmen_sin_juego"}
+    # Sucursal del juego: del selector de la página, o la del cliente si ya es de Mérida.
+    suc_juego = "Mérida" if ("merida" in _ciudad or "mérida" in _ciudad or _suc_conocida == "Mérida") else "Campeche"
 
     tel = telefono.replace("+", "").replace(" ", "").replace("-", "")
     if len(tel) == 10:
