@@ -93,10 +93,14 @@ HTML_PANEL = r"""<!DOCTYPE html>
   .stat span { font-size: 12px; color: #777; }
   .stat.venta { background: #e8f5e9; }
   .stat.venta b { color: #2e7d32; }
+  /* Mes actual = el número protagonista: más grande y con borde */
+  .stat.venta.mes { background: #c8e6c9; border: 2px solid #2e7d32; padding: 12px 22px; }
+  .stat.venta.mes b { color: #1b5e20; font-size: 30px; }
   .stat.venta.hoy { background: #fff8e1; }
   .stat.venta.hoy b { color: #e65100; }
-  .stat.venta.total { background: #e3f2fd; }
-  .stat.venta.total b { color: #1565c0; }
+  /* Acumulado = dato secundario, más chico para no competir con el mes */
+  .stat.venta.total { background: #eef4f8; }
+  .stat.venta.total b { color: #607d8b; font-size: 16px; }
   .ventas-filtro { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; font-size: 13px; color: #555; }
   .ventas-filtro span { font-weight: 600; }
   .ventas-filtro input[type=month] { padding: 5px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
@@ -623,8 +627,9 @@ function pintarStats(s, ventas){
       var na = ventas.acumulado_num || 0;
       acHtml = '<div class="stat venta total"><b>'+fmtDinero(ventas.acumulado)+'</b><span>🏆 Total acumulado'+(na?" ("+na+")":"")+'</span></div>';
     }
-    ventaHtml = hoyHtml +
-      '<div class="stat venta"><b>'+fmtDinero(ventas.total)+'</b><span>'+etiqueta+'</span></div>' +
+    ventaHtml =
+      '<div class="stat venta mes"><b>'+fmtDinero(ventas.total)+'</b><span>'+etiqueta+'</span></div>' +
+      hoyHtml +
       acHtml;
   }
   document.getElementById("stats").innerHTML =
