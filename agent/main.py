@@ -1082,20 +1082,39 @@ async def _procesar_mensaje(msg):
         ctx_entrega = f"Ahora es {_dias_sem[ahora_local.weekday()]} {ahora_local.strftime('%d/%m/%Y %H:%M')} (hora local)."
         try:
             _info = await info_pedido_por_telefono(tel_limpio)
+            # Asesor asignado + su WhatsApp — para compartirlo cuando el pedido ya está listo,
+            # así el cliente coordina la entrega directo y no volvemos a saturar al equipo.
+            _asesor_nom = await asesor_crm_por_telefono(tel_limpio)
+            _asesor_tel = ASESOR_PERSONAL.get(_asesor_nom, "")
+            _asesor_txt = ""
+            if _asesor_nom:
+                _asesor_txt = f" El asesor que le tocó es {_asesor_nom}"
+                if _asesor_tel:
+                    _asesor_txt += f" (WhatsApp: +{_asesor_tel})"
+                _asesor_txt += "."
             if _info and _info.get("entrega_en"):
                 ent_local = _info["entrega_en"].replace(tzinfo=timezone.utc).astimezone(_TZ_CAMP)
                 if ahora_local >= ent_local:
                     ctx_entrega += (
-                        f"\n⚠️ ENTREGA: el cliente tiene un pedido cuya hora de entrega "
-                        f"({ent_local.strftime('%d/%m a las %H:%M')}) YA PASÓ. Si pregunta por su "
-                        f"pedido, dile con gusto que YA ESTÁ LISTO y puede pasar a recogerlo, y "
-                        f"agrega al final la etiqueta [VA_EN_CAMINO] (invisible) para avisar al asesor."
+                        f"\n⚠️ ENTREGA: el pedido del cliente (hora acordada "
+                        f"{ent_local.strftime('%d/%m a las %H:%M')}) YA debe estar LISTO. Si vuelve a "
+                        f"preguntar, dile con gusto que su pedido ya está listo y puede pasar a "
+                        f"recogerlo.{_asesor_txt} Comparte el nombre y número del asesor para que "
+                        f"coordine la entrega. Agrega al final la etiqueta [VA_EN_CAMINO] (invisible) "
+                        f"para avisar al asesor. TÚ tienes la respuesta: NO lo mandes a preguntar al asesor."
                     )
                 else:
+                    # Cuánto falta (solo si es hoy y en pocas horas, para no confundir con noches)
+                    _falta = ""
+                    _hf = (ent_local - ahora_local).total_seconds() / 3600
+                    if 0 < _hf <= 12 and ent_local.date() == ahora_local.date():
+                        _h, _m = int(_hf), int((_hf - int(_hf)) * 60)
+                        _falta = f" (faltan aprox {_h} h {_m} min)" if _h else f" (faltan aprox {_m} min)"
                     ctx_entrega += (
                         f"\nENTREGA: el pedido del cliente estará listo el "
-                        f"{ent_local.strftime('%d/%m a las %H:%M')} (aún no es la hora). Si pregunta, "
-                        f"dile que estará listo a esa hora."
+                        f"{ent_local.strftime('%d/%m a las %H:%M')}{_falta} (aún no es la hora). Si vuelve "
+                        f"a preguntar, recuérdale con gusto esa hora acordada y cuánto falta. TÚ tienes la "
+                        f"respuesta: NO lo mandes a preguntar al asesor."
                     )
             elif _info and _info.get("estado") == "proceso" and _info.get("pagado_en"):
                 # Pedido viejo: pagó pero no tiene hora calculada → estimar y guardar.
