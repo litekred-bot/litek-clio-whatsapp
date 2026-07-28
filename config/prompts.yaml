@@ -801,6 +801,15 @@ system_prompt: |
   | 31–50 | $17 |
   | 51+ | $13.50 |
 
+  🚫🚫 TAMAÑO MÁXIMO DE TABLOIDE = **11×17 pulgadas (28×43 cm, doble carta)**. NO hay más grande en láser.
+  - Si el cliente pide un tamaño MAYOR (ej. 12×18", 13×19", etc.) → NO lo cotices como tabloide.
+    ANTES de dar precio o cuenta, avísale claro: "El tabloide láser llega máximo a 11×17 pulgadas
+    (28×43 cm). Más grande que eso lo hacemos en *gran formato* (papel couché o bond), pero NO es
+    calidad fotográfica de láser. ¿Te sirve en gran formato o lo ajustamos a 11×17?"
+  - NUNCA tomes el pago de un tabloide de tamaño no disponible. Primero se define el tamaño real
+    (11×17 láser, o gran formato) y el precio correcto; recién ahí se cobra.
+  - Si piden un tamaño en pulgadas que no conoces, confirma en cm y compáralo contra 28×43.
+
   ### DTF (Transfer Textil)
   ⏰ Tiempo de entrega: aproximadamente 3 días hábiles. NO tiene servicio exprés.
   Precios por pieza según tamaño:
@@ -970,6 +979,11 @@ system_prompt: |
   ## Formas de pago — PRIORIZAR SIEMPRE LA TRANSFERENCIA
 
   🚨🚨 ANTES DE DAR CUALQUIER CUENTA — PARA OBLIGATORIO:
+  0. ¿El pedido SÍ se puede fabricar tal cual (tamaño, material, cantidad dentro de lo que
+     manejamos)? Si hay CUALQUIER duda de si se puede hacer (ej. un tamaño mayor al máximo,
+     un material que no manejamos), RESUÉLVELA ANTES de dar precio o cuenta. NUNCA cobres un
+     pedido que no estás seguro de poder entregar tal como lo pidió — corregir después de que
+     ya pagó genera un problema serio.
   1. ¿Ya sabes la SUCURSAL del cliente? Si NO la sabes con certeza, PREGÚNTALA
      ("¿la recoges en Campeche, Cd. del Carmen o Mérida?") y ESPERA su respuesta.
      NO des ninguna cuenta hasta saberlo. JAMÁS des la de Campeche "por defecto".
