@@ -2,8 +2,10 @@
 # Generado por AgentKit para LiTek
 
 import os
+import io
 import json
 import base64
+import asyncio
 import yaml
 import logging
 import httpx
@@ -113,6 +115,35 @@ def obtener_mensaje_fallback() -> str:
     return config.get("fallback_message", "Mmm, no entendí bien. ¿Me puedes decir qué producto necesitas y las medidas?")
 
 
+# La API de Anthropic rechaza imágenes de más de ~10 MB. Dejamos un margen seguro:
+# si una foto pesa más que esto, la reducimos antes de mandarla.
+MAX_IMG_BYTES = 5 * 1024 * 1024  # 5 MB
+
+
+def _comprimir_imagen(data: bytes) -> tuple[bytes, str]:
+    """Reduce una imagen pesada (dimensión + calidad) para que la acepte la IA.
+    Retorna (bytes, media_type). Si algo falla, devuelve la original."""
+    try:
+        from PIL import Image
+        img = Image.open(io.BytesIO(data))
+        img = img.convert("RGB")  # quita transparencia/modos raros para guardar como JPEG
+        # Anthropic recomienda que el lado largo no pase de ~1568 px (más grande no ayuda)
+        max_lado = 1568
+        if max(img.size) > max_lado:
+            img.thumbnail((max_lado, max_lado))
+        # Baja la calidad por pasos hasta quedar debajo del límite
+        buf = io.BytesIO()
+        for calidad in (85, 75, 65, 55, 45):
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=calidad, optimize=True)
+            if buf.tell() <= MAX_IMG_BYTES:
+                break
+        return buf.getvalue(), "image/jpeg"
+    except Exception as e:
+        logger.error(f"No se pudo comprimir la imagen: {e}")
+        return data, "image/jpeg"
+
+
 async def descargar_imagen(media_url: str, whapi_token: str) -> tuple[str, str] | None:
     """Descarga imagen de Whapi y la convierte a base64. Retorna (b64, media_type) o None."""
     if not media_url:
@@ -130,7 +161,13 @@ async def descargar_imagen(media_url: str, whapi_token: str) -> tuple[str, str] 
             media_type   = content_type.split(";")[0].strip()
             if media_type not in ("image/jpeg", "image/png", "image/gif", "image/webp"):
                 media_type = "image/jpeg"
-            return base64.standard_b64encode(r.content).decode("utf-8"), media_type
+            contenido = r.content
+            # Si la foto pesa de más, la reducimos para que la IA no la rechace (>10 MB)
+            if len(contenido) > MAX_IMG_BYTES:
+                logger.info(f"Imagen de {len(contenido)} bytes supera el límite; comprimiendo…")
+                contenido, media_type = await asyncio.to_thread(_comprimir_imagen, contenido)
+                logger.info(f"Imagen comprimida a {len(contenido)} bytes ({media_type})")
+            return base64.standard_b64encode(contenido).decode("utf-8"), media_type
     except Exception as e:
         logger.error(f"Excepción descargando imagen: {e}")
         return None
