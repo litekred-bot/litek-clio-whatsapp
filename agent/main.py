@@ -1095,14 +1095,28 @@ async def _procesar_mensaje(msg):
             if _info and _info.get("entrega_en"):
                 ent_local = _info["entrega_en"].replace(tzinfo=timezone.utc).astimezone(_TZ_CAMP)
                 if ahora_local >= ent_local:
-                    ctx_entrega += (
-                        f"\n⚠️ ENTREGA: el pedido del cliente (hora acordada "
-                        f"{ent_local.strftime('%d/%m a las %H:%M')}) YA debe estar LISTO. Si vuelve a "
-                        f"preguntar, dile con gusto que su pedido ya está listo y puede pasar a "
-                        f"recogerlo.{_asesor_txt} Comparte el nombre y número del asesor para que "
-                        f"coordine la entrega. Agrega al final la etiqueta [VA_EN_CAMINO] (invisible) "
-                        f"para avisar al asesor. TÚ tienes la respuesta: NO lo mandes a preguntar al asesor."
-                    )
+                    _suc_ent = await sucursal_crm_por_telefono(tel_limpio) or "Campeche"
+                    if es_horario_atencion(_suc_ent):
+                        ctx_entrega += (
+                            f"\n⚠️ ENTREGA: el pedido del cliente (hora acordada "
+                            f"{ent_local.strftime('%d/%m a las %H:%M')}) YA debe estar LISTO. Si vuelve a "
+                            f"preguntar, dile con gusto que su pedido ya está listo y puede pasar a "
+                            f"recogerlo.{_asesor_txt} Comparte el nombre y número del asesor para que "
+                            f"coordine la entrega. Agrega al final la etiqueta [VA_EN_CAMINO] (invisible) "
+                            f"para avisar al asesor. TÚ tienes la respuesta: NO lo mandes a preguntar al asesor."
+                        )
+                    else:
+                        _hz = ("Lunes a Viernes de 9 a 19 h y Sábados de 9 a 16 h"
+                               if _suc_ent == "Campeche"
+                               else "Lunes a Viernes de 9 a 18 h y Sábados de 9 a 14 h")
+                        ctx_entrega += (
+                            f"\n⚠️ ENTREGA: el pedido del cliente YA está LISTO, pero AHORITA la tienda "
+                            f"está CERRADA. Si pregunta, dile con gusto que su pedido ya está listo y que "
+                            f"puede pasar a recogerlo dentro de nuestro horario: {_hz}. NO le digas que "
+                            f"pase 'ahorita' ni que 'va en camino'.{_asesor_txt} 🚫 NO agregues la etiqueta "
+                            f"[VA_EN_CAMINO] (la tienda está cerrada, no se avisa al asesor a esta hora). "
+                            f"TÚ tienes la respuesta: NO lo escales."
+                        )
                 else:
                     # Cuánto falta (solo si es hoy y en pocas horas, para no confundir con noches)
                     _falta = ""
@@ -1232,17 +1246,22 @@ async def _procesar_mensaje(msg):
             respuesta = respuesta.replace("[VA_EN_CAMINO]", "").strip()
             try:
                 _suc_vc = await sucursal_crm_por_telefono(tel_limpio)
-                _grupo_vc = await _grupo_alerta_de(msg.telefono)
-                aviso_vc = (
-                    f"🚶 *CLIENTE VA EN CAMINO — CLIO*\n\n"
-                    f"👤 {msg.nombre_perfil or 'Cliente'}\n"
-                    f"📱 wa.me/{''.join(c for c in tel_limpio if c.isdigit())}\n"
-                    f"🏢 {_suc_vc}\n\n"
-                    f"Su pedido ya está listo y va en camino a recogerlo. 🙌"
-                )
-                await proveedor.enviar_mensaje(_grupo_vc, aviso_vc)
-                _dueno_vc = await asesor_crm_por_telefono(tel_limpio)
-                await _avisar_personal(_dueno_vc, aviso_vc)
+                # Blindaje: solo avisamos "va en camino" si la tienda está ABIERTA
+                # (no tiene caso avisar al asesor fuera de horario).
+                if es_horario_atencion(_suc_vc or "Campeche"):
+                    _grupo_vc = await _grupo_alerta_de(msg.telefono)
+                    aviso_vc = (
+                        f"🚶 *CLIENTE VA EN CAMINO — CLIO*\n\n"
+                        f"👤 {msg.nombre_perfil or 'Cliente'}\n"
+                        f"📱 wa.me/{''.join(c for c in tel_limpio if c.isdigit())}\n"
+                        f"🏢 {_suc_vc}\n\n"
+                        f"Su pedido ya está listo y va en camino a recogerlo. 🙌"
+                    )
+                    await proveedor.enviar_mensaje(_grupo_vc, aviso_vc)
+                    _dueno_vc = await asesor_crm_por_telefono(tel_limpio)
+                    await _avisar_personal(_dueno_vc, aviso_vc)
+                else:
+                    logger.info(f"[VA_EN_CAMINO] ignorado (fuera de horario) para {msg.telefono}")
             except Exception as e:
                 logger.error(f"Error avisando va en camino: {e}")
 
