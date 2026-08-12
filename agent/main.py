@@ -1695,7 +1695,7 @@ async def _procesar_mensaje(msg):
                 elif es_carmen:
                     _atender = await asesor_crm_por_telefono(_tel_esc) or "el equipo de Carmen"
                 elif area_escalar == "letreros":
-                    _atender = "Brayan"   # Campeche: letreros lo ve Brayan
+                    _atender = "Erick"   # Campeche: diseño/letreros lo lleva Erick (diseñador)
                 else:
                     _atender = "Anna"
 
@@ -1730,7 +1730,7 @@ async def _procesar_mensaje(msg):
             # En Carmen NO se reasigna: el dueño por turnos (Alan/Jadiel) se queda.
             _asesor_area = {
                 "asesor": "Anna", "director": "Chino",
-                "letreros": "Brayan", "administracion": "Tere",
+                "letreros": "Erick", "administracion": "Tere",
             }.get(area_escalar, "")
             # Mérida: el asesor general Y los letreros/diseño los lleva Edith (no los de Campeche).
             if area_escalar in ("asesor", "letreros") and es_merida:
