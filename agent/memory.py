@@ -941,9 +941,11 @@ async def ruletas_para_seguimiento(horas_min: int = 2, horas_max: int = 48) -> l
 
 async def clientes_para_agradecer(horas_min: int = 12, dias_max: int = 7) -> list[dict]:
     """
-    Clientes que YA pagaron (estado 'proceso' o 'vendido') cuyo pedido se confirmó
+    Clientes cuyo pedido YA fue ENTREGADO (estado 'vendido' — botón 📦 Entregado del panel)
     hace al menos `horas_min` horas y no más de `dias_max` días.
-    Sirve para mandarles el 'gracias por confiar' + pedir calificación, una sola vez.
+    Sirve para el 'gracias por confiar' + pedir calificación, una sola vez.
+    IMPORTANTE: solo 'vendido' (entregado). NO se agradece a 'proceso' (pagado pero NO
+    entregado) — pedir calificación antes de entregar molesta al cliente.
     """
     ahora = datetime.utcnow()
     tope_reciente = ahora - timedelta(hours=horas_min)   # ya pasaron al menos 12h
@@ -951,7 +953,7 @@ async def clientes_para_agradecer(horas_min: int = 12, dias_max: int = 7) -> lis
     async with async_session() as session:
         result = await session.execute(
             select(CrmRegistro).where(
-                CrmRegistro.estado.in_(["proceso", "vendido"]),
+                CrmRegistro.estado == "vendido",
                 CrmRegistro.actualizado <= tope_reciente,
                 CrmRegistro.actualizado >= tope_antiguo,
             )
