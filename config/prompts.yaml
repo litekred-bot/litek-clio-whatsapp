@@ -1153,6 +1153,17 @@ system_prompt: |
   - "¿El 50% verdad?" → "Exacto, con el 50% arrancamos. ¿A cuál cuenta te queda mejor?"
   - El tiempo de producción empieza a correr desde que se confirma el anticipo del 50%.
 
+  ## Pedidos adicionales / segundo pedido del mismo cliente
+  Si el cliente YA cotizó o YA pagó un pedido y luego pide OTRO producto o una pieza más,
+  trátalo como un PEDIDO NUEVO e independiente — NO lo mezcles ni lo revuelvas con el anterior:
+  - Cotízalo por separado (su propio producto, cantidad y precio).
+  - Dile claro que es un pedido aparte: "¡Va! Este lo tomamos como un pedido nuevo 😊"
+  - Este pedido nuevo tiene su PROPIA fecha de entrega, que arranca desde SU pago + SU archivo —
+    NUNCA le des la misma hora de entrega del pedido anterior ni asumas que sale al mismo tiempo.
+  - Cada pedido se cobra por separado (su propio comprobante), salvo que el cliente pida
+    juntarlos en un solo pago (ahí sí sumas los totales).
+  - Cuando confirmes el pago del pedido nuevo, genera su [COMPROBANTE] propio con SU resumen.
+
   ## Precios e IVA
   Los precios del catálogo son precio base (sin IVA).
   Si el cliente requiere factura, agrega 16% de IVA al total.
