@@ -803,30 +803,40 @@ async def guardar_entrega_crm(telefono: str, entrega: datetime) -> bool:
 
 async def pedidos_listos_para_entregar() -> list[dict]:
     """
-    Pedidos en 'proceso' cuya hora de entrega YA PASÓ y aún NO se ha avisado.
-    Los marca como avisados y los devuelve para mandar la alerta 'listo para entregar'.
+    Pedidos en 'proceso' cuya hora de entrega es dentro de la PRÓXIMA HORA (o ya pasó) y aún
+    NO se han avisado. NO los marca aquí — el job decide si avisar (según el horario de la
+    sucursal, para no avisar en hora de cierre) y luego llama a marcar_entrega_avisada().
     """
     ahora = datetime.utcnow()
+    limite = ahora + timedelta(hours=1)  # avisar ~1 hora antes de la entrega
     listos = []
     async with async_session() as session:
         result = await session.execute(
             select(CrmRegistro).where(
                 CrmRegistro.estado == "proceso",
                 CrmRegistro.entrega_en.is_not(None),
-                CrmRegistro.entrega_en <= ahora,
+                CrmRegistro.entrega_en <= limite,
                 CrmRegistro.entrega_avisada == False,  # noqa: E712
             )
         )
         for r in result.scalars().all():
             listos.append({
+                "id": r.id,
                 "telefono": r.telefono, "nombre": r.nombre or "Cliente",
                 "asesor": r.asesor or "", "sucursal": getattr(r, "sucursal", "") or "Campeche",
                 "descripcion": r.descripcion or "",
+                "entrega_en": r.entrega_en,
             })
-            r.entrega_avisada = True
-        if listos:
-            await session.commit()
     return listos
+
+
+async def marcar_entrega_avisada(reg_id: int):
+    """Marca un pedido como ya avisado de entrega (para no repetir el recordatorio)."""
+    async with async_session() as session:
+        r = await session.get(CrmRegistro, reg_id)
+        if r:
+            r.entrega_avisada = True
+            await session.commit()
 
 
 async def info_pedido_por_telefono(telefono: str) -> dict | None:

@@ -53,7 +53,7 @@ from agent.memory import (
     analisis_mensajeria,
     guardar_sucursal_crm, sucursal_crm_por_telefono, asesor_crm_por_telefono,
     guardar_entrega_crm, entrega_crm_por_telefono, info_pedido_por_telefono,
-    pedidos_listos_para_entregar, marcar_factura_crm, forzar_asesor_crm,
+    pedidos_listos_para_entregar, marcar_entrega_avisada, marcar_factura_crm, forzar_asesor_crm,
     canalizar_diseno_disenador, marcar_diseno_crm, marcar_diseno_aprobado_crm, rutear_asesor_merida,
 )
 from zoneinfo import ZoneInfo as _ZI
@@ -212,41 +212,63 @@ async def _calcular_entrega_y_avisar(telefono_chat: str, tel_limpio: str, resume
 
 
 async def enviar_avisos_listos_para_entregar(*_):
-    """Job: avisa al grupo + asesor cuando un pedido llega a su hora de entrega."""
+    """Job: ~1 hora antes de la hora de entrega, recuerda al cliente y avisa al equipo.
+    NO avisa fuera de horario (ej. a la hora de cierre): espera a que la tienda esté abierta."""
     try:
         listos = await pedidos_listos_para_entregar()
     except Exception as e:
         logger.error(f"Error buscando pedidos listos: {e}")
         return
+    ahora_utc = datetime.utcnow()
+    enviados = 0
     for p in listos:
+        suc = p["sucursal"]
+        # Blindaje: no avisar si la tienda está CERRADA. Se reintenta cuando abra.
+        if not es_horario_atencion(suc):
+            continue
+        ent_local = p["entrega_en"].replace(tzinfo=timezone.utc).astimezone(_TZ_CAMP)
+        hora_txt = ent_local.strftime("%H:%M")
+        ya_paso = ahora_utc >= p["entrega_en"]
         wa = "".join(c for c in (p["telefono"] or "") if c.isdigit())
+        # Aviso al equipo/asesor
         msg = (
-            f"📦 *LISTO PARA ENTREGAR — CLIO*\n\n"
+            f"📦 *ENTREGA PRÓXIMA — CLIO*\n\n"
             f"👤 *Cliente:* {p['nombre']}\n"
             f"📱 wa.me/{wa}\n"
-            f"🏢 *Sucursal:* {p['sucursal']}\n"
-            f"📋 *Pedido:* {p['descripcion'][:160]}\n\n"
-            f"Ya llegó su hora de entrega. Cuando lo entreguen, márquenlo "
-            f"como *✅ Entregado* en el panel para quitarlo de pendientes. 🙌"
+            f"🏢 *Sucursal:* {suc}\n"
+            f"📋 *Pedido:* {p['descripcion'][:160]}\n"
+            f"⏰ *Entrega:* hoy a las {hora_txt}\n\n"
+            f"Ténganlo listo. Al entregarlo, márquenlo *✅ Entregado* en el panel. 🙌"
         )
-        grupo = GRUPO_ALERTA_SUCURSAL.get(p["sucursal"], ASESOR_WHATSAPP)
+        grupo = GRUPO_ALERTA_SUCURSAL.get(suc, ASESOR_WHATSAPP)
         try:
             await proveedor.enviar_mensaje(grupo, msg)
         except Exception as e:
-            logger.error(f"Error aviso listo (grupo): {e}")
+            logger.error(f"Error aviso entrega (grupo): {e}")
         await _avisar_personal(p["asesor"], msg)
-        # Avisar también al CLIENTE que su pedido ya está listo para recoger
+        # Recordatorio al CLIENTE (~1 hora antes de la hora prometida, para que le dé tiempo)
         try:
             nom = (p["nombre"] or "").split(" ")[0]
-            msg_cli = (
-                f"¡Hola {nom}! 📦 ¡Buenas noticias! Tu pedido ya está listo. "
-                f"Puedes pasar a recogerlo cuando gustes 😊"
-            )
+            if ya_paso:
+                msg_cli = (
+                    f"¡Hola {nom}! 📦 Tu pedido ya está listo. Puedes pasar a recogerlo "
+                    f"dentro de nuestro horario 😊"
+                )
+            else:
+                msg_cli = (
+                    f"¡Hola {nom}! 📦 Te recordamos que tu pedido estará listo hoy a las "
+                    f"*{hora_txt}*, como te mencionamos. Para que tengas tiempo de pasar por él 😊"
+                )
             await proveedor.enviar_mensaje(p["telefono"], msg_cli)
         except Exception as e:
-            logger.error(f"Error avisando al cliente listo: {e}")
-    if listos:
-        logger.info(f"Listos para entregar: {len(listos)} aviso(s) enviado(s)")
+            logger.error(f"Error avisando al cliente entrega: {e}")
+        try:
+            await marcar_entrega_avisada(p["id"])
+        except Exception as e:
+            logger.error(f"Error marcando entrega avisada: {e}")
+        enviados += 1
+    if enviados:
+        logger.info(f"Avisos de entrega enviados: {enviados}")
 
 
 async def _grupo_alerta_de(telefono: str) -> str:
