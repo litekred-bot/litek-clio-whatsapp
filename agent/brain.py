@@ -192,10 +192,13 @@ async def generar_respuesta(
     `señales` (opcional): si se pasa un dict, se rellena con banderas del turno.
     Hoy: señales["cotizo"] = True si Clio dio un precio (producto identificado).
     """
-    # Mensaje vacío o un solo carácter NO numérico → fallback.
-    # Pero un dígito suelto (1/2/3) SÍ se procesa: es la respuesta a la calificación.
+    # Mensaje vacío → fallback siempre.
+    # Un carácter suelto (".", emoji) durante una conversación EN CURSO (con historial) SÍ pasa
+    # a la IA para que responda en contexto — así un "." no reinicia la venta con "¿qué producto?".
+    # Solo cae en fallback si es un carácter suelto SIN historial (primer contacto ruidoso).
+    # Un dígito suelto (1/2/3) siempre se procesa: es la respuesta a la calificación.
     _m = (mensaje or "").strip()
-    if not _m or (len(_m) < 2 and not _m.isdigit()):
+    if not _m or (len(_m) < 2 and not _m.isdigit() and not historial):
         return obtener_mensaje_fallback()
 
     system_prompt = cargar_system_prompt()
