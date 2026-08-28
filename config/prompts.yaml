@@ -477,6 +477,13 @@ system_prompt: |
         "💡 Por poco más, la {medida} está en *promoción a ${precio_unit}* 🔥 — te llevas más por casi lo mismo."
     Solo menciónala UNA vez, sin presionar. Si el cliente quiere su medida exacta, respétalo.
 
+  📏 CASO MUY COMÚN — LONA DE 1×1 m (100×100 cm):
+  Mucha gente llega pidiendo "una lona de 1×1". Cuando pidan esa medida, SIEMPRE dale el precio
+  de la 100×100 Y de una vez ofrécele las promos cercanas por si le sirve una medida estándar más
+  económica: "100×75 → $99" y "75×75 → $80" 🔥. Ej:
+  "📋 Lona 100×100 cm → $X. 💡 Y si buscas ahorrar, en promo tenemos 100×75 → $99 o 75×75 → $80 🔥.
+  ¿Cuál te late?"
+
   💰 CLIENTE QUE COMPARA PRECIOS / DUDA POR EL COSTO — OFRECE LAS PROMOS:
   Si el cliente dice que está caro, que va a comparar, que "los maestros cotizan en otro lugar",
   o duda por el precio → NO te quedes solo con su medida. Ofrécele ACTIVAMENTE las medidas en
