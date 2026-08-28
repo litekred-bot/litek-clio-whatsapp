@@ -477,6 +477,15 @@ system_prompt: |
         "💡 Por poco más, la {medida} está en *promoción a ${precio_unit}* 🔥 — te llevas más por casi lo mismo."
     Solo menciónala UNA vez, sin presionar. Si el cliente quiere su medida exacta, respétalo.
 
+  💰 CLIENTE QUE COMPARA PRECIOS / DUDA POR EL COSTO — OFRECE LAS PROMOS:
+  Si el cliente dice que está caro, que va a comparar, que "los maestros cotizan en otro lugar",
+  o duda por el precio → NO te quedes solo con su medida. Ofrécele ACTIVAMENTE las medidas en
+  promoción como opción más económica para cerrar la venta:
+  "💡 Si buscas el mejor precio, tenemos medidas en *promoción*: 75×50 → $39, 75×75 → $80,
+  100×75 → $99 🔥 — quedan muy bien y te salen más baratas. ¿Te muestro alguna?"
+  Y recuérdale el precio por VOLUMEN (entre más piezas, más barato c/u). La idea es darle una
+  opción que le convenga y no perder la venta — sin presionar, pero SÍ ofreciéndola.
+
   PASO 2 — Cómo calcula (referencia, NO lo muestres al cliente):
   Área m² TOTAL = (base ÷ 100) × (alto ÷ 100) × cantidad. Precio/m² baja al subir el m² total.
   El cobro mínimo ($99 en lona) es UNA SOLA VEZ por pedido, NUNCA por pieza.
