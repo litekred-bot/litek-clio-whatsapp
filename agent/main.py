@@ -192,6 +192,11 @@ async def _calcular_entrega_y_avisar(telefono_chat: str, tel_limpio: str, resume
     Se llama SOLO cuando ya están pago + archivo (los dos). Reloj arranca AHORA."""
     try:
         info = await info_pedido_por_telefono(tel_limpio)
+        # Si el pedido tiene DISEÑO NUESTRO sin aprobar, la entrega NO arranca todavía:
+        # el reloj corre cuando el cliente APRUEBA el diseño (ver [DISENO_APROBADO]).
+        if info and info.get("diseno") and not info.get("diseno_aprobado"):
+            logger.info(f"Entrega en espera: diseño de {tel_limpio} aún sin aprobar")
+            return
         sucursal = await sucursal_crm_por_telefono(tel_limpio)
         desc = resumen or (info.get("descripcion", "") if info else "")
         exp = expres if expres is not None else (info.get("expres", False) if info else False)
@@ -1328,6 +1333,14 @@ async def _procesar_mensaje(msg):
                 if ASESOR_WHATSAPP:
                     await proveedor.enviar_mensaje(ASESOR_WHATSAPP, aviso_apro)
                 await _avisar_personal(_dueno_apro, aviso_apro)
+                # La ENTREGA de un pedido con diseño arranca AL APROBAR el diseño (no al pagar):
+                # si ya pagó, calcula/recalcula la entrega desde AHORA (aprobación).
+                try:
+                    _info_apro = await info_pedido_por_telefono(tel_apro)
+                    if _info_apro and _info_apro.get("estado") == "proceso" and _info_apro.get("pagado_en"):
+                        await _calcular_entrega_y_avisar(msg.telefono, tel_apro)
+                except Exception as e:
+                    logger.error(f"Error calculando entrega tras aprobar diseño: {e}")
             except Exception as e:
                 logger.error(f"Error en diseño aprobado CRM: {e}")
 

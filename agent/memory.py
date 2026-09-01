@@ -854,6 +854,8 @@ async def info_pedido_por_telefono(telefono: str) -> dict | None:
                     "entrega_en": getattr(r, "entrega_en", None),
                     "descripcion": r.descripcion or "",
                     "expres": bool(getattr(r, "expres", False)),
+                    "diseno": bool(getattr(r, "diseno", False)),
+                    "diseno_aprobado": bool(getattr(r, "diseno_aprobado", False)),
                 }
     return None
 
