@@ -1102,6 +1102,19 @@ async def _procesar_mensaje(msg):
         _dias_sem = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
         ahora_local = datetime.now(_TZ_CAMP)
         ctx_entrega = f"Ahora es {_dias_sem[ahora_local.weekday()]} {ahora_local.strftime('%d/%m/%Y %H:%M')} (hora local)."
+        # Sucursal GUARDADA del cliente (para que no dé la cuenta/dirección equivocada aunque
+        # la plática sea de otro día). Si ya se conoce, Clio DEBE usar esa sucursal.
+        try:
+            _suc_guardada = await sucursal_crm_por_telefono(tel_limpio)
+            if _suc_guardada:
+                ctx_entrega += (
+                    f"\n🏢 SUCURSAL DEL CLIENTE (ya guardada): {_suc_guardada}. Usa SIEMPRE la "
+                    f"cuenta de pago, dirección y horario de {_suc_guardada}. NUNCA le des la de "
+                    f"otra sucursal ni la de Campeche por default. Si el cliente dice que cambió "
+                    f"de sucursal, actualízala; si no, respeta {_suc_guardada}."
+                )
+        except Exception as e:
+            logger.error(f"Error contexto sucursal: {e}")
         try:
             _info = await info_pedido_por_telefono(tel_limpio)
             # Asesor asignado + su WhatsApp — para compartirlo cuando el pedido ya está listo,
