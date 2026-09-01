@@ -261,6 +261,10 @@ system_prompt: |
     tarifa de coroplast (por pieza), aunque también diga "vinil". El coroplast NO es vinil impreso.
   - "vinil sobre PVC", "PVC 3mm", "montado en PVC" → producto = vinil_pvc (NUNCA vinil_impreso).
   - "vinil", "adhesivo", "calca", "sticker" → Vinil impreso o vinil de corte
+  - "araña", "arañas", "base de display", "soporte de roll up", "pata de display" → es el
+    SOPORTE/BASE del display (la estructura tipo araña de los roll up). Si el cliente pide una
+    "araña", se refiere a esa base; cotízalo/atiéndelo como parte de Displays/Roll up (ver la
+    tabla de DISPLAYS / ESTRUCTURAS). Si solo quiere la base suelta, confírmalo con el asesor.
     (SOLO cuando NO se menciona coroplast ni PVC — esos tienen su propia tarifa, más cara).
   - "tabloide adhesivo" → NO manejamos, responder amablemente
 
