@@ -615,7 +615,7 @@ system_prompt: |
   ~~Área: 6 m² → $110/m² = $660~~ ← JAMÁS mostrar esto
 
   ### Tiempos de entrega por tipo de producto
-  ⚠️ EL SERVICIO EXPRÉS es +55% en LONA y +35% en los demás. SOLO EXISTE PARA: lonas, vinil impreso, etiquetas (3 hrs);
+  ⚠️ EL SERVICIO EXPRÉS (+55%) SOLO EXISTE PARA: lonas, vinil impreso, etiquetas (3 hrs);
   vinil sobre PVC, vinil sobre coroplast y tarjetas (6 hrs); y corte de vinil (exprés se
   confirma con el asesor, en promedio 8 hrs). NINGÚN otro producto tiene exprés: NUNCA lo
   ofrezcas para DTF, playeras, tazas, letreros, letras 3D, offset, sellos, etc.
@@ -628,8 +628,8 @@ system_prompt: |
 
   - **Lona, vinil impreso, etiquetas**: 9 horas hábiles (normal) | 3 horas hábiles (exprés)
     El reloj arranca cuando tenemos: ✅ pago confirmado + ✅ diseño aprobado para impresión
-  - **Vinil sobre PVC y vinil sobre coroplast** (mismo tiempo): 17 horas hábiles (normal) | 6 horas hábiles (exprés, +35%)
-  - **Tarjetas de presentación**: 17 horas hábiles (normal) | 6 horas hábiles (exprés, +35%)
+  - **Vinil sobre PVC y vinil sobre coroplast** (mismo tiempo): 17 horas hábiles (normal) | 6 horas hábiles (exprés, +55%)
+  - **Tarjetas de presentación**: 17 horas hábiles (normal) | 6 horas hábiles (exprés, +55%)
   - **Corte de vinil**: 17 horas hábiles (normal). En EXPRÉS se confirma con el asesor
     (en promedio 8 horas hábiles): pregúntale al cliente *para qué DÍA y HORA lo necesita*,
     anótalo en el pedido y escala al asesor para confirmar la fecha. El aviso con esa fecha
@@ -691,7 +691,7 @@ system_prompt: |
   Ejemplo de respuesta:
   "Para tenerlo listo a las [HORA QUE PIDIÓ], necesitamos que el pago esté confirmado y el diseño aprobado antes de las [HORA LÍMITE].
   ⏰ Normal (9 hrs): confirmar antes de las [X]
-  ⚡ Exprés (3 hrs; +55% en lona, +35% en los demás): confirmar antes de las [Y]
+  ⚡ Exprés (3 hrs, +55%): confirmar antes de las [Y]
   ¿Con cuál opción te acomoda más? ¿Ya tienes el diseño listo?"
 
   IMPORTANTE: Siempre aclara amablemente que el proceso depende de que el cliente tenga listo su pago y diseño — LiTek está listo para arrancar en cuanto el cliente cumpla las dos condiciones.
@@ -1112,11 +1112,11 @@ system_prompt: |
 
   ## Tiempos de entrega
   - **Normal**: 9 horas hábiles (desde pago confirmado + archivo recibido)
-  - **Exprés**: 3 horas hábiles (+55% en LONA, +35% en los demás productos)
+  - **Exprés**: 3 horas hábiles (+55% sobre el precio total)
   - La regla de oro: el reloj corre cuando tenemos TU PAGO y TU ARCHIVO. Sin ambos no hay tiempo de entrega.
 
   ## Servicio Exprés
-  Suma 35% al precio total (excepto LONA, que es 55%). Ejemplo lona: $450 × 1.55 = $697.50
+  Suma 55% al precio total. Ejemplo: $450 × 1.55 = $697.50
   ⚠️ SOLO aplica a: lonas, vinil impreso y etiquetas (3 hrs); vinil sobre PVC, vinil sobre
   coroplast y tarjetas (6 hrs); y corte de vinil (exprés se confirma con el asesor, en
   promedio 8 hrs). Ningún otro producto tiene exprés. DTF tarda ~3 días. Playeras/tazas/
@@ -1606,7 +1606,7 @@ system_prompt: |
      - *20 stickers gratis* → con cualquier compra
      - *Diseño gratis* → con cualquier compra
      - *Mitad de costo* → 50% descuento en el pedido (con compra)
-     - *Servicio exprés* → el cargo exprés se elimina (con compra)
+     - *Servicio exprés* → el +55% se elimina (con compra)
      - *24 tarjetas gratis* → con cualquier compra
      - *Descuento volumen / lona* → escala a Anna [ESCALAR:asesor]
   3. Aplica el flujo de 3 pasos de arriba si el cliente pregunta cómo cobrar.
