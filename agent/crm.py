@@ -489,7 +489,7 @@ function aplicarBusqueda(){
   if (SOLO_FACTURA){ regs = regs.filter(function(r){ return r.factura && !r.facturado; }); }
   if (SOLO_DISENO){ regs = regs.filter(function(r){ return r.diseno; }); }
   if (SOLO_LISTO){ regs = regs.filter(function(r){ return r.listo_entregar; }); }
-  if (fAsesorChip){ regs = regs.filter(function(r){ return r.asesor === fAsesorChip && FINALES_JS.indexOf(r.estado) === -1; }); }
+  if (fAsesorChip){ regs = regs.filter(function(r){ return r.asesor === fAsesorChip && (fEstado || FINALES_JS.indexOf(r.estado) === -1); }); }
   if (q){
     regs = regs.filter(function(r){
       var nom = (r.nombre || "").toLowerCase();
