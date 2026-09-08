@@ -1302,14 +1302,22 @@ async def total_vendido_crm(desde: datetime = None, hasta: datetime = None,
 
 
 async def contar_pagados_por_estado(desde: datetime = None, hasta: datetime = None,
-                                    sucursal: str = "", asesor: str = "") -> dict:
+                                    sucursal: str = "", asesor: str = "",
+                                    asesores: tuple = (), incluir_diseno: bool = False) -> dict:
     """Cuenta pedidos en 'proceso' y 'vendido' por fecha de PAGO (pagado_en, o creado si falta),
-    dentro del rango. Sirve para que los contadores 'En proceso' y 'Vendidos' cuadren con el
-    $ Vendido (que también cuenta por fecha de pago), no por fecha de entrada."""
+    dentro del rango. Sirve para que los contadores 'Vendidos' y 'Por entregar' cuadren con el
+    $ Vendido y con las tarjetas. Usa el MISMO filtro por persona que listar_crm (asesor / varios
+    asesores / diseño para Erick), para que cada usuario vea sus contadores consistentes."""
     fecha_venta = func.coalesce(CrmRegistro.pagado_en, CrmRegistro.creado)
     filtros = [CrmRegistro.estado.in_(["proceso", "vendido"])]
-    if asesor:
-        filtros.append(CrmRegistro.asesor == asesor)
+    if asesores:
+        cond = CrmRegistro.asesor.in_(asesores)
+        filtros.append(or_(cond, CrmRegistro.diseno == True) if incluir_diseno else cond)
+    elif asesor:
+        cond = (CrmRegistro.asesor == asesor)
+        filtros.append(or_(cond, CrmRegistro.diseno == True) if incluir_diseno else cond)
+    elif incluir_diseno:
+        filtros.append(CrmRegistro.diseno == True)
     if sucursal:
         filtros.append(CrmRegistro.sucursal == sucursal)
     if desde is not None:

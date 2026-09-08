@@ -601,7 +601,7 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = "",
     # AMBAS por fecha de PAGO. Se calcula para TODOS (director y asesores), respetando su asesor,
     # para que la vista de cada quien concuerde con la del director.
     try:
-        _dp = await contar_pagados_por_estado(desde=stats_ini, hasta=stats_fin, sucursal=sucursal, asesor=asesor_filtro)
+        _dp = await contar_pagados_por_estado(desde=stats_ini, hasta=stats_fin, sucursal=sucursal, asesor=asesor_filtro, asesores=asesores_multi, incluir_diseno=incluir_diseno)
         stats["vendido"] = _dp["vendido"] + _dp["proceso"]
         stats["por_entregar"] = _dp["proceso"]
     except Exception as e:
