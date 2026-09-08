@@ -565,10 +565,8 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = "",
     # Erick (diseñador) ve, además de lo suyo, TODA tarjeta con diseño 🎨 (disena pedidos
     # de cualquier asesor sin ser su dueño). Igual el login compartido 'taller' (Brayan+Erick).
     incluir_diseno = (asesor_filtro == "Erick") or ("Erick" in asesores_multi)
-    registros = await listar_crm(estado=estado, tipo=tipo, asesor=asesor_filtro, sucursal=sucursal, asesores=asesores_multi, incluir_diseno=incluir_diseno)
-    # Rango de fechas para los CONTADORES: mismos meses que el filtro de ventas.
-    # Así "Nuevos/Asignados/En proceso/Vendidos/etc." cuentan solo los que ENTRARON en ese mes
-    # (por fecha de creación) y se reinician cada mes. 'todo' = sin límite (histórico).
+    # Rango de fechas del MES elegido (mismo que el filtro de ventas). Aplica a las TARJETAS y a
+    # los contadores: solo lo de ese mes (por fecha de creación). 'todo' = sin límite (histórico).
     if desde == "todo" or hasta == "todo":
         stats_ini = stats_fin = None
     else:
@@ -577,6 +575,8 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = "",
         _mh = hasta or _md
         stats_ini = _mes_inicio_utc(_md)
         stats_fin = _mes_siguiente_utc(_mh)
+    # TARJETAS: solo las del mes elegido (que No contestó/etc. de meses viejos no salgan).
+    registros = await listar_crm(estado=estado, tipo=tipo, asesor=asesor_filtro, sucursal=sucursal, asesores=asesores_multi, incluir_diseno=incluir_diseno, desde=stats_ini, hasta=stats_fin)
     # Stats por estado (respetando persona/sucursal y el mes; sin filtro de estado)
     todos = await listar_crm(tipo=tipo, asesor=asesor_filtro, sucursal=sucursal, limite=100000, asesores=asesores_multi, incluir_diseno=incluir_diseno, desde=stats_ini, hasta=stats_fin)
     stats = {"nuevo": 0, "asignado": 0, "proceso": 0, "vendido": 0, "no_contesto": 0}
@@ -612,6 +612,10 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = "",
             _desg = await contar_pagados_por_estado(desde=d_ini, hasta=d_fin, sucursal=sucursal)
             ventas["entregadas"] = _desg["vendido"]
             ventas["por_entregar"] = _desg["proceso"]
+            # Contadores de arriba (por fecha de PAGO, para el director):
+            # 'Vendidos' = lo VENDIDO este mes · 'Por entregar' = lo que falta entregar.
+            stats["vendido"] = _desg["vendido"] + _desg["proceso"]
+            stats["por_entregar"] = _desg["proceso"]
         except Exception as e:
             logger.error(f"Error desglose entregas: {e}")
         # Total de HOY (siempre el día de hoy, sin importar el rango elegido)

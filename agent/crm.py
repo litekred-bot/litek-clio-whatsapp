@@ -640,8 +640,8 @@ function pintarStats(s, ventas){
     '<div class="stat" style="background:#eef4f8"><b>'+(s.entraron||0)+'</b><span>📥 Entraron este mes</span></div>'+
     '<div class="stat"><b>'+(s.nuevo||0)+'</b><span>Nuevos</span></div>'+
     '<div class="stat"><b>'+(s.asignado||0)+'</b><span>Asignados</span></div>'+
-    '<div class="stat"><b>'+(s.proceso||0)+'</b><span>En proceso</span></div>'+
-    '<div class="stat"><b>'+(s.vendido||0)+'</b><span>Vendidos</span></div>'+
+    '<div class="stat" style="background:#e8f5e9"><b>'+(s.vendido||0)+'</b><span>✅ Vendidos (mes)</span></div>'+
+    '<div class="stat" style="background:#fff3e0"><b>'+(s.por_entregar||0)+'</b><span>📦 Por entregar</span></div>'+
     '<div class="stat"><b>'+(s.esperando_pago||0)+'</b><span>💳 Esperando pago</span></div>'+
     '<div class="stat"><b>'+(s.no_contesto||0)+'</b><span>No contestó</span></div>'+
     '<div class="stat"><b>'+(s.no_concretado||0)+'</b><span>No concretados</span></div>'+
