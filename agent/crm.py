@@ -616,7 +616,8 @@ function pintarStats(s, ventas){
   if(!s) return;
   var ventaHtml = "";
   if (ventas){
-    var etiqueta = "💰 Vendido" + (ventas.rango ? " · " + nombreRango(ventas.rango) : "");
+    var _nv = ventas.num || 0;
+    var etiqueta = "💰 Vendido" + (ventas.rango ? " · " + nombreRango(ventas.rango) : "") + (_nv ? " (" + _nv + " ventas)" : "");
     var hoyHtml = "";
     if (ventas.hoy !== undefined){
       var nh = ventas.hoy_num || 0;

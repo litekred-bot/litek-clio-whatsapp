@@ -583,16 +583,9 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = "",
     for r in todos:
         stats[r["estado"]] = stats.get(r["estado"], 0) + 1
     # Total de clientes que ENTRARON este mes (todos los creados en el rango, sin importar estado).
+    # TODOS los contadores se cuentan por fecha de ENTRADA (creado), así SUMAN 'entraron'.
+    # El número de VENTAS del mes (por fecha de pago) va junto al $ Vendido (ventas.num).
     stats["entraron"] = len(todos)
-    # 'En proceso' y 'Vendidos' se cuentan por fecha de PAGO (igual que el $ Vendido), no por
-    # fecha de entrada. Así el contador de Vendidos cuadra con el monto vendido del mes.
-    try:
-        pagados = await contar_pagados_por_estado(desde=stats_ini, hasta=stats_fin,
-                                                  sucursal=sucursal, asesor=asesor_filtro)
-        stats["proceso"] = pagados["proceso"]
-        stats["vendido"] = pagados["vendido"]
-    except Exception as e:
-        logger.error(f"Error contando pagados por estado: {e}")
     # Ventas por rango de meses — SOLO el administrador (Tere/Chino) ve el dinero.
     # Los asesores NO reciben ningún total de ventas.
     ventas = None
