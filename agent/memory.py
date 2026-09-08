@@ -479,19 +479,24 @@ async def registrar_crm(tipo: str, nombre: str, telefono: str, descripcion: str,
         return reg.id
 
 
-async def listar_crm(estado: str = "", tipo: str = "", asesor: str = "", sucursal: str = "", limite: int = 200, asesores: tuple = (), incluir_diseno: bool = False, desde=None, hasta=None) -> list[dict]:
+async def listar_crm(estado: str = "", tipo: str = "", asesor: str = "", sucursal: str = "", limite: int = 200, asesores: tuple = (), incluir_diseno: bool = False, desde=None, hasta=None, por_pago: bool = False, estados: tuple = ()) -> list[dict]:
     """Lista registros del CRM, opcionalmente filtrados por estado, tipo, asesor y sucursal.
     'asesores' (tupla) = ver los clientes de VARIOS asesores (login compartido, ej. Brayan+Erick).
     'incluir_diseno' = además de lo del asesor, incluir TODA tarjeta con diseño 🎨 (para Erick,
     que disena pedidos de cualquier asesor sin ser su dueno).
-    'desde'/'hasta' (datetime UTC naive) = filtra por fecha de CREACIÓN (para contar por mes)."""
+    'desde'/'hasta' (datetime UTC naive) = filtra por fecha de CREACIÓN (para contar por mes).
+    'por_pago' = filtra el rango por fecha de PAGO (pagado_en/creado) en vez de creación
+    (para 'Vendidos'/'En proceso', que se miden por cuándo pagaron)."""
+    _fcol = func.coalesce(CrmRegistro.pagado_en, CrmRegistro.creado) if por_pago else CrmRegistro.creado
     async with async_session() as session:
         query = select(CrmRegistro)
         if desde is not None:
-            query = query.where(CrmRegistro.creado >= desde)
+            query = query.where(_fcol >= desde)
         if hasta is not None:
-            query = query.where(CrmRegistro.creado < hasta)
-        if estado:
+            query = query.where(_fcol < hasta)
+        if estados:
+            query = query.where(CrmRegistro.estado.in_(estados))
+        elif estado:
             query = query.where(CrmRegistro.estado == estado)
         if tipo:
             query = query.where(CrmRegistro.tipo == tipo)

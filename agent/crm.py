@@ -221,7 +221,7 @@ HTML_PANEL = r"""<!DOCTYPE html>
       <button data-f="estado" data-v="" class="activo">Todos</button>
       <button data-f="estado" data-v="nuevo">🔵 Nuevos</button>
       <button data-f="estado" data-v="asignado">🟠 Asignados</button>
-      <button data-f="estado" data-v="proceso">🟣 En proceso</button>
+      <button data-f="estado" data-v="proceso">📦 Por entregar</button>
       <button data-f="estado" data-v="vendido">✅ Vendidos</button>
       <button data-f="estado" data-v="esperando_pago">💳 Esperando pago</button>
       <button data-f="estado" data-v="no_contesto">⚫ No contestó</button>

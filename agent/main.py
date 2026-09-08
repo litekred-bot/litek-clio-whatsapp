@@ -576,7 +576,16 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = "",
         stats_ini = _mes_inicio_utc(_md)
         stats_fin = _mes_siguiente_utc(_mh)
     # TARJETAS: solo las del mes elegido (que No contestó/etc. de meses viejos no salgan).
-    registros = await listar_crm(estado=estado, tipo=tipo, asesor=asesor_filtro, sucursal=sucursal, asesores=asesores_multi, incluir_diseno=incluir_diseno, desde=stats_ini, hasta=stats_fin)
+    # Para 'Vendidos'/'En proceso' se filtra por fecha de PAGO (igual que su contador); el resto
+    # por fecha de entrada. 'Vendidos' = TODAS las ventas del mes (proceso+vendido), no solo las
+    # entregadas — así el filtro cuadra con el contador 'Vendidos (mes)'.
+    _tarj_por_pago = estado in ("proceso", "vendido")
+    _estado_q = estado
+    _estados_q = ()
+    if estado == "vendido":
+        _estados_q = ("proceso", "vendido")
+        _estado_q = ""
+    registros = await listar_crm(estado=_estado_q, estados=_estados_q, tipo=tipo, asesor=asesor_filtro, sucursal=sucursal, asesores=asesores_multi, incluir_diseno=incluir_diseno, desde=stats_ini, hasta=stats_fin, por_pago=_tarj_por_pago)
     # Stats por estado (respetando persona/sucursal y el mes; sin filtro de estado)
     todos = await listar_crm(tipo=tipo, asesor=asesor_filtro, sucursal=sucursal, limite=100000, asesores=asesores_multi, incluir_diseno=incluir_diseno, desde=stats_ini, hasta=stats_fin)
     stats = {"nuevo": 0, "asignado": 0, "proceso": 0, "vendido": 0, "no_contesto": 0}
