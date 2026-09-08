@@ -1296,6 +1296,32 @@ async def total_vendido_crm(desde: datetime = None, hasta: datetime = None,
     return {"proceso": proceso, "vendido": vendido, "total": proceso + vendido, "num": num}
 
 
+async def contar_pagados_por_estado(desde: datetime = None, hasta: datetime = None,
+                                    sucursal: str = "", asesor: str = "") -> dict:
+    """Cuenta pedidos en 'proceso' y 'vendido' por fecha de PAGO (pagado_en, o creado si falta),
+    dentro del rango. Sirve para que los contadores 'En proceso' y 'Vendidos' cuadren con el
+    $ Vendido (que también cuenta por fecha de pago), no por fecha de entrada."""
+    fecha_venta = func.coalesce(CrmRegistro.pagado_en, CrmRegistro.creado)
+    filtros = [CrmRegistro.estado.in_(["proceso", "vendido"])]
+    if asesor:
+        filtros.append(CrmRegistro.asesor == asesor)
+    if sucursal:
+        filtros.append(CrmRegistro.sucursal == sucursal)
+    if desde is not None:
+        filtros.append(fecha_venta >= desde)
+    if hasta is not None:
+        filtros.append(fecha_venta < hasta)
+    async with async_session() as session:
+        res = await session.execute(
+            select(CrmRegistro.estado, func.count(CrmRegistro.id))
+            .where(*filtros).group_by(CrmRegistro.estado)
+        )
+        out = {"proceso": 0, "vendido": 0}
+        for estado, cnt in res.fetchall():
+            out[estado] = int(cnt or 0)
+        return out
+
+
 async def analisis_mensajeria(desde: datetime = None, hasta: datetime = None) -> dict:
     """
     Datos para el análisis de costo de la mensajería, POR SUCURSAL y en TOTAL:

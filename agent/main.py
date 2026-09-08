@@ -49,7 +49,7 @@ from agent.memory import (
     marcar_alerta_crm, listar_usuarios_crm, cambiar_password_crm,
     reactivar_cliente_no_contesto, marcar_no_contesto_automatico,
     marcar_no_concretado_automatico, marcar_esperando_pago_automatico, marcar_expres_crm,
-    guardar_calificacion_crm, guardar_monto_crm, total_vendido_crm, backfill_montos_crm,
+    guardar_calificacion_crm, guardar_monto_crm, total_vendido_crm, contar_pagados_por_estado, backfill_montos_crm,
     analisis_mensajeria,
     guardar_sucursal_crm, sucursal_crm_por_telefono, asesor_crm_por_telefono,
     guardar_entrega_crm, entrega_crm_por_telefono, info_pedido_por_telefono,
@@ -582,6 +582,15 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = "",
     stats = {"nuevo": 0, "asignado": 0, "proceso": 0, "vendido": 0, "no_contesto": 0}
     for r in todos:
         stats[r["estado"]] = stats.get(r["estado"], 0) + 1
+    # 'En proceso' y 'Vendidos' se cuentan por fecha de PAGO (igual que el $ Vendido), no por
+    # fecha de entrada. Así el contador de Vendidos cuadra con el monto vendido del mes.
+    try:
+        pagados = await contar_pagados_por_estado(desde=stats_ini, hasta=stats_fin,
+                                                  sucursal=sucursal, asesor=asesor_filtro)
+        stats["proceso"] = pagados["proceso"]
+        stats["vendido"] = pagados["vendido"]
+    except Exception as e:
+        logger.error(f"Error contando pagados por estado: {e}")
     # Ventas por rango de meses — SOLO el administrador (Tere/Chino) ve el dinero.
     # Los asesores NO reciben ningún total de ventas.
     ventas = None
