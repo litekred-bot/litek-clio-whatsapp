@@ -579,12 +579,14 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = "",
     # Para 'Vendidos'/'En proceso' se filtra por fecha de PAGO (igual que su contador); el resto
     # por fecha de entrada. 'Vendidos' = TODAS las ventas del mes (proceso+vendido), no solo las
     # entregadas — así el filtro cuadra con el contador 'Vendidos (mes)'.
-    _tarj_por_pago = estado in ("proceso", "vendido")
+    _tarj_por_pago = estado in ("proceso", "vendido", "entregado")
     _estado_q = estado
     _estados_q = ()
     if estado == "vendido":
-        _estados_q = ("proceso", "vendido")
+        _estados_q = ("proceso", "vendido")   # 'Vendidos' = todas las ventas del mes
         _estado_q = ""
+    elif estado == "entregado":
+        _estado_q = "vendido"   # 'Entregados' = solo las ya entregadas (estado vendido)
     registros = await listar_crm(estado=_estado_q, estados=_estados_q, tipo=tipo, asesor=asesor_filtro, sucursal=sucursal, asesores=asesores_multi, incluir_diseno=incluir_diseno, desde=stats_ini, hasta=stats_fin, por_pago=_tarj_por_pago)
     # Stats por estado (respetando persona/sucursal y el mes; sin filtro de estado)
     todos = await listar_crm(tipo=tipo, asesor=asesor_filtro, sucursal=sucursal, limite=100000, asesores=asesores_multi, incluir_diseno=incluir_diseno, desde=stats_ini, hasta=stats_fin)
