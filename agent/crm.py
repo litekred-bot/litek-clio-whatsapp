@@ -617,7 +617,10 @@ function pintarStats(s, ventas){
   var ventaHtml = "";
   if (ventas){
     var _nv = ventas.num || 0;
-    var etiqueta = "💰 Vendido" + (ventas.rango ? " · " + nombreRango(ventas.rango) : "") + (_nv ? " (" + _nv + " ventas)" : "");
+    var _ent = ventas.entregadas || 0, _pend = ventas.por_entregar || 0;
+    var etiqueta = "💰 Vendido" + (ventas.rango ? " · " + nombreRango(ventas.rango) : "")
+      + (_nv ? " · " + _nv + " ventas" : "")
+      + ((_ent || _pend) ? " (📦 " + _ent + " entregadas · ⏳ " + _pend + " por entregar)" : "");
     var hoyHtml = "";
     if (ventas.hoy !== undefined){
       var nh = ventas.hoy_num || 0;

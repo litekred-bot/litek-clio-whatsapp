@@ -605,6 +605,15 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = "",
             rango_label = mes_desde if mes_desde == mes_hasta else (mes_desde + " a " + mes_hasta)
         ventas = await total_vendido_crm(desde=d_ini, hasta=d_fin, asesor="", sucursal=sucursal)
         ventas["rango"] = rango_label
+        # Desglose de las VENTAS del mes (por fecha de pago): cuántas ya se ENTREGARON
+        # (estado vendido) y cuántas están POR ENTREGAR (estado proceso). Para saber al
+        # instante si falta entregar, sin preguntarle al equipo.
+        try:
+            _desg = await contar_pagados_por_estado(desde=d_ini, hasta=d_fin, sucursal=sucursal)
+            ventas["entregadas"] = _desg["vendido"]
+            ventas["por_entregar"] = _desg["proceso"]
+        except Exception as e:
+            logger.error(f"Error desglose entregas: {e}")
         # Total de HOY (siempre el día de hoy, sin importar el rango elegido)
         hoy_camp = datetime.now(_TZ_CAMP)
         inicio_hoy = datetime(hoy_camp.year, hoy_camp.month, hoy_camp.day, tzinfo=_TZ_CAMP)
