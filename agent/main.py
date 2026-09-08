@@ -597,6 +597,15 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = "",
     # TODOS los contadores se cuentan por fecha de ENTRADA (creado), así SUMAN 'entraron'.
     # El número de VENTAS del mes (por fecha de pago) va junto al $ Vendido (ventas.num).
     stats["entraron"] = len(todos)
+    # 'Vendidos (mes)' = ventas del mes (proceso+vendido) y 'Por entregar' = pagadas sin entregar,
+    # AMBAS por fecha de PAGO. Se calcula para TODOS (director y asesores), respetando su asesor,
+    # para que la vista de cada quien concuerde con la del director.
+    try:
+        _dp = await contar_pagados_por_estado(desde=stats_ini, hasta=stats_fin, sucursal=sucursal, asesor=asesor_filtro)
+        stats["vendido"] = _dp["vendido"] + _dp["proceso"]
+        stats["por_entregar"] = _dp["proceso"]
+    except Exception as e:
+        logger.error(f"Error contadores pagados (vendido/por_entregar): {e}")
     # Ventas por rango de meses — SOLO el administrador (Tere/Chino) ve el dinero.
     # Los asesores NO reciben ningún total de ventas.
     ventas = None
@@ -623,10 +632,6 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = "",
             _desg = await contar_pagados_por_estado(desde=d_ini, hasta=d_fin, sucursal=sucursal)
             ventas["entregadas"] = _desg["vendido"]
             ventas["por_entregar"] = _desg["proceso"]
-            # Contadores de arriba (por fecha de PAGO, para el director):
-            # 'Vendidos' = lo VENDIDO este mes · 'Por entregar' = lo que falta entregar.
-            stats["vendido"] = _desg["vendido"] + _desg["proceso"]
-            stats["por_entregar"] = _desg["proceso"]
         except Exception as e:
             logger.error(f"Error desglose entregas: {e}")
         # Total de HOY (siempre el día de hoy, sin importar el rango elegido)
