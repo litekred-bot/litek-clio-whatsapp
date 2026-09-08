@@ -633,6 +633,7 @@ function pintarStats(s, ventas){
       acHtml;
   }
   document.getElementById("stats").innerHTML =
+    '<div class="stat" style="background:#eef4f8"><b>'+(s.entraron||0)+'</b><span>📥 Entraron este mes</span></div>'+
     '<div class="stat"><b>'+(s.nuevo||0)+'</b><span>Nuevos</span></div>'+
     '<div class="stat"><b>'+(s.asignado||0)+'</b><span>Asignados</span></div>'+
     '<div class="stat"><b>'+(s.proceso||0)+'</b><span>En proceso</span></div>'+

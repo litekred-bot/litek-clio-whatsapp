@@ -582,6 +582,8 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = "",
     stats = {"nuevo": 0, "asignado": 0, "proceso": 0, "vendido": 0, "no_contesto": 0}
     for r in todos:
         stats[r["estado"]] = stats.get(r["estado"], 0) + 1
+    # Total de clientes que ENTRARON este mes (todos los creados en el rango, sin importar estado).
+    stats["entraron"] = len(todos)
     # 'En proceso' y 'Vendidos' se cuentan por fecha de PAGO (igual que el $ Vendido), no por
     # fecha de entrada. Así el contador de Vendidos cuadra con el monto vendido del mes.
     try:
