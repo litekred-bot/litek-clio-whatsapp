@@ -479,13 +479,18 @@ async def registrar_crm(tipo: str, nombre: str, telefono: str, descripcion: str,
         return reg.id
 
 
-async def listar_crm(estado: str = "", tipo: str = "", asesor: str = "", sucursal: str = "", limite: int = 200, asesores: tuple = (), incluir_diseno: bool = False) -> list[dict]:
+async def listar_crm(estado: str = "", tipo: str = "", asesor: str = "", sucursal: str = "", limite: int = 200, asesores: tuple = (), incluir_diseno: bool = False, desde=None, hasta=None) -> list[dict]:
     """Lista registros del CRM, opcionalmente filtrados por estado, tipo, asesor y sucursal.
     'asesores' (tupla) = ver los clientes de VARIOS asesores (login compartido, ej. Brayan+Erick).
     'incluir_diseno' = además de lo del asesor, incluir TODA tarjeta con diseño 🎨 (para Erick,
-    que disena pedidos de cualquier asesor sin ser su dueno)."""
+    que disena pedidos de cualquier asesor sin ser su dueno).
+    'desde'/'hasta' (datetime UTC naive) = filtra por fecha de CREACIÓN (para contar por mes)."""
     async with async_session() as session:
         query = select(CrmRegistro)
+        if desde is not None:
+            query = query.where(CrmRegistro.creado >= desde)
+        if hasta is not None:
+            query = query.where(CrmRegistro.creado < hasta)
         if estado:
             query = query.where(CrmRegistro.estado == estado)
         if tipo:

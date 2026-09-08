@@ -566,8 +566,19 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = "",
     # de cualquier asesor sin ser su dueño). Igual el login compartido 'taller' (Brayan+Erick).
     incluir_diseno = (asesor_filtro == "Erick") or ("Erick" in asesores_multi)
     registros = await listar_crm(estado=estado, tipo=tipo, asesor=asesor_filtro, sucursal=sucursal, asesores=asesores_multi, incluir_diseno=incluir_diseno)
-    # Stats por estado (respetando el filtro de persona y sucursal, sin filtro de estado)
-    todos = await listar_crm(tipo=tipo, asesor=asesor_filtro, sucursal=sucursal, limite=1000, asesores=asesores_multi, incluir_diseno=incluir_diseno)
+    # Rango de fechas para los CONTADORES: mismos meses que el filtro de ventas.
+    # Así "Nuevos/Asignados/En proceso/Vendidos/etc." cuentan solo los que ENTRARON en ese mes
+    # (por fecha de creación) y se reinician cada mes. 'todo' = sin límite (histórico).
+    if desde == "todo" or hasta == "todo":
+        stats_ini = stats_fin = None
+    else:
+        _hoy = datetime.now(_TZ_CAMP)
+        _md = desde or _hoy.strftime("%Y-%m")
+        _mh = hasta or _md
+        stats_ini = _mes_inicio_utc(_md)
+        stats_fin = _mes_siguiente_utc(_mh)
+    # Stats por estado (respetando persona/sucursal y el mes; sin filtro de estado)
+    todos = await listar_crm(tipo=tipo, asesor=asesor_filtro, sucursal=sucursal, limite=100000, asesores=asesores_multi, incluir_diseno=incluir_diseno, desde=stats_ini, hasta=stats_fin)
     stats = {"nuevo": 0, "asignado": 0, "proceso": 0, "vendido": 0, "no_contesto": 0}
     for r in todos:
         stats[r["estado"]] = stats.get(r["estado"], 0) + 1
