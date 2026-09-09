@@ -269,9 +269,9 @@ def calcular_precio(
             )
         }
 
-    # Servicio exprés +55% (parejo en todos los productos).
+    # Servicio exprés: +55% SOLO en lona; +35% en los demás productos.
     if expres:
-        precio *= 1.55
+        precio *= 1.55 if producto == "lona" else 1.35
 
     return {
         "precio":     round(precio, 2),
