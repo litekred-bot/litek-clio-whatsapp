@@ -26,6 +26,28 @@ _LONAS_PROMO: dict[tuple[int, int], float] = {
     (150, 150): 297,
 }
 
+# Promos CHICAS que Clio anuncia — NO entran al descuento por VOLUMEN (se cobran a su
+# precio de promo aparte). Las demás medidas fijas (150×100, 200×100, 150×150) SÍ suman
+# al volumen cuando el cliente pide varias lonas.
+_PROMOS_FUERA_VOLUMEN: set[tuple[int, int]] = {(75, 50), (75, 75), (100, 75)}
+
+
+# Tabla OFICIAL de lona por m² — el precio/m² baja al aumentar el área total.
+# Compartida por calcular_precio() y calcular_precio_lonas_volumen().
+_TABLA_LONA: list[tuple[float, float]] = [
+    (0.98,         185.0),
+    (2.00,         166.0),
+    (4.00,         100.0),
+    (6.00,         95.0),
+    (9.00,         90.0),
+    (12.00,        90.0),
+    (15.00,        90.0),
+    (100.00,       90.0),
+    (200.00,       80.0),
+    (400.00,       75.0),
+    (float("inf"), 65.0),
+]
+
 
 def _tasa(area: float, tabla: list[tuple[float, float]]) -> float:
     """Devuelve la tasa $/m² que corresponde al área según la tabla de rangos."""
@@ -66,20 +88,7 @@ def calcular_precio(
 
     # ── LONA ─────────────────────────────────────────────────────────────────
     if producto == "lona":
-        # Tabla OFICIAL por m² — el precio/m² baja al aumentar el área total.
-        tabla = [
-            (0.98,         185.0),
-            (2.00,         166.0),
-            (4.00,         100.0),
-            (6.00,         95.0),
-            (9.00,         90.0),
-            (12.00,        90.0),
-            (15.00,        90.0),
-            (100.00,       90.0),
-            (200.00,       80.0),
-            (400.00,       75.0),
-            (float("inf"), 65.0),
-        ]
+        tabla = _TABLA_LONA
         area_total = area_pieza * cantidad
         precio_vol = max(99.0, area_total * _tasa(area_total, tabla))
 
@@ -282,4 +291,108 @@ def calcular_precio(
         "expres":     expres,
         "promocion":  es_promocion,   # True → dile al cliente que es precio de promoción
         "promo_sugerida": promo_sugerida,  # promo de lona cercana para ofrecer (o None)
+    }
+
+
+def calcular_precio_lonas_volumen(lonas: list[dict], expres: bool = False) -> dict:
+    """
+    Descuento por VOLUMEN cuando el cliente pide VARIAS lonas de medidas distintas.
+
+    Suma los m² de TODAS las lonas por medida y les aplica la tarifa $/m² del total
+    (mientras más metros, más barato el m²). El ahorro vs. cotizar cada lona suelta se
+    devuelve como DESCUENTO EN PESOS ligado al número de lonas (para decírselo así al
+    cliente, SIN mencionar el $/m²).
+
+    ⚠️ Las lonas PROMOCIONALES (medida exacta con precio fijo, ej. 75×50=$39) NO entran
+    al volumen: se cobran aparte con su precio de promo.
+
+    Args:
+        lonas: lista de {"base_cm": float, "alto_cm": float, "cantidad": int}.
+        expres: True → +55% (solo lona) sobre el total.
+
+    Returns:
+        {
+          "precio": total final a cobrar (todas las lonas),
+          "descuento": pesos ahorrados por volumen (0 si no hay ahorro),
+          "precio_sin_descuento": lo que costaría cotizando cada lona suelta,
+          "n_lonas": número total de lonas del pedido,
+          "n_lonas_volumen": lonas por medida que entraron al volumen,
+          "m2_total": m² sumados que entraron al volumen,
+          "promos": [{"medida","cantidad","precio"}...] lonas de promo cobradas aparte,
+          "expres": bool,
+        }
+        o {"accion": "error", "mensaje": str} si la lista es inválida.
+    """
+    if not lonas or not isinstance(lonas, list):
+        return {"accion": "error", "mensaje": "Se requiere una lista de lonas."}
+
+    tabla = _TABLA_LONA
+    regulares_m2   = 0.0
+    n_regulares    = 0
+    precio_individual = 0.0   # suma de cada lona regular cotizada SUELTA (referencia)
+    promos         = []
+    precio_promos  = 0.0
+    n_promos       = 0
+
+    for item in lonas:
+        try:
+            base_cm  = float(item.get("base_cm", 0))
+            alto_cm  = float(item.get("alto_cm", 0))
+            cantidad = int(item.get("cantidad", 1) or 1)
+        except (TypeError, ValueError):
+            return {"accion": "error", "mensaje": f"Lona inválida: {item}"}
+        if base_cm <= 0 or alto_cm <= 0 or cantidad <= 0:
+            return {"accion": "error", "mensaje": f"Medida/cantidad inválida: {item}"}
+
+        area_pieza = (base_cm / 100) * (alto_cm / 100)
+        clave      = (int(base_cm), int(alto_cm))
+        clave_inv  = (int(alto_cm), int(base_cm))
+        # Solo las promos CHICAS anunciadas (75×50, 75×75, 100×75) quedan FUERA del
+        # volumen. Las demás medidas (incl. 150×100, 200×100, 150×150) SÍ suman.
+        es_promo_chica = clave in _PROMOS_FUERA_VOLUMEN or clave_inv in _PROMOS_FUERA_VOLUMEN
+        promo_unit = _LONAS_PROMO.get(clave) or _LONAS_PROMO.get(clave_inv)
+
+        if es_promo_chica and promo_unit is not None:
+            # Promo chica: se cobra aparte, NO entra al volumen.
+            p = float(promo_unit) * cantidad
+            precio_promos += p
+            n_promos += cantidad
+            promos.append({
+                "medida":   f"{int(base_cm)}×{int(alto_cm)} cm",
+                "cantidad": cantidad,
+                "precio":   round(p, 2),
+            })
+        else:
+            # Regular: entra al volumen.
+            n_regulares  += cantidad
+            regulares_m2 += area_pieza * cantidad
+            area_line = area_pieza * cantidad
+            precio_individual += max(99.0, area_line * _tasa(area_line, tabla))
+
+    # Precio por volumen (todas las lonas regulares juntas en un solo escalón).
+    if n_regulares > 0:
+        precio_volumen = max(99.0, regulares_m2 * _tasa(regulares_m2, tabla))
+    else:
+        precio_volumen = 0.0
+
+    # Exprés: +55% solo en lona (aplica a regulares y promos).
+    if expres:
+        precio_volumen    *= 1.55
+        precio_individual *= 1.55
+        precio_promos     *= 1.55
+        for pr in promos:
+            pr["precio"] = round(pr["precio"] * 1.55, 2)
+
+    descuento = round(max(0.0, precio_individual - precio_volumen), 2)
+    total     = round(precio_volumen + precio_promos, 2)
+
+    return {
+        "precio":               total,
+        "descuento":            descuento,
+        "precio_sin_descuento": round(precio_individual + precio_promos, 2),
+        "n_lonas":              n_regulares + n_promos,
+        "n_lonas_volumen":      n_regulares,
+        "m2_total":             round(regulares_m2, 2),
+        "promos":               promos,
+        "expres":               expres,
     }

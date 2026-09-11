@@ -12,7 +12,7 @@ import httpx
 from anthropic import AsyncAnthropic
 from dotenv import load_dotenv
 
-from agent.tools import calcular_precio
+from agent.tools import calcular_precio, calcular_precio_lonas_volumen
 
 load_dotenv()
 logger = logging.getLogger("agentkit")
@@ -86,7 +86,42 @@ HERRAMIENTAS_CLAUDE = [
             },
             "required": ["producto", "base_cm", "alto_cm"],
         },
-    }
+    },
+    {
+        "name": "calcular_precio_lonas_volumen",
+        "description": (
+            "Úsala SOLO cuando el cliente pide VARIAS LONAS de medidas DISTINTAS en el mismo "
+            "pedido (ej. una 2×1, una 3×2 y una 4×2). Suma los m² de todas y les aplica el "
+            "DESCUENTO POR VOLUMEN. Devuelve 'descuento' (pesos ahorrados) y 'precio' (total). "
+            "Al cliente dile el DESCUENTO EN PESOS por el número de lonas — NUNCA menciones el "
+            "precio por m². Las promos chicas (75×50, 75×75, 100×75) se cobran aparte (campo "
+            "'promos'). NO la uses para un solo tamaño ni una sola lona (para eso usa "
+            "calcular_precio con cantidad)."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "lonas": {
+                    "type": "array",
+                    "description": "Lista de TODAS las lonas del pedido, cada una con su medida y cantidad.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "base_cm":  {"type": "number",  "description": "Ancho en cm."},
+                            "alto_cm":  {"type": "number",  "description": "Alto en cm."},
+                            "cantidad": {"type": "integer", "description": "Piezas de esa medida (default 1)."},
+                        },
+                        "required": ["base_cm", "alto_cm"],
+                    },
+                },
+                "expres": {
+                    "type": "boolean",
+                    "description": "True si quieren exprés (+55% solo lona).",
+                },
+            },
+            "required": ["lonas"],
+        },
+    },
 ]
 
 
@@ -294,6 +329,13 @@ async def generar_respuesta(
                             señales["cotizo"] = True
                             if "producto" not in señales:
                                 señales["producto"] = block.input.get("producto", "")
+                    elif block.name == "calcular_precio_lonas_volumen":
+                        resultado = calcular_precio_lonas_volumen(**block.input)
+                        # Cotización de varias lonas → producto = lona (para el ruteo por asesor).
+                        if señales is not None and isinstance(resultado, dict) and "precio" in resultado:
+                            señales["cotizo"] = True
+                            if "producto" not in señales:
+                                señales["producto"] = "lona"
                     else:
                         resultado = {"accion": "error", "mensaje": f"Herramienta desconocida: {block.name}"}
 
