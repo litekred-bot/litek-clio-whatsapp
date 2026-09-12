@@ -1775,19 +1775,20 @@ async def _procesar_mensaje(msg):
             es_merida = (suc_cliente == "Mérida")
             _tel_esc = msg.telefono.replace("@s.whatsapp.net", "")
 
-            # ¿Quién atiende? El default del área (letreros→Erick, director→Chino, asesor→Anna,
+            # ¿Quién atiende? El default del área (letreros→Brayan, director→Chino, asesor→Anna,
             # administracion→Tere). Excepción: el "asesor" depende de la sucursal —
             # Mérida lo atiende Edith; Carmen, su dueño actual (Alan/Jadiel).
             _atender = AREAS.get(area_escalar, {}).get("nombre", "")
             if area_escalar in ("asesor", "letreros"):
-                # 'asesor' y 'letreros' (diseño) los atiende el equipo de la sucursal.
-                # Erick NO entra en la escalación (pre-venta): solo se le avisa cuando ya PAGÓ.
+                # 'asesor' y 'letreros' los atiende el equipo de la sucursal.
+                # Erick es SOLO diseño: NO entra en la escalación (pre-venta) de letreros;
+                # solo se le avisa cuando el pedido ya PAGÓ y toca hacer el diseño.
                 if es_merida:
                     _atender = "Edith"
                 elif es_carmen:
                     _atender = await asesor_crm_por_telefono(_tel_esc) or "el equipo de Carmen"
                 elif area_escalar == "letreros":
-                    _atender = "Erick"   # Campeche: diseño/letreros lo lleva Erick (diseñador)
+                    _atender = "Brayan"   # Campeche: letreros/letras 3D/neón los cotiza Brayan
                 else:
                     _atender = "Anna"
 
@@ -1822,7 +1823,7 @@ async def _procesar_mensaje(msg):
             # En Carmen NO se reasigna: el dueño por turnos (Alan/Jadiel) se queda.
             _asesor_area = {
                 "asesor": "Anna", "director": "Chino",
-                "letreros": "Erick", "administracion": "Tere",
+                "letreros": "Brayan", "administracion": "Tere",
             }.get(area_escalar, "")
             # Mérida: el asesor general Y los letreros/diseño los lleva Edith (no los de Campeche).
             if area_escalar in ("asesor", "letreros") and es_merida:
