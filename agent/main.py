@@ -39,6 +39,14 @@ VENTANA_PEDIDO_MIN = 60  # no reenviar el pedido confirmado del mismo cliente en
 # como comprobante (el cliente la mandó un mensaje antes).
 _ultima_imagen: dict[str, str] = {}
 
+# ── DEBOUNCE de mensajes ─────────────────────────────────────────────────────
+# Junta los mensajes que un cliente manda seguidos (varias imágenes, o texto en
+# ráfaga) en UNA sola tanda, para responder una vez y no saturar ni contestar
+# encimado. La ventana se REINICIA con cada mensaje nuevo del cliente.
+_pendientes: dict[str, list] = {}                 # telefono → [msg, ...]
+_debounce_tasks: dict[str, "asyncio.Task"] = {}   # telefono → tarea de flush
+DEBOUNCE_SEGUNDOS = 6
+
 from agent.brain import generar_respuesta
 from agent.memory import (
     inicializar_db, guardar_mensaje, obtener_historial, registrar_ruleta, verificar_ruleta,
@@ -1060,6 +1068,86 @@ async def _reenviar_media(destino: str, tipo: str, media_url: str, media_id: str
     return False
 
 
+def _encolar_mensaje(msg):
+    """Mete el mensaje al buffer del cliente y (re)arma el flush con debounce.
+    La ventana se reinicia con cada mensaje nuevo, así se juntan las ráfagas."""
+    phone = msg.telefono
+    _pendientes.setdefault(phone, []).append(msg)
+    tarea_previa = _debounce_tasks.get(phone)
+    if tarea_previa and not tarea_previa.done():
+        tarea_previa.cancel()
+    _debounce_tasks[phone] = asyncio.create_task(_flush_pendientes(phone))
+
+
+async def _flush_pendientes(phone):
+    """Espera la ventana de silencio y procesa TODA la tanda del cliente como una."""
+    try:
+        await asyncio.sleep(DEBOUNCE_SEGUNDOS)
+    except asyncio.CancelledError:
+        return  # llegó otro mensaje → habrá un nuevo flush; no procesamos aquí
+    msgs = _pendientes.pop(phone, [])
+    _debounce_tasks.pop(phone, None)
+    if not msgs:
+        return
+    try:
+        if len(msgs) == 1:
+            await _procesar_mensaje(msgs[0])
+        else:
+            await _procesar_lote(phone, msgs)
+    except Exception as e:
+        logger.error(f"Error procesando tanda de {phone}: {e}")
+
+
+async def _procesar_lote(phone, msgs):
+    """Fusiona varios mensajes seguidos en UNO y lo procesa una sola vez.
+    Junta el texto (incluye audio transcrito y documentos leídos) y, si hubo
+    imágenes, deja la ÚLTIMA para que Clio la vea y avisa cuántas llegaron."""
+    partes_texto: list[str] = []
+    imagenes: list[tuple[str, str]] = []  # (media_url, media_id)
+    base = msgs[-1]  # plantilla: conserva telefono, nombre_perfil, etc.
+    for m in msgs:
+        try:
+            _mid = getattr(m, "media_id", "")
+            if m.tipo in ("audio", "voice", "ptt") and m.media_url:
+                t = await transcribir_audio(m.media_url, proveedor.token)
+                if t:
+                    partes_texto.append(t)
+            elif m.tipo == "document" and m.media_url:
+                t = await leer_documento(m.media_url, proveedor.token, m.texto)
+                if t:
+                    partes_texto.append(t)
+                _ultima_imagen[phone] = f"document|{m.media_url}|{_mid}"
+            elif m.tipo == "image" and m.media_url:
+                imagenes.append((m.media_url, _mid))
+                _ultima_imagen[phone] = f"image|{m.media_url}|{_mid}"
+                if m.texto:
+                    partes_texto.append(m.texto)
+            else:
+                if m.texto:
+                    partes_texto.append(m.texto)
+        except Exception as e:
+            logger.error(f"Error fusionando mensaje de {phone}: {e}")
+
+    texto = "\n".join(p for p in partes_texto if p).strip()
+    if imagenes:
+        nota = f"[El cliente envió {len(imagenes)} imágenes seguidas en esta tanda.]"
+        texto = (texto + "\n" + nota).strip() if texto else nota
+
+    base.texto = texto
+    if imagenes:
+        base.tipo = "image"
+        base.media_url = imagenes[-1][0]
+        try:
+            base.media_id = imagenes[-1][1]
+        except Exception:
+            pass
+    else:
+        base.tipo = "text"
+        base.media_url = ""
+    logger.info(f"Tanda fusionada de {phone}: {len(msgs)} msgs → 1 ({len(imagenes)} imágenes)")
+    await _procesar_mensaje(base)
+
+
 async def _procesar_mensaje(msg):
     """Procesa un mensaje en segundo plano (responder rápido evita reintentos de Whapi)."""
     try:
@@ -2015,7 +2103,8 @@ async def webhook_handler(request: Request):
             _ids_procesados[msg.mensaje_id] = True
             if len(_ids_procesados) > MAX_IDS_CACHE:
                 _ids_procesados.popitem(last=False)
-        asyncio.create_task(_procesar_mensaje(msg))
+        # Debounce: junta los mensajes seguidos del mismo cliente en una tanda.
+        _encolar_mensaje(msg)
 
     return {"status": "ok"}
 
