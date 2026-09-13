@@ -654,13 +654,19 @@ async def crm_registros(request: Request, estado: str = "", tipo: str = "",
         vac = await total_vendido_crm(asesor="", sucursal=sucursal)
         ventas["acumulado"] = vac["total"]
         ventas["acumulado_num"] = vac["num"]
-    # Carga por asesor (solo para quien ve todo). Si hay sucursal elegida, solo
-    # muestra los asesores de ESA sucursal (Carmen → Alan/Jadiel; Campeche → Anna/Brayan/Tere).
+    # Carga por asesor (solo para quien ve todo). Cuenta los PENDIENTES del MES visible
+    # (estados no-finales), calculada desde 'todos' (mismo mes que la lista) para que el
+    # número cuadre EXACTO con lo que se ve al tocar el nombre. Antes contaba TODO el
+    # histórico y no cuadraba con la lista mensual. Si hay sucursal elegida, solo sus asesores.
     carga = None
     if ve_todo:
-        aseq = ASESORES_POR_SUCURSAL.get(sucursal)
-        carga = await carga_por_asesor(asesores=aseq, sucursal=sucursal) if aseq \
-            else await carga_por_asesor(sucursal=sucursal)
+        _FINALES = ("vendido", "no_contesto", "no_concretado", "esperando_pago", "cerrado")
+        aseq = ASESORES_POR_SUCURSAL.get(sucursal) or ("Anna", "Brayan", "Tere", "Alan", "Jadiel", "Erick")
+        carga = {a: 0 for a in aseq}
+        for r in todos:
+            _a = r.get("asesor") or ""
+            if _a in carga and r.get("estado") not in _FINALES:
+                carga[_a] += 1
     return {
         "registros": registros,
         "stats": stats,
