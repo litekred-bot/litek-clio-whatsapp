@@ -1446,6 +1446,33 @@ async def carga_por_asesor(asesores: tuple = ("Anna", "Brayan", "Tere", "Alan", 
     return out
 
 
+async def clientes_perdidos(desde=None, hasta=None, sucursal: str = "", limite: int = 60) -> list[dict]:
+    """
+    Clientes que se CAYERON en el rango (por fecha de entrada 'creado'):
+    estado no_contesto / no_concretado / esperando_pago. Para el Analista de Perdidos.
+    Devuelve los más recientes primero, hasta `limite`.
+    """
+    estados = ("no_contesto", "no_concretado", "esperando_pago")
+    async with async_session() as session:
+        filtros = [CrmRegistro.estado.in_(estados)]
+        if sucursal:
+            filtros.append(CrmRegistro.sucursal == sucursal)
+        if desde is not None:
+            filtros.append(CrmRegistro.creado >= desde)
+        if hasta is not None:
+            filtros.append(CrmRegistro.creado < hasta)
+        res = await session.execute(
+            select(CrmRegistro).where(*filtros).order_by(CrmRegistro.creado.desc()).limit(limite)
+        )
+        return [{
+            "telefono":   r.telefono,
+            "nombre":     r.nombre or "Cliente",
+            "estado":     r.estado,
+            "sucursal":   getattr(r, "sucursal", "") or "Campeche",
+            "descripcion": (r.descripcion or "")[:300],
+        } for r in res.scalars().all()]
+
+
 async def registrar_o_actualizar_crm(
     telefono: str,
     nombre: str = "",

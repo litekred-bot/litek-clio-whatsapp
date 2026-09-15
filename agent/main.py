@@ -155,6 +155,7 @@ from agent.escalation import enviar_alerta_asesor, AREAS
 from agent.reporte_diario import generar_reporte_diario
 from agent.seguimiento import enviar_seguimientos, cargar_cache_desde_db, enviar_seguimiento_ruleta, cargar_cache_ruleta
 from agent.agradecimiento import enviar_agradecimientos, cargar_cache_agradecidos
+from agent.analista_perdidos import analizar_perdidos
 from agent.crm import HTML_PANEL, crear_token, verificar_token
 
 # Número del dueño para recibir copia de cotizaciones de productos que no son lonas
@@ -704,6 +705,36 @@ async def crm_analisis(request: Request, desde: str = "", hasta: str = ""):
         rango_label = mes_desde if mes_desde == mes_hasta else (mes_desde + " a " + mes_hasta)
 
     data = await analisis_mensajeria(desde=d_ini, hasta=d_fin)
+    data["rango"] = rango_label
+    return data
+
+
+@app.get("/crm/api/perdidos")
+async def crm_perdidos(request: Request, desde: str = "", hasta: str = "", sucursal: str = ""):
+    """
+    Analista de PERDIDOS: lee los chats de los clientes que se cayeron (No contestó,
+    No concretó, Esperando pago) del rango y devuelve motivos + patrones + recomendaciones.
+    Solo administradores. A demanda (usa IA, tiene costo).
+    """
+    u = _crm_usuario_de_request(request)
+    if not u:
+        raise HTTPException(status_code=401, detail="No autorizado")
+    if not _es_admin(u["usuario"]):
+        raise HTTPException(status_code=403, detail="Solo administradores")
+
+    es_todo = (desde == "todo" or hasta == "todo")
+    if es_todo:
+        d_ini = d_fin = None
+        rango_label = "Todo"
+    else:
+        mes_actual = datetime.now(_TZ_CAMP).strftime("%Y-%m")
+        mes_desde = desde or mes_actual
+        mes_hasta = hasta or mes_desde
+        d_ini = _mes_inicio_utc(mes_desde)
+        d_fin = _mes_siguiente_utc(mes_hasta)
+        rango_label = mes_desde if mes_desde == mes_hasta else (mes_desde + " a " + mes_hasta)
+
+    data = await analizar_perdidos(desde=d_ini, hasta=d_fin, sucursal=sucursal, limite=60)
     data["rango"] = rango_label
     return data
 

@@ -197,7 +197,7 @@ HTML_PANEL = r"""<!DOCTYPE html>
 <div id="app" style="display:none">
   <div class="top">
     <h1>🤖 CRM LiTek</h1>
-    <div><span class="user" id="quien"></span> &nbsp; <button id="btnAnalisis" onclick="toggleAnalisis()" style="display:none">📊 Análisis</button> &nbsp; <button id="btnEquipo" onclick="abrirEquipo()" style="display:none">👥 Equipo</button> &nbsp; <button onclick="salir()">Salir</button></div>
+    <div><span class="user" id="quien"></span> &nbsp; <button id="btnPerdidos" onclick="togglePerdidos()" style="display:none">🕵️ Perdidos</button> &nbsp; <button id="btnAnalisis" onclick="toggleAnalisis()" style="display:none">📊 Análisis</button> &nbsp; <button id="btnEquipo" onclick="abrirEquipo()" style="display:none">👥 Equipo</button> &nbsp; <button onclick="salir()">Salir</button></div>
   </div>
   <div class="wrap">
     <div class="sucursales" id="sucursales">
@@ -245,6 +245,7 @@ HTML_PANEL = r"""<!DOCTYPE html>
     </div>
     <div id="lista"></div>
     <div id="analisisPanel" style="display:none"></div>
+    <div id="perdidosPanel" style="display:none"></div>
   </div>
 </div>
 
@@ -329,7 +330,7 @@ function initVentas(){
   if (a) a.value = m;
   if (b) b.value = m;
 }
-function redibujar(){ if (MODO_ANALISIS){ cargarAnalisis(); } else { cargar(); } }
+function redibujar(){ if (MODO_ANALISIS){ cargarAnalisis(); } else if (MODO_PERDIDOS){ cargarPerdidos(); } else { cargar(); } }
 function aplicarVentas(){
   V_TODO = false;
   V_DESDE = document.getElementById("vDesde").value || "";
@@ -365,6 +366,7 @@ async function cargar(){
     document.getElementById("quien").textContent = "👤 " + (d.nombre || "") + (d.es_director ? "" : " · viendo solo lo tuyo");
     document.getElementById("btnEquipo").style.display = (d.es_director && !d.solo_sucursal) ? "inline-block" : "none";
     document.getElementById("btnAnalisis").style.display = d.es_director ? "inline-block" : "none";
+  document.getElementById("btnPerdidos").style.display = d.es_director ? "inline-block" : "none";
     ES_DIRECTOR = !!d.es_director;
     document.getElementById("ventasFiltro").style.display = ES_DIRECTOR ? "flex" : "none";
     // Admin de UNA sola sucursal (ej. Leo→Carmen): se le fija y se oculta el selector.
@@ -393,6 +395,68 @@ function toggleAnalisis(){
   document.getElementById("analisisPanel").style.display = MODO_ANALISIS ? "block" : "none";
   document.getElementById("btnAnalisis").textContent = MODO_ANALISIS ? "← Volver" : "📊 Análisis";
   if (MODO_ANALISIS){ cargarAnalisis(); } else { cargar(); }
+}
+
+var MODO_PERDIDOS = false;
+function togglePerdidos(){
+  if (MODO_ANALISIS){ toggleAnalisis(); }  // cerrar análisis si estaba abierto
+  MODO_PERDIDOS = !MODO_PERDIDOS;
+  _ELEMS_NORMALES.forEach(function(id){ var e=document.getElementById(id); if(e) e.style.display = MODO_PERDIDOS ? "none" : ""; });
+  document.getElementById("ventasFiltro").style.display = "flex";
+  document.getElementById("perdidosPanel").style.display = MODO_PERDIDOS ? "block" : "none";
+  document.getElementById("btnPerdidos").textContent = MODO_PERDIDOS ? "← Volver" : "🕵️ Perdidos";
+  if (MODO_PERDIDOS){ cargarPerdidos(); } else { cargar(); }
+}
+
+async function cargarPerdidos(){
+  var panel = document.getElementById("perdidosPanel");
+  panel.innerHTML = "<div style='padding:20px;color:#777'>🕵️ Leyendo las conversaciones y analizando… (puede tardar unos segundos)</div>";
+  var url = "/crm/api/perdidos?sucursal=" + encodeURIComponent(SUCURSAL);
+  if (V_TODO){ url += "&desde=todo&hasta=todo"; }
+  else if (V_DESDE || V_HASTA){ url += "&desde=" + encodeURIComponent(V_DESDE||V_HASTA) + "&hasta=" + encodeURIComponent(V_HASTA||V_DESDE); }
+  try{
+    var r = await fetch(url, {headers:{"Authorization":"Bearer "+TOKEN}});
+    if (r.status === 401){ salir(); return; }
+    if (r.status === 403){ panel.innerHTML = "<div style='padding:20px'>Solo el director ve este análisis.</div>"; return; }
+    var d = await r.json();
+    pintarPerdidos(d);
+  }catch(e){ console.log(e); panel.innerHTML = "<div style='padding:20px'>Error analizando. Intenta de nuevo.</div>"; }
+}
+
+function _escP(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+function pintarPerdidos(d){
+  var panel = document.getElementById("perdidosPanel");
+  if (!d || !d.total){ panel.innerHTML = "<div style='padding:20px'>🎉 No hay clientes perdidos en este periodo.</div>"; return; }
+  var h = "<h2 style='margin:6px 0'>🕵️ Análisis de perdidos — "+_escP(d.rango||"")+"</h2>";
+  h += "<p style='color:#777;margin:0 0 12px'>Se analizaron <b>"+d.total+"</b> clientes que no cerraron (No contestó, No concretó, Esperando pago).</p>";
+  h += "<div style='background:#fff;border:1px solid #eee;border-radius:10px;padding:14px;margin-bottom:14px'>";
+  h += "<h3 style='margin:0 0 10px'>📊 Motivos por los que no cerraron</h3>";
+  (d.por_motivo||[]).forEach(function(m){
+    h += "<div style='margin:8px 0'>";
+    h += "<div style='display:flex;justify-content:space-between;font-size:14px'><span>"+_escP(m.label)+"</span><b>"+m.count+" ("+m.pct+"%)</b></div>";
+    h += "<div style='background:#f0f0f0;border-radius:6px;height:9px;overflow:hidden;margin-top:3px'><div style='background:#e30613;height:9px;width:"+m.pct+"%'></div></div>";
+    h += "</div>";
+  });
+  h += "</div>";
+  if (d.recomendaciones){
+    h += "<div style='background:#fff8e1;border:1px solid #ffe082;border-radius:10px;padding:14px;margin-bottom:14px'>";
+    h += "<h3 style='margin:0 0 8px'>💡 Recomendaciones</h3>";
+    h += "<div style='font-size:14px;white-space:pre-wrap;line-height:1.55'>"+_escP(d.recomendaciones)+"</div>";
+    h += "</div>";
+  }
+  h += "<h3 style='margin:10px 0 6px'>👥 Detalle por cliente</h3>";
+  (d.clientes||[]).forEach(function(c){
+    var num = (c.telefono||"").replace(/[^0-9]/g,"").slice(-10);
+    h += "<div style='background:#fff;border:1px solid #eee;border-radius:8px;padding:10px 12px;margin:6px 0'>";
+    h += "<div style='display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;align-items:center'>";
+    h += "<span><b>"+_escP(c.nombre)+"</b> <span style='color:#999'>"+num+"</span></span>";
+    h += "<span style='background:#f3f3f3;border-radius:12px;padding:2px 10px;font-size:12px'>"+_escP(c.motivo_label)+"</span>";
+    h += "</div>";
+    if (c.diagnostico){ h += "<div style='font-size:13px;color:#555;margin-top:4px'>"+_escP(c.diagnostico)+"</div>"; }
+    h += "</div>";
+  });
+  panel.innerHTML = h;
 }
 
 function _claveCostos(rango){ return "costos_" + (rango||"mes"); }
