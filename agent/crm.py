@@ -398,6 +398,9 @@ function toggleAnalisis(){
 }
 
 var MODO_PERDIDOS = false;
+var PERD_ASESOR = "";
+var PERDIDOS_DATA = null;
+function setPerdAsesor(a){ PERD_ASESOR = (PERD_ASESOR===a) ? "" : a; cargarPerdidos(); }
 function togglePerdidos(){
   if (MODO_ANALISIS){ toggleAnalisis(); }  // cerrar análisis si estaba abierto
   MODO_PERDIDOS = !MODO_PERDIDOS;
@@ -411,7 +414,7 @@ function togglePerdidos(){
 async function cargarPerdidos(){
   var panel = document.getElementById("perdidosPanel");
   panel.innerHTML = "<div style='padding:20px;color:#777'>🕵️ Leyendo las conversaciones y analizando… (puede tardar unos segundos)</div>";
-  var url = "/crm/api/perdidos?sucursal=" + encodeURIComponent(SUCURSAL);
+  var url = "/crm/api/perdidos?sucursal=" + encodeURIComponent(SUCURSAL) + "&asesor=" + encodeURIComponent(PERD_ASESOR);
   if (V_TODO){ url += "&desde=todo&hasta=todo"; }
   else if (V_DESDE || V_HASTA){ url += "&desde=" + encodeURIComponent(V_DESDE||V_HASTA) + "&hasta=" + encodeURIComponent(V_HASTA||V_DESDE); }
   try{
@@ -425,11 +428,38 @@ async function cargarPerdidos(){
 
 function _escP(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
+function _chipsAsesorPerd(){
+  var ase = Object.keys(window._cargaCache||{});
+  if (!ase.length) ase = ["Anna","Brayan","Tere","Erick"];
+  var h = "<div style='margin:4px 0 12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center'>";
+  h += "<span style='color:#888;font-size:12px'>Filtrar por asesor:</span>";
+  var actTodos = PERD_ASESOR==="" ? "background:#e30613;color:#fff;border-color:#e30613;" : "";
+  h += "<button onclick=\"setPerdAsesor('')\" style='border:1px solid #ccc;border-radius:16px;padding:4px 12px;font-size:13px;cursor:pointer;"+actTodos+"'>Todos</button>";
+  ase.forEach(function(a){
+    var act = PERD_ASESOR===a ? "background:#e30613;color:#fff;border-color:#e30613;" : "";
+    h += "<button onclick=\"setPerdAsesor('"+a+"')\" style='border:1px solid #ccc;border-radius:16px;padding:4px 12px;font-size:13px;cursor:pointer;"+act+"'>"+a+"</button>";
+  });
+  h += "</div>";
+  return h;
+}
+function copiarPerdidos(){
+  var d = PERDIDOS_DATA; if(!d||!d.clientes) return;
+  var quien = d.asesor ? d.asesor : "todos";
+  var t = "🕵️ Clientes por recuperar ("+quien+") — "+(d.rango||"")+"\n\n";
+  d.clientes.forEach(function(c, i){
+    var num = (c.telefono||"").replace(/[^0-9]/g,"").slice(-10);
+    t += (i+1)+". "+c.nombre+" ("+num+") — "+c.motivo_label+"\n   "+(c.diagnostico||"")+"\n";
+  });
+  navigator.clipboard.writeText(t).then(function(){ alert("Lista copiada ✅ Ya puedes pegarla y mandarla al asesor."); },
+    function(){ alert("No se pudo copiar automáticamente."); });
+}
 function pintarPerdidos(d){
+  PERDIDOS_DATA = d;
   var panel = document.getElementById("perdidosPanel");
-  if (!d || !d.total){ panel.innerHTML = "<div style='padding:20px'>🎉 No hay clientes perdidos en este periodo.</div>"; return; }
-  var h = "<h2 style='margin:6px 0'>🕵️ Análisis de perdidos — "+_escP(d.rango||"")+"</h2>";
-  h += "<p style='color:#777;margin:0 0 12px'>Se analizaron <b>"+d.total+"</b> clientes que no cerraron (No contestó, No concretó, Esperando pago).</p>";
+  var h = "<h2 style='margin:6px 0'>🕵️ Análisis de perdidos — "+_escP(d&&d.rango||"")+"</h2>";
+  h += _chipsAsesorPerd();
+  if (!d || !d.total){ panel.innerHTML = h + "<div style='padding:20px'>🎉 No hay clientes perdidos"+(PERD_ASESOR?(" para "+_escP(PERD_ASESOR)):"")+" en este periodo.</div>"; return; }
+  h += "<p style='color:#777;margin:0 0 12px'>Se analizaron <b>"+d.total+"</b> clientes que no cerraron"+(PERD_ASESOR?(" de <b>"+_escP(PERD_ASESOR)+"</b>"):"")+" (No contestó, No concretó, Esperando pago). &nbsp; <button onclick='copiarPerdidos()' style='border:1px solid #ccc;border-radius:8px;padding:4px 10px;cursor:pointer'>📋 Copiar lista para el asesor</button></p>";
   h += "<div style='background:#fff;border:1px solid #eee;border-radius:10px;padding:14px;margin-bottom:14px'>";
   h += "<h3 style='margin:0 0 10px'>📊 Motivos por los que no cerraron</h3>";
   (d.por_motivo||[]).forEach(function(m){
@@ -450,7 +480,8 @@ function pintarPerdidos(d){
     var num = (c.telefono||"").replace(/[^0-9]/g,"").slice(-10);
     h += "<div style='background:#fff;border:1px solid #eee;border-radius:8px;padding:10px 12px;margin:6px 0'>";
     h += "<div style='display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;align-items:center'>";
-    h += "<span><b>"+_escP(c.nombre)+"</b> <span style='color:#999'>"+num+"</span></span>";
+    var aseTxt = c.asesor ? " <span style='background:#fff3e0;color:#e65100;border-radius:10px;padding:1px 8px;font-size:11px'>"+_escP(c.asesor)+"</span>" : "";
+    h += "<span><b>"+_escP(c.nombre)+"</b> <span style='color:#999'>"+num+"</span>"+aseTxt+"</span>";
     h += "<span style='background:#f3f3f3;border-radius:12px;padding:2px 10px;font-size:12px'>"+_escP(c.motivo_label)+"</span>";
     h += "</div>";
     if (c.diagnostico){ h += "<div style='font-size:13px;color:#555;margin-top:4px'>"+_escP(c.diagnostico)+"</div>"; }

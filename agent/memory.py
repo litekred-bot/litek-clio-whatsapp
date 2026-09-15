@@ -1446,10 +1446,11 @@ async def carga_por_asesor(asesores: tuple = ("Anna", "Brayan", "Tere", "Alan", 
     return out
 
 
-async def clientes_perdidos(desde=None, hasta=None, sucursal: str = "", limite: int = 60) -> list[dict]:
+async def clientes_perdidos(desde=None, hasta=None, sucursal: str = "", asesor: str = "", limite: int = 60) -> list[dict]:
     """
     Clientes que se CAYERON en el rango (por fecha de entrada 'creado'):
     estado no_contesto / no_concretado / esperando_pago. Para el Analista de Perdidos.
+    Filtra por `asesor` si se pasa (para que cada asesor atienda los suyos).
     Devuelve los más recientes primero, hasta `limite`.
     """
     estados = ("no_contesto", "no_concretado", "esperando_pago")
@@ -1457,6 +1458,8 @@ async def clientes_perdidos(desde=None, hasta=None, sucursal: str = "", limite: 
         filtros = [CrmRegistro.estado.in_(estados)]
         if sucursal:
             filtros.append(CrmRegistro.sucursal == sucursal)
+        if asesor:
+            filtros.append(CrmRegistro.asesor == asesor)
         if desde is not None:
             filtros.append(CrmRegistro.creado >= desde)
         if hasta is not None:
@@ -1468,6 +1471,7 @@ async def clientes_perdidos(desde=None, hasta=None, sucursal: str = "", limite: 
             "telefono":   r.telefono,
             "nombre":     r.nombre or "Cliente",
             "estado":     r.estado,
+            "asesor":     r.asesor or "",
             "sucursal":   getattr(r, "sucursal", "") or "Campeche",
             "descripcion": (r.descripcion or "")[:300],
         } for r in res.scalars().all()]

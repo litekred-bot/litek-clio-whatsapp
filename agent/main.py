@@ -710,7 +710,7 @@ async def crm_analisis(request: Request, desde: str = "", hasta: str = ""):
 
 
 @app.get("/crm/api/perdidos")
-async def crm_perdidos(request: Request, desde: str = "", hasta: str = "", sucursal: str = ""):
+async def crm_perdidos(request: Request, desde: str = "", hasta: str = "", sucursal: str = "", asesor: str = ""):
     """
     Analista de PERDIDOS: lee los chats de los clientes que se cayeron (No contestó,
     No concretó, Esperando pago) del rango y devuelve motivos + patrones + recomendaciones.
@@ -734,8 +734,9 @@ async def crm_perdidos(request: Request, desde: str = "", hasta: str = "", sucur
         d_fin = _mes_siguiente_utc(mes_hasta)
         rango_label = mes_desde if mes_desde == mes_hasta else (mes_desde + " a " + mes_hasta)
 
-    data = await analizar_perdidos(desde=d_ini, hasta=d_fin, sucursal=sucursal, limite=60)
+    data = await analizar_perdidos(desde=d_ini, hasta=d_fin, sucursal=sucursal, asesor=asesor, limite=60)
     data["rango"] = rango_label
+    data["asesor"] = asesor
     return data
 
 

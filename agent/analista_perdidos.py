@@ -121,9 +121,9 @@ async def _recomendaciones(por_motivo: list[dict], total: int) -> str:
         return ""
 
 
-async def analizar_perdidos(desde=None, hasta=None, sucursal: str = "", limite: int = 60) -> dict:
+async def analizar_perdidos(desde=None, hasta=None, sucursal: str = "", asesor: str = "", limite: int = 60) -> dict:
     """Orquesta el análisis completo. Devuelve el reporte para el panel."""
-    clientes = await clientes_perdidos(desde=desde, hasta=hasta, sucursal=sucursal, limite=limite)
+    clientes = await clientes_perdidos(desde=desde, hasta=hasta, sucursal=sucursal, asesor=asesor, limite=limite)
     if not clientes:
         return {
             "total": 0, "por_motivo": [], "clientes": [],
@@ -153,6 +153,7 @@ async def analizar_perdidos(desde=None, hasta=None, sucursal: str = "", limite: 
             "nombre": c["nombre"],
             "telefono": c["telefono"],
             "estado": c["estado"],
+            "asesor": c.get("asesor", ""),
             "sucursal": c["sucursal"],
             "motivo": mot,
             "motivo_label": MOTIVOS.get(mot, mot),
