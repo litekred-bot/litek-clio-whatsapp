@@ -47,6 +47,11 @@ _pendientes: dict[str, list] = {}                 # telefono → [msg, ...]
 _debounce_tasks: dict[str, "asyncio.Task"] = {}   # telefono → tarea de flush
 DEBOUNCE_SEGUNDOS = 6
 
+# Diseño-primero (cliente quiere ver el diseño antes de pagar): a quién ya se le avisó
+# al equipo de diseño, para no repetir el aviso en cada mensaje.
+_diseno_primero_avisado: dict[str, datetime] = {}
+VENTANA_DISENO_PRIMERO_MIN = 120
+
 from agent.brain import generar_respuesta
 from agent.memory import (
     inicializar_db, guardar_mensaje, obtener_historial, registrar_ruleta, verificar_ruleta,
@@ -1523,6 +1528,40 @@ async def _procesar_mensaje(msg):
                 await marcar_diseno_crm(msg.telefono, True)
             except Exception as e:
                 logger.error(f"Error marcando diseño CRM: {e}")
+
+        # [DISENO_PRIMERO:<brief>] — el cliente quiere VER el diseño ANTES de pagar.
+        # Sin pago no se dispara el aviso normal a Erick, así que el diseño no le llega a
+        # NADIE. Aquí alertamos al equipo de diseño de una vez (una sola vez por ventana)
+        # para que lo armen y lo muestren en máx 5 horas hábiles.
+        m_dp = re.search(r'\[DISENO_PRIMERO:(.*?)\]', respuesta, re.DOTALL)
+        if m_dp:
+            brief = m_dp.group(1).strip()
+            respuesta = re.sub(r'\[DISENO_PRIMERO:.*?\]', '', respuesta, flags=re.DOTALL).strip()
+            try:
+                await marcar_diseno_crm(msg.telefono, True)
+                _ahora_dp = datetime.utcnow()
+                _prev_dp = _diseno_primero_avisado.get(tel_limpio)
+                if not _prev_dp or (_ahora_dp - _prev_dp).total_seconds() > VENTANA_DISENO_PRIMERO_MIN * 60:
+                    _diseno_primero_avisado[tel_limpio] = _ahora_dp
+                    _suc_dp = await sucursal_crm_por_telefono(tel_limpio) or "Campeche"
+                    _ase_dp = await asesor_crm_por_telefono(tel_limpio) or "su asesor"
+                    _num_dp = ''.join(c for c in tel_limpio if c.isdigit())
+                    aviso_dp = (
+                        "🎨 *DISEÑO PARA MOSTRAR (sin pago aún) — CLIO*\n\n"
+                        f"👤 *Cliente:* {msg.nombre_perfil or 'Cliente'}\n"
+                        f"📱 *WhatsApp:* wa.me/{_num_dp}\n"
+                        f"📋 *Brief:* {brief[:400]}\n"
+                        f"🏢 *Sucursal:* {_suc_dp}\n"
+                        f"🙋 *Asesor:* {_ase_dp}\n\n"
+                        "El cliente quiere VER el diseño ANTES de pagar. Favor de armarlo y mandarlo "
+                        "para su visto bueno en un *máximo de 5 horas hábiles*. 🙌"
+                    )
+                    await proveedor.enviar_mensaje(ERICK_WHATSAPP, aviso_dp)  # al diseñador
+                    if ASESOR_WHATSAPP:                                        # + grupo de la sucursal
+                        await proveedor.enviar_mensaje(ASESOR_WHATSAPP, aviso_dp)
+                    logger.info(f"Diseño-primero avisado a Erick: {tel_limpio}")
+            except Exception as e:
+                logger.error(f"Error avisando diseño-primero: {e}")
 
         # Detectar [SUCURSAL:Campeche|Mérida|Carmen] — la sucursal del cliente.
         # En Carmen, además asigna a Jadiel (dueño por defecto del equipo Carmen).
