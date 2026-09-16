@@ -72,6 +72,39 @@ from agent.memory import (
 from zoneinfo import ZoneInfo as _ZI
 
 
+def es_festivo_oficial(fecha) -> bool:
+    """True si la fecha (date, hora local) es día de descanso OBLIGATORIO en México
+    según el art. 74 de la Ley Federal del Trabajo. Esos días LiTek NO trabaja físicamente
+    (no produce ni entrega), pero sí toma pedidos en línea."""
+    m, d, wd = fecha.month, fecha.day, fecha.weekday()  # wd: 0=Lun
+    # Fechas fijas: Año Nuevo, Día del Trabajo, Independencia, Navidad
+    if (m, d) in ((1, 1), (5, 1), (9, 16), (12, 25)):
+        return True
+    # 1er lunes de febrero (Día de la Constitución)
+    if m == 2 and wd == 0 and d <= 7:
+        return True
+    # 3er lunes de marzo (Natalicio de Benito Juárez)
+    if m == 3 and wd == 0 and 15 <= d <= 21:
+        return True
+    # 3er lunes de noviembre (Revolución Mexicana)
+    if m == 11 and wd == 0 and 15 <= d <= 21:
+        return True
+    return False
+
+
+def nombre_festivo(fecha) -> str:
+    """Nombre del día festivo oficial (para el mensaje), o '' si no es festivo."""
+    m, d, wd = fecha.month, fecha.day, fecha.weekday()
+    if (m, d) == (1, 1):   return "Año Nuevo"
+    if (m, d) == (5, 1):   return "Día del Trabajo"
+    if (m, d) == (9, 16):  return "Día de la Independencia"
+    if (m, d) == (12, 25): return "Navidad"
+    if m == 2 and wd == 0 and d <= 7:        return "Día de la Constitución"
+    if m == 3 and wd == 0 and 15 <= d <= 21: return "Natalicio de Benito Juárez"
+    if m == 11 and wd == 0 and 15 <= d <= 21: return "Día de la Revolución"
+    return ""
+
+
 def _horario_sucursal(sucursal: str):
     """(apertura, cierre L-V, cierre Sáb) de la sucursal. Todas abren 9."""
     if sucursal in ("Carmen", "Mérida"):
@@ -89,7 +122,7 @@ def sumar_horas_habiles(inicio_utc, horas: float, sucursal: str = ""):
     while rem > 1e-6 and guard < 200:
         guard += 1
         wd = cur.weekday()
-        if wd == 6:  # domingo → siguiente día 9am
+        if wd == 6 or es_festivo_oficial(cur.date()):  # domingo o festivo → siguiente día 9am
             cur = (cur + timedelta(days=1)).replace(hour=apertura, minute=0, second=0, microsecond=0)
             continue
         cierre_h = cierre_sab if wd == 5 else cierre_lv
@@ -128,6 +161,8 @@ def es_horario_atencion(sucursal: str = "") -> bool:
     dia = ahora.weekday()  # 0=Lun ... 6=Dom
     h = ahora.hour
     if dia == 6:            # Domingo (cerrado en todas)
+        return False
+    if es_festivo_oficial(ahora.date()):  # Festivo oficial (no se trabaja físicamente)
         return False
     if sucursal in ("Carmen", "Mérida"):
         if dia == 5:        # Sábado hasta las 2pm
@@ -1282,6 +1317,28 @@ async def _procesar_mensaje(msg):
         _dias_sem = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
         ahora_local = datetime.now(_TZ_CAMP)
         ctx_entrega = f"Ahora es {_dias_sem[ahora_local.weekday()]} {ahora_local.strftime('%d/%m/%Y %H:%M')} (hora local)."
+        # Festivo oficial (art. 74 LFT): hoy o mañana. Clio lo AVISA y sigue tomando pedidos en línea.
+        try:
+            _hoy_fest = nombre_festivo(ahora_local.date())
+            _man = ahora_local.date() + timedelta(days=1)
+            _man_fest = nombre_festivo(_man)
+            if _hoy_fest:
+                ctx_entrega += (
+                    f"\n🎌 HOY es día FESTIVO OFICIAL ({_hoy_fest}): la tienda NO trabaja físicamente "
+                    f"hoy (no se produce ni se entrega). Pero SÍ seguimos tomando pedidos EN LÍNEA. "
+                    f"Avísale al cliente con buena actitud, invítalo a apartar/confirmar hoy para "
+                    f"'hacer cola' y que su pedido salga más rápido en cuanto reabramos, y recuérdale "
+                    f"que aquí estamos pendientes. NO prometas entrega para hoy."
+                )
+            elif _man_fest:
+                ctx_entrega += (
+                    f"\n🎌 MAÑANA es día FESTIVO OFICIAL ({_man_fest}): mañana NO se trabaja "
+                    f"físicamente. Si aplica, avísale al cliente y anímalo a dejar su pedido hoy para "
+                    f"hacer cola y salir más rápido; seguimos tomando pedidos en línea. El cálculo de "
+                    f"entrega ya salta el festivo, así que da la fecha tal cual la calcula el sistema."
+                )
+        except Exception as e:
+            logger.error(f"Error contexto festivo: {e}")
         # Sucursal GUARDADA del cliente (para que no dé la cuenta/dirección equivocada aunque
         # la plática sea de otro día). Si ya se conoce, Clio DEBE usar esa sucursal.
         try:
