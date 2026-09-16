@@ -105,6 +105,48 @@ def nombre_festivo(fecha) -> str:
     return ""
 
 
+# Marcadores de SALUDO/AGRADECIMIENTO/DESPEDIDA.
+_MARCADORES_CORTESIA = [
+    "hola", "buenos dias", "buenas tardes", "buenas noches", "buen dia", "buena tarde",
+    "buena noche", "gracias", "saludos", "igualmente", "adios", "hasta luego", "hasta pronto",
+    "nos vemos", "que tenga", "que tengas", "excelente dia", "bonito dia", "feliz dia",
+    "bendiciones", "cuidate", "un abrazo", "con gusto", "para servirle",
+]
+# Señales de INTENCIÓN real (si aparecen, NO es cortesía vacía → Clio debe responder).
+_INTENCION = [
+    "precio", "cotiz", "cuanto", "cuánto", "quiero", "necesito", "medida", "lona", "vinil",
+    "tarjeta", "etiqueta", "playera", "diseño", "diseno", "pedido", "factura", "pago", "pagar",
+    "entrega", "cuando", "cuándo", "disponible", "coroplast", "microperf", "tabloide", "letras",
+    "neon", "neón", "banner", "sticker", "info", "informacion", "información", "ayuda", "duda",
+]
+
+
+def _es_cortesia(texto: str) -> bool:
+    """True si el mensaje es SOLO cortesía (saludo/gracias/despedida) SIN pedir nada."""
+    s = (texto or "").lower()
+    s = (s.replace("á", "a").replace("é", "e").replace("í", "i")
+           .replace("ó", "o").replace("ú", "u").replace("ü", "u"))
+    limpio = re.sub(r"[^a-zñ ]", " ", s)   # quita emojis, números y signos
+    palabras = [w for w in limpio.split() if w]
+    if not palabras:
+        return True   # solo emojis (👋🙏😊) → cortesía
+    if "?" in (texto or "") or any(k in s for k in _INTENCION):
+        return False  # pide algo → NO es cortesía vacía
+    tiene_marcador = any(mk in s for mk in _MARCADORES_CORTESIA)
+    return tiene_marcador and len(palabras) <= 8
+
+
+def _parece_bot(texto: str) -> bool:
+    """True si el mensaje delata que del otro lado hay un BOT / asistente automático."""
+    s = (texto or "").lower()
+    claves = [
+        "asistente virtual", "soy un bot", "soy un asistente", "chatbot",
+        "el asistente virtual del", "asistente del consultorio",
+        "no ofrecemos servicios de impresi", "puedo ayudarle con:", "¿en qué le puedo ayudar",
+    ]
+    return any(k in s for k in claves)
+
+
 def _horario_sucursal(sucursal: str):
     """(apertura, cierre L-V, cierre Sáb) de la sucursal. Todas abren 9."""
     if sucursal in ("Carmen", "Mérida"):
@@ -1311,6 +1353,20 @@ async def _procesar_mensaje(msg):
             await guardar_mensaje(msg.telefono, "user", msg.texto)
             logger.info(f"Modo humano activo para {msg.telefono} — Clio no responde")
             return
+
+        # ── ANTI-BUCLE de cortesías / otros bots ────────────────────────────
+        # Si el mensaje es SOLO cortesía/despedida y la ÚLTIMA respuesta de Clio también
+        # lo fue, NO respondemos: corta el ping-pong de "saludos/gracias" (sobre todo
+        # cuando del otro lado hay otro bot, ej. NUTRIOLI). No aplica al primer saludo
+        # (ahí no hay respuesta previa de Clio, así que Clio sí saluda).
+        try:
+            _ult_asis = next((h["content"] for h in reversed(historial) if h.get("role") == "assistant"), "")
+            if _ult_asis and _es_cortesia(msg.texto) and (_es_cortesia(_ult_asis) or _parece_bot(msg.texto)):
+                await guardar_mensaje(msg.telefono, "user", msg.texto)
+                logger.info(f"Anti-bucle cortesía/bot: Clio no responde a {msg.telefono}")
+                return
+        except Exception as e:
+            logger.error(f"Error anti-bucle cortesía: {e}")
 
         # Contexto de ENTREGA: si el cliente tiene un pedido con hora prometida, le
         # decimos a Clio si YA PASÓ (para "ya puedes pasar") o si aún falta.
