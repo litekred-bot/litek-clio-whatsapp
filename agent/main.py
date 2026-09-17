@@ -52,6 +52,11 @@ DEBOUNCE_SEGUNDOS = 6
 _diseno_primero_avisado: dict[str, datetime] = {}
 VENTANA_DISENO_PRIMERO_MIN = 120
 
+# Escalaciones ya avisadas al asesor ("telefono|area" → datetime), para NO mandar la MISMA
+# alerta del mismo cliente varias veces seguidas mientras se afinan medida/cantidad/detalles.
+_escalacion_avisada: dict[str, datetime] = {}
+VENTANA_ESCALACION_MIN = 90
+
 from agent.brain import generar_respuesta
 from agent.memory import (
     inicializar_db, guardar_mensaje, obtener_historial, registrar_ruleta, verificar_ruleta,
@@ -2013,6 +2018,18 @@ async def _procesar_mensaje(msg):
                 _ultima_imagen.pop(msg.telefono, None)
             except Exception as e:
                 logger.error(f"Error enviando pedido al asesor: {e}")
+
+        # Anti-duplicado: no reenviar la MISMA alerta del mismo cliente+área si ya se avisó
+        # hace poco (Clio a veces re-escala mientras el cliente afina medida/cantidad/uso).
+        if area_escalar:
+            _clave_esc = f"{tel_limpio}|{area_escalar}"
+            _ahora_esc = datetime.utcnow()
+            _prev_esc = _escalacion_avisada.get(_clave_esc)
+            if _prev_esc and (_ahora_esc - _prev_esc).total_seconds() < VENTANA_ESCALACION_MIN * 60:
+                logger.info(f"Escalación duplicada de {tel_limpio} ({area_escalar}) — no se reenvía la alerta")
+                area_escalar = None
+            else:
+                _escalacion_avisada[_clave_esc] = _ahora_esc
 
         # Enviar alerta al asesor si hay escalación
         if area_escalar:
